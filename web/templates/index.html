@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Sora:wght@400;500;600&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="/static/css/app.css" />
+  <link rel="stylesheet" href="/static/css/app.css?v={{ version }}" />
 </head>
 <body>
   <div class="atmosphere" aria-hidden="true"></div>
@@ -115,6 +115,6 @@
     <span>Deskline v{{ version }}</span>
     <span id="statusLine">…</span>
   </footer>
-  <script src="/static/js/app.js"></script>
+  <script src="/static/js/app.js?v={{ version }}"></script>
 </body>
 </html>

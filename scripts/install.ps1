@@ -65,6 +65,9 @@ Write-Host 'Installing dependencies...'
 @"
 @echo off
 cd /d "%~dp0"
+REM Prefer this install's package (.\deskline) over any other Deskline on the machine.
+set "PYTHONPATH=%~dp0"
+set "PYTHONNOUSERSITE=1"
 if exist "%~dp0venv\Scripts\pythonw.exe" (
   start "" "%~dp0venv\Scripts\pythonw.exe" -m deskline
 ) else (
@@ -75,10 +78,15 @@ if exist "%~dp0venv\Scripts\pythonw.exe" (
 # Silent VBS launcher (no console flash)
 @"
 Set sh = CreateObject("WScript.Shell")
-sh.CurrentDirectory = CreateObject("Scripting.FileSystemObject").GetParentFolderName(WScript.ScriptFullName)
-exe = sh.CurrentDirectory & "\venv\Scripts\pythonw.exe"
-If CreateObject("Scripting.FileSystemObject").FileExists(exe) = False Then
-  exe = sh.CurrentDirectory & "\venv\Scripts\python.exe"
+Dim fso, root
+Set fso = CreateObject("Scripting.FileSystemObject")
+root = fso.GetParentFolderName(WScript.ScriptFullName)
+sh.CurrentDirectory = root
+sh.Environment("PROCESS")("PYTHONPATH") = root
+sh.Environment("PROCESS")("PYTHONNOUSERSITE") = "1"
+exe = root & "\venv\Scripts\pythonw.exe"
+If fso.FileExists(exe) = False Then
+  exe = root & "\venv\Scripts\python.exe"
 End If
 sh.Run """" & exe & """ -m deskline", 0, False
 "@ | Set-Content -Path $LauncherVbs -Encoding ASCII
