@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from deskline.api import create_app
+from deskline.auth import set_password
 from deskline.db import Database
 from deskline.tracker import Tracker
 
@@ -10,6 +11,10 @@ def test_dashboard_index_ok(tmp_path, monkeypatch):
     monkeypatch.setattr("deskline.config.DB_PATH", tmp_path / "deskline.db")
     monkeypatch.setattr("deskline.config.SCREENSHOTS_DIR", tmp_path / "screenshots")
     monkeypatch.setattr("deskline.config.CONFIG_PATH", tmp_path / "config.json")
+    monkeypatch.setattr("deskline.auth.AUTH_PATH", tmp_path / "auth.json")
+    monkeypatch.setattr("deskline.capture.SCREENSHOTS_DIR", tmp_path / "screenshots")
+
+    set_password("test-pass")
 
     db = Database(tmp_path / "deskline.db")
     tracker = Tracker(db)
@@ -19,6 +24,7 @@ def test_dashboard_index_ok(tmp_path, monkeypatch):
     from fastapi.testclient import TestClient
 
     client = TestClient(app)
+    client.post("/api/auth/login", json={"password": "test-pass"})
     res = client.get("/")
     assert res.status_code == 200
     assert "Deskline" in res.text

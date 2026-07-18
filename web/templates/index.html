@@ -99,6 +99,19 @@
         </label>
         <button type="submit" class="btn">Сохранить</button>
       </form>
+      <form id="passwordForm" class="settings-form">
+        <h3 class="subhead">Пароль входа</h3>
+        <label>
+          Текущий пароль
+          <input type="password" name="current_password" autocomplete="current-password" required />
+        </label>
+        <label>
+          Новый пароль
+          <input type="password" name="new_password" autocomplete="new-password" required minlength="4" />
+        </label>
+        <button type="submit" class="btn">Сменить пароль</button>
+      </form>
+      <button type="button" class="btn" id="logoutBtn">Выйти из дашборда</button>
       <button type="button" class="btn" id="purgeShotsBtn">Удалить старые скриншоты сейчас</button>
       <button type="button" class="btn danger" id="clearBtn">Очистить все локальные данные</button>
       <p class="hint">Данные в %LOCALAPPDATA%\Deskline — никуда не загружаются.</p>

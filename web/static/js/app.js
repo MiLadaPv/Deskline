@@ -19,6 +19,10 @@ async function api(path, opts = {}) {
     headers: { "Content-Type": "application/json", ...(opts.headers || {}) },
     ...opts,
   });
+  if (res.status === 401 && !path.startsWith("/api/auth/")) {
+    location.href = "/login";
+    throw new Error("auth required");
+  }
   if (!res.ok) throw new Error(await res.text());
   if (res.status === 204) return null;
   return res.json();
@@ -232,6 +236,27 @@ function wireUi() {
     updateStorageHint({ screenshots_storage: result.screenshots_storage });
     await refreshShots();
     alert(`Удалено файлов: ${result.deleted_files || 0}`);
+  });
+
+  document.getElementById("passwordForm").addEventListener("submit", async (ev) => {
+    ev.preventDefault();
+    const form = ev.currentTarget;
+    const body = {
+      current_password: form.current_password.value,
+      new_password: form.new_password.value,
+    };
+    try {
+      await api("/api/auth/change-password", { method: "POST", body: JSON.stringify(body) });
+      form.reset();
+      alert("Пароль изменён");
+    } catch (e) {
+      alert("Не удалось сменить пароль. Проверьте текущий пароль.");
+    }
+  });
+
+  document.getElementById("logoutBtn").addEventListener("click", async () => {
+    await api("/api/auth/logout", { method: "POST" });
+    location.href = "/login";
   });
 
   document.getElementById("clearBtn").addEventListener("click", async () => {

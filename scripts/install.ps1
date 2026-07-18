@@ -119,7 +119,8 @@ function New-Shortcut {
     [string]$Path,
     [string]$Target,
     [string]$WorkDir,
-    [string]$Description
+    [string]$Description,
+    [string]$IconPath = $null
   )
   try {
     $dir = Split-Path -Parent $Path
@@ -133,6 +134,9 @@ function New-Shortcut {
     $s.WorkingDirectory = $WorkDir
     $s.WindowStyle = 7
     $s.Description = $Description
+    if ($IconPath -and (Test-Path $IconPath)) {
+      $s.IconLocation = "$IconPath,0"
+    }
     $s.Save()
     return $true
   } catch {
@@ -141,22 +145,28 @@ function New-Shortcut {
   }
 }
 
+$iconSrc = Join-Path $ProjectRoot 'assets\deskline.ico'
+$iconDst = Join-Path $InstallRoot 'deskline.ico'
+if (Test-Path $iconSrc) {
+  Copy-Item $iconSrc $iconDst -Force
+}
+
 $desktopCandidates = @(
   (Join-Path $env:USERPROFILE 'Desktop'),
   (Join-Path $env:USERPROFILE 'OneDrive\Desktop'),
+  (Join-Path $env:USERPROFILE 'OneDrive\Рабочий стол'),
   [Environment]::GetFolderPath('Desktop')
 ) | Where-Object { $_ -and (Test-Path $_) } | Select-Object -Unique
 
 $startMenu = Join-Path $env:APPDATA 'Microsoft\Windows\Start Menu\Programs'
 New-Item -ItemType Directory -Path $startMenu -Force | Out-Null
-New-Shortcut -Path (Join-Path $startMenu 'Deskline.lnk') -Target $LauncherVbs -WorkDir $InstallRoot -Description 'Deskline local productivity tracker' | Out-Null
+New-Shortcut -Path (Join-Path $startMenu 'Deskline.lnk') -Target $LauncherVbs -WorkDir $InstallRoot -Description 'Deskline — личный трекер времени' -IconPath $iconDst | Out-Null
 
 $desktopOk = $false
 foreach ($desktop in $desktopCandidates) {
-  if (New-Shortcut -Path (Join-Path $desktop 'Deskline.lnk') -Target $LauncherVbs -WorkDir $InstallRoot -Description 'Deskline local productivity tracker') {
+  if (New-Shortcut -Path (Join-Path $desktop 'Deskline.lnk') -Target $LauncherVbs -WorkDir $InstallRoot -Description 'Deskline — личный трекер времени' -IconPath $iconDst) {
     Write-Host "Desktop shortcut: $desktop\Deskline.lnk"
     $desktopOk = $true
-    break
   }
 }
 if (-not $desktopOk) {

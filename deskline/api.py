@@ -3,15 +3,27 @@ from __future__ import annotations
 import webbrowser
 from datetime import date, datetime, timedelta
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
-from fastapi import FastAPI, HTTPException, Query, Request
-from fastapi.responses import FileResponse, HTMLResponse
+from fastapi import FastAPI, HTTPException, Query, Request, Response
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel, Field
+from starlette.middleware.base import BaseHTTPMiddleware
 
 from deskline import __version__
+from deskline.auth import (
+    COOKIE_NAME,
+    SESSION_TTL_SEC,
+    change_password,
+    create_session_token,
+    is_password_set,
+    is_public_path,
+    set_password,
+    validate_session_token,
+    verify_password,
+)
 from deskline.capture import screenshots_storage_info
 from deskline.config import (
     APP_NAME,
@@ -42,16 +54,120 @@ class RuleUpdate(BaseModel):
     category: str = Field(pattern="^(productive|neutral|distracting)$")
 
 
+class PasswordBody(BaseModel):
+    password: str = Field(min_length=4, max_length=128)
+
+
+class ChangePasswordBody(BaseModel):
+    current_password: str = Field(min_length=1, max_length=128)
+    new_password: str = Field(min_length=4, max_length=128)
+
+
+def _set_session_cookie(response: Response, token: str) -> None:
+    response.set_cookie(
+        key=COOKIE_NAME,
+        value=token,
+        httponly=True,
+        samesite="strict",
+        max_age=SESSION_TTL_SEC,
+        path="/",
+    )
+
+
+def _clear_session_cookie(response: Response) -> None:
+    response.delete_cookie(COOKIE_NAME, path="/")
+
+
+class AuthMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next: Callable):
+        path = request.url.path
+        if is_public_path(path):
+            return await call_next(request)
+
+        token = request.cookies.get(COOKIE_NAME)
+        authed = validate_session_token(token)
+        password_ready = is_password_set()
+
+        if not password_ready:
+            if path.startswith("/api/"):
+                return JSONResponse({"detail": "password setup required"}, status_code=401)
+            return RedirectResponse(url="/login", status_code=303)
+
+        if not authed:
+            if path.startswith("/api/") or path.startswith("/media/"):
+                return JSONResponse({"detail": "authentication required"}, status_code=401)
+            return RedirectResponse(url="/login", status_code=303)
+
+        return await call_next(request)
+
+
 def create_app(tracker: Tracker, db: Database | None = None) -> FastAPI:
     db = db or tracker.db
     app = FastAPI(title=APP_NAME, version=__version__)
     templates = Jinja2Templates(directory=str(WEB_ROOT / "templates"))
     app.mount("/static", StaticFiles(directory=str(WEB_ROOT / "static")), name="static")
+    app.add_middleware(AuthMiddleware)
 
     def _range(from_s: str | None, to_s: str | None) -> tuple[datetime, datetime]:
         end = datetime.fromisoformat(to_s) if to_s else datetime.now().astimezone()
         start = datetime.fromisoformat(from_s) if from_s else end - timedelta(days=1)
         return start, end
+
+    @app.get("/login", response_class=HTMLResponse)
+    def login_page(request: Request) -> HTMLResponse:
+        return templates.TemplateResponse(
+            request,
+            "login.html",
+            {"app_name": APP_NAME, "version": __version__},
+        )
+
+    @app.get("/api/auth/status")
+    def auth_status(request: Request) -> dict[str, Any]:
+        token = request.cookies.get(COOKIE_NAME)
+        return {
+            "password_set": is_password_set(),
+            "authenticated": validate_session_token(token),
+        }
+
+    @app.post("/api/auth/setup")
+    def auth_setup(body: PasswordBody) -> Response:
+        if is_password_set():
+            raise HTTPException(400, "password already set")
+        try:
+            set_password(body.password)
+        except ValueError as exc:
+            raise HTTPException(400, str(exc)) from exc
+        token = create_session_token()
+        response = JSONResponse({"ok": True})
+        _set_session_cookie(response, token)
+        return response
+
+    @app.post("/api/auth/login")
+    def auth_login(body: PasswordBody) -> Response:
+        if not is_password_set():
+            raise HTTPException(400, "password not set")
+        if not verify_password(body.password):
+            raise HTTPException(401, "Неверный пароль")
+        token = create_session_token()
+        response = JSONResponse({"ok": True})
+        _set_session_cookie(response, token)
+        return response
+
+    @app.post("/api/auth/logout")
+    def auth_logout() -> Response:
+        response = JSONResponse({"ok": True})
+        _clear_session_cookie(response)
+        return response
+
+    @app.post("/api/auth/change-password")
+    def auth_change_password(body: ChangePasswordBody) -> dict[str, bool]:
+        try:
+            change_password(body.current_password, body.new_password)
+        except PermissionError as exc:
+            raise HTTPException(401, "Неверный текущий пароль") from exc
+        except ValueError as exc:
+            raise HTTPException(400, str(exc)) from exc
+        return {"ok": True}
 
     @app.get("/", response_class=HTMLResponse)
     def index(request: Request) -> HTMLResponse:
