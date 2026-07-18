@@ -91,6 +91,14 @@ def create_app(tracker: Tracker, db: Database | None = None) -> FastAPI:
         start, end = _range(from_ts, to)
         return db.sites_range(start, end)
 
+    @app.get("/api/activities")
+    def activities(
+        from_ts: str | None = Query(default=None, alias="from"),
+        to: str | None = None,
+    ) -> list[dict[str, Any]]:
+        start, end = _range(from_ts, to)
+        return db.activities_range(start, end)
+
     @app.get("/api/screenshots")
     def screenshots(day: str | None = None) -> list[dict[str, Any]]:
         d = date.fromisoformat(day) if day else date.today()

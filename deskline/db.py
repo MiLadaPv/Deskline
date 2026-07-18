@@ -7,6 +7,7 @@ from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Any, Iterator
 
+from deskline.classify import display_name_for_app, is_system_noise, resolve_activity
 from deskline.config import DB_PATH, ensure_data_dirs
 
 
@@ -34,6 +35,9 @@ class SessionRow:
     ended_at: str | None
     duration_sec: float
     category: str
+    display_name: str | None = None
+    activity_kind: str | None = None
+    activity_label: str | None = None
 
 
 class Database:
@@ -69,7 +73,10 @@ class Database:
                     started_at TEXT NOT NULL,
                     ended_at TEXT,
                     duration_sec REAL NOT NULL DEFAULT 0,
-                    category TEXT NOT NULL DEFAULT 'neutral'
+                    category TEXT NOT NULL DEFAULT 'neutral',
+                    display_name TEXT,
+                    activity_kind TEXT,
+                    activity_label TEXT
                 );
                 CREATE INDEX IF NOT EXISTS idx_sessions_started ON sessions(started_at);
                 CREATE INDEX IF NOT EXISTS idx_sessions_app ON sessions(app_name);
@@ -95,6 +102,14 @@ class Database:
                 );
                 """
             )
+            cols = {r[1] for r in conn.execute("PRAGMA table_info(sessions)").fetchall()}
+            for col, decl in (
+                ("display_name", "TEXT"),
+                ("activity_kind", "TEXT"),
+                ("activity_label", "TEXT"),
+            ):
+                if col not in cols:
+                    conn.execute(f"ALTER TABLE sessions ADD COLUMN {col} {decl}")
 
     def get_app_rules(self) -> dict[str, str]:
         with self.connect() as conn:
@@ -133,15 +148,30 @@ class Database:
         url_hint: str | None,
         category: str,
         started_at: datetime | None = None,
+        display_name: str | None = None,
+        activity_kind: str | None = None,
+        activity_label: str | None = None,
     ) -> int:
         started = started_at or _utcnow()
         with self.connect() as conn:
             cur = conn.execute(
                 """
-                INSERT INTO sessions(app_name, window_title, url_hint, started_at, category)
-                VALUES (?, ?, ?, ?, ?)
+                INSERT INTO sessions(
+                    app_name, window_title, url_hint, started_at, category,
+                    display_name, activity_kind, activity_label
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                 """,
-                (app_name, window_title or "", url_hint, _iso(started), category),
+                (
+                    app_name,
+                    window_title or "",
+                    url_hint,
+                    _iso(started),
+                    category,
+                    display_name,
+                    activity_kind,
+                    activity_label,
+                ),
             )
             return int(cur.lastrowid)
 
@@ -182,6 +212,7 @@ class Database:
         return self._session(row) if row else None
 
     def _session(self, row: sqlite3.Row) -> SessionRow:
+        keys = row.keys()
         return SessionRow(
             id=row["id"],
             app_name=row["app_name"],
@@ -191,7 +222,36 @@ class Database:
             ended_at=row["ended_at"],
             duration_sec=float(row["duration_sec"] or 0),
             category=row["category"],
+            display_name=row["display_name"] if "display_name" in keys else None,
+            activity_kind=row["activity_kind"] if "activity_kind" in keys else None,
+            activity_label=row["activity_label"] if "activity_label" in keys else None,
         )
+
+    def _enrich(self, row: sqlite3.Row) -> dict[str, Any]:
+        keys = set(row.keys())
+        app = row["app_name"]
+        title = row["window_title"]
+        site = row["url_hint"]
+        display = row["display_name"] if "display_name" in keys else None
+        kind = row["activity_kind"] if "activity_kind" in keys else None
+        label = row["activity_label"] if "activity_label" in keys else None
+        cat = row["category"]
+        if not display or not label or not kind:
+            resolved = resolve_activity(app, title, site)
+            display = display or resolved["display_name"]
+            kind = kind or resolved["activity_kind"]
+            label = label or resolved["activity_label"]
+            cat = cat or resolved["category"]
+        hidden = is_system_noise(app) or kind == "system"
+        return {
+            "app_name": app,
+            "display_name": display or display_name_for_app(app),
+            "activity_kind": kind or "other",
+            "activity_label": label or display_name_for_app(app),
+            "category": cat or "neutral",
+            "url_hint": site,
+            "hidden": hidden,
+        }
 
     def summary_for_day(self, day: date | None = None) -> dict[str, Any]:
         day = day or date.today()
@@ -213,7 +273,10 @@ class Database:
         by_cat = {"productive": 0.0, "neutral": 0.0, "distracting": 0.0}
         by_app: dict[str, float] = {}
         by_site: dict[str, float] = {}
+        by_activity: dict[str, float] = {}
+        by_kind: dict[str, float] = {}
         total = 0.0
+        tracked = 0.0
         now = _utcnow()
 
         for row in rows:
@@ -225,21 +288,36 @@ class Database:
             if dur <= 0:
                 continue
             total += dur
-            cat = row["category"] if row["category"] in by_cat else "neutral"
+            meta = self._enrich(row)
+            if meta["hidden"]:
+                continue
+            tracked += dur
+            cat = meta["category"] if meta["category"] in by_cat else "neutral"
             by_cat[cat] += dur
-            app = row["app_name"] or "unknown"
-            by_app[app] = by_app.get(app, 0.0) + dur
-            site = row["url_hint"]
+            app_label = meta["display_name"]
+            by_app[app_label] = by_app.get(app_label, 0.0) + dur
+            act = meta["activity_label"]
+            by_activity[act] = by_activity.get(act, 0.0) + dur
+            kind = meta["activity_kind"]
+            by_kind[kind] = by_kind.get(kind, 0.0) + dur
+            site = meta["url_hint"]
             if site:
                 by_site[site] = by_site.get(site, 0.0) + dur
 
         focus = by_cat["productive"]
-        focus_pct = (focus / total * 100.0) if total else 0.0
+        focus_pct = (focus / tracked * 100.0) if tracked else 0.0
         return {
-            "total_sec": total,
+            "total_sec": tracked,
+            "raw_total_sec": total,
             "focus_sec": focus,
             "focus_pct": round(focus_pct, 1),
             "by_category": by_cat,
+            "by_kind": by_kind,
+            "by_activity": sorted(
+                [{"name": k, "sec": v} for k, v in by_activity.items()],
+                key=lambda x: x["sec"],
+                reverse=True,
+            ),
             "by_app": sorted(
                 [{"name": k, "sec": v} for k, v in by_app.items()],
                 key=lambda x: x["sec"],
@@ -257,6 +335,9 @@ class Database:
 
     def sites_range(self, start: datetime, end: datetime) -> list[dict[str, Any]]:
         return self.summary_range(start, end)["by_site"]
+
+    def activities_range(self, start: datetime, end: datetime) -> list[dict[str, Any]]:
+        return self.summary_range(start, end)["by_activity"]
 
     def screenshots_for_date(self, day: date | None = None) -> list[dict[str, Any]]:
         day = day or date.today()

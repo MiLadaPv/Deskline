@@ -187,10 +187,10 @@ main {
 .panel { display: none; animation: rise 0.45s ease both; }
 .panel.active { display: block; }
 
-h2 {
-  margin: 0 0 18px;
+.subhead {
+  margin: 28px 0 12px;
   font-family: var(--display);
-  font-size: 1.8rem;
+  font-size: 1.25rem;
   font-weight: 600;
 }
 

@@ -5,7 +5,7 @@ import time
 from typing import Callable
 
 from deskline.capture import capture_screenshot
-from deskline.classify import classify, extract_site_from_title
+from deskline.classify import extract_site_from_title, resolve_activity
 from deskline.config import load_config, save_config
 from deskline.db import Database
 from deskline.windows import get_active_window
@@ -36,12 +36,19 @@ class Tracker:
         self._status_listeners.append(cb)
 
     def status(self) -> dict:
+        current_app = self._current_key[0] if self._current_key else None
+        current_title = self._current_key[1] if self._current_key else None
+        label = None
+        if current_app:
+            meta = resolve_activity(current_app, current_title)
+            label = meta.get("activity_label") or meta.get("display_name")
         return {
             "paused": self.paused,
             "recording": not self.paused and self._thread is not None and self._thread.is_alive(),
             "current_session_id": self._current_session_id,
-            "current_app": self._current_key[0] if self._current_key else None,
-            "current_title": self._current_key[1] if self._current_key else None,
+            "current_app": current_app,
+            "current_title": current_title,
+            "current_label": label,
         }
 
     def _emit(self) -> None:
@@ -110,8 +117,9 @@ class Tracker:
             if switched:
                 self._close_current_unlocked()
                 site = extract_site_from_title(win.window_title, win.app_name)
-                category = classify(
+                meta = resolve_activity(
                     win.app_name,
+                    win.window_title,
                     site,
                     self.db.get_app_rules(),
                     self.db.get_site_rules(),
@@ -119,8 +127,11 @@ class Tracker:
                 self._current_session_id = self.db.start_session(
                     app_name=win.app_name,
                     window_title=win.window_title,
-                    url_hint=site,
-                    category=category,
+                    url_hint=meta.get("url_hint") or site,
+                    category=meta["category"],
+                    display_name=meta["display_name"],
+                    activity_kind=meta["activity_kind"],
+                    activity_label=meta["activity_label"],
                 )
                 self._current_key = key
                 if cfg.get("screenshots_enabled") and cfg.get("screenshot_on_app_switch"):

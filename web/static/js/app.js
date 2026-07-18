@@ -2,8 +2,8 @@ const fmtDur = (sec) => {
   sec = Math.max(0, Math.round(sec || 0));
   const h = Math.floor(sec / 3600);
   const m = Math.floor((sec % 3600) / 60);
-  if (h > 0) return `${h}h ${m}m`;
-  return `${m}m`;
+  if (h > 0) return `${h}ч ${m}м`;
+  return `${m}м`;
 };
 
 async function api(path, opts = {}) {
@@ -27,9 +27,9 @@ function setActiveTab(name) {
 
 function renderBars(byCategory, total) {
   const order = [
-    ["productive", "Focus"],
-    ["neutral", "Neutral"],
-    ["distracting", "Drift"],
+    ["productive", "Фокус"],
+    ["neutral", "Нейтрально"],
+    ["distracting", "Отвлечения"],
   ];
   const el = document.getElementById("catBars");
   el.innerHTML = order
@@ -43,7 +43,6 @@ function renderBars(byCategory, total) {
       </div>`;
     })
     .join("");
-  // trigger width animation
   requestAnimationFrame(() => {
     el.querySelectorAll(".bar > span").forEach((s) => {
       const w = s.style.width;
@@ -55,13 +54,13 @@ function renderBars(byCategory, total) {
   });
 }
 
-function renderList(el, rows) {
+function renderList(el, rows, emptyText) {
   if (!rows.length) {
-    el.innerHTML = `<li><span class="rank-name">No data yet</span><span class="rank-meta">Keep Deskline running</span></li>`;
+    el.innerHTML = `<li><span class="rank-name">${emptyText || "Пока нет данных"}</span><span class="rank-meta">Оставьте Deskline включённым</span></li>`;
     return;
   }
   el.innerHTML = rows
-    .slice(0, 12)
+    .slice(0, 15)
     .map(
       (r) => `<li>
         <span class="rank-name">${escapeHtml(r.name)}</span>
@@ -82,29 +81,33 @@ function escapeHtml(s) {
 async function refreshSummary() {
   const summary = await api("/api/summary/today");
   document.getElementById("focusValue").textContent = `${summary.focus_pct}%`;
-  document.getElementById("focusSub").textContent = `${fmtDur(summary.focus_sec)} of ${fmtDur(summary.total_sec)} tracked`;
+  document.getElementById("focusSub").textContent = `${fmtDur(summary.focus_sec)} из ${fmtDur(summary.total_sec)}`;
   renderBars(summary.by_category, summary.total_sec);
-  renderList(document.getElementById("topAppsToday"), summary.by_app);
-  renderList(document.getElementById("appsList"), summary.by_app);
-  renderList(document.getElementById("sitesList"), summary.by_site);
+  const activities = summary.by_activity || [];
+  renderList(document.getElementById("topAppsToday"), activities, "Занятий пока нет");
+  renderList(document.getElementById("activitiesList"), activities, "Занятий пока нет");
+  renderList(document.getElementById("appsList"), summary.by_app || [], "Приложений пока нет");
+  renderList(document.getElementById("sitesList"), summary.by_site || [], "Сайтов пока нет");
 }
 
 async function refreshStatus() {
   const st = await api("/api/status");
   const btn = document.getElementById("toggleBtn");
-  btn.textContent = st.paused ? "Resume" : "Pause";
+  btn.textContent = st.paused ? "Продолжить" : "Пауза";
   btn.dataset.paused = st.paused ? "1" : "0";
-  const app = st.current_app ? ` · ${st.current_app}` : "";
+  const label = st.current_label || st.current_app || "";
   document.getElementById("statusLine").textContent = st.paused
-    ? "Paused"
-    : `Recording${app}`;
+    ? "Пауза"
+    : label
+      ? `Запись · ${label}`
+      : "Запись";
 }
 
 async function refreshShots() {
   const rows = await api("/api/screenshots");
   const grid = document.getElementById("shotsGrid");
   if (!rows.length) {
-    grid.innerHTML = `<p class="hint">No screenshots today.</p>`;
+    grid.innerHTML = `<p class="hint">Сегодня скриншотов нет.</p>`;
     return;
   }
   grid.innerHTML = rows
@@ -153,11 +156,11 @@ function wireUi() {
       autostart: form.autostart.checked,
     };
     await api("/api/settings", { method: "PUT", body: JSON.stringify(body) });
-    alert("Settings saved");
+    alert("Сохранено");
   });
 
   document.getElementById("clearBtn").addEventListener("click", async () => {
-    if (!confirm("Delete all local sessions and screenshot records?")) return;
+    if (!confirm("Удалить все локальные сессии и записи скриншотов?")) return;
     await api("/api/data/clear", { method: "POST" });
     await refreshSummary();
     await refreshShots();
@@ -175,5 +178,5 @@ async function boot() {
 
 boot().catch((err) => {
   console.error(err);
-  document.getElementById("focusSub").textContent = "Failed to load";
+  document.getElementById("focusSub").textContent = "Ошибка загрузки";
 });
