@@ -37,23 +37,27 @@ function New-DesklineShortcut {
 
 $icon = if (Test-Path $IconDst) { $IconDst } else { $null }
 
-$desktopCandidates = @(
+$desktopCandidates = New-Object System.Collections.Generic.List[string]
+foreach ($p in @(
   (Join-Path $env:USERPROFILE 'Desktop'),
   (Join-Path $env:USERPROFILE 'OneDrive\Desktop'),
-  (Join-Path $env:USERPROFILE 'OneDrive\Rabochiy stol')
-)
-# Also resolve localized OneDrive Desktop folder if present
+  [Environment]::GetFolderPath('Desktop')
+)) {
+  if ($p -and (Test-Path $p)) { [void]$desktopCandidates.Add($p) }
+}
+
 $od = Join-Path $env:USERPROFILE 'OneDrive'
 if (Test-Path $od) {
-  Get-ChildItem $od -Directory -ErrorAction SilentlyContinue | Where-Object {
-    $_.Name -match 'Desktop|stol|Стол|стол'
-  } | ForEach-Object {
-    $desktopCandidates += $_.FullName
+  Get-ChildItem -LiteralPath $od -Directory -ErrorAction SilentlyContinue | ForEach-Object {
+    $hasDeskline = Test-Path (Join-Path $_.FullName 'Deskline.lnk')
+    $looksDesktop = $_.Name -like '*Desktop*' -or $_.Name -like '*desk*'
+    if ($hasDeskline -or $looksDesktop) {
+      [void]$desktopCandidates.Add($_.FullName)
+    }
   }
 }
-$desktopCandidates += [Environment]::GetFolderPath('Desktop')
-$desktopCandidates = $desktopCandidates | Where-Object { $_ -and (Test-Path $_) } | Select-Object -Unique
 
+$desktopCandidates = $desktopCandidates | Select-Object -Unique
 foreach ($desktop in $desktopCandidates) {
   New-DesklineShortcut -Path (Join-Path $desktop 'Deskline.lnk') -Icon $icon
 }
