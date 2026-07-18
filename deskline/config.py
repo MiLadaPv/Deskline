@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import sys
 from copy import deepcopy
 from pathlib import Path
 from typing import Any
@@ -11,7 +12,16 @@ PORT = 8787
 BASE_URL = f"http://{HOST}:{PORT}"
 
 PACKAGE_ROOT = Path(__file__).resolve().parent
-PROJECT_ROOT = PACKAGE_ROOT.parent
+
+
+def _project_root() -> Path:
+    # PyInstaller onedir/onefile extracts/bundles resources here
+    if getattr(sys, "frozen", False) and hasattr(sys, "_MEIPASS"):
+        return Path(sys._MEIPASS)
+    return PACKAGE_ROOT.parent
+
+
+PROJECT_ROOT = _project_root()
 WEB_ROOT = PROJECT_ROOT / "web"
 
 DATA_ROOT = Path.home() / "AppData" / "Local" / "Deskline"

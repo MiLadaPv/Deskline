@@ -1,0 +1,5 @@
+"""PyInstaller entrypoint for Deskline."""
+from deskline.main import main
+
+if __name__ == "__main__":
+    raise SystemExit(main())

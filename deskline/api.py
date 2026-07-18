@@ -158,9 +158,12 @@ def _set_autostart(enabled: bool) -> None:
         if enabled:
             import sys
 
-            pythonw = Path(sys.executable).with_name("pythonw.exe")
-            exe = str(pythonw if pythonw.exists() else sys.executable)
-            cmd = f'"{exe}" -m deskline --no-browser'
+            if getattr(sys, "frozen", False):
+                cmd = f'"{sys.executable}" --no-browser'
+            else:
+                pythonw = Path(sys.executable).with_name("pythonw.exe")
+                exe = str(pythonw if pythonw.exists() else sys.executable)
+                cmd = f'"{exe}" -m deskline --no-browser'
             winreg.SetValueEx(key, name, 0, winreg.REG_SZ, cmd)
         else:
             try:
