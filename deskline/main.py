@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import signal
+import sys
 import threading
 
 import uvicorn
@@ -47,13 +48,16 @@ def main(argv: list[str] | None = None) -> int:
         signal.signal(signal.SIGTERM, handle_signal)
 
     if not args.no_tray:
-        start_tray(
-            get_status=tracker.status,
-            on_pause=tracker.pause,
-            on_resume=tracker.resume,
-            on_open=open_dashboard,
-            on_quit=shutdown,
-        )
+        try:
+            start_tray(
+                get_status=tracker.status,
+                on_pause=tracker.pause,
+                on_resume=tracker.resume,
+                on_open=open_dashboard,
+                on_quit=shutdown,
+            )
+        except Exception as exc:  # noqa: BLE001
+            print(f"Tray unavailable, continuing without it: {exc}", file=sys.stderr)
 
     cfg = load_config()
     if cfg.get("open_dashboard_on_start") and not args.no_browser:

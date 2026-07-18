@@ -16,17 +16,29 @@ Local-first Windows productivity tracker. Your activity stays on your PC — no 
 - Dashboard binds to `127.0.0.1:8787` only
 - Autostart is off by default and uses a normal Run key named `Deskline`
 
-## Setup
+## Install (recommended)
+
+Double-click **`install.bat`**.
+
+This will:
+- install Deskline into `%LOCALAPPDATA%\Programs\Deskline`
+- create its own Python virtual environment
+- add a **Desktop** shortcut and a **Start Menu** item named `Deskline`
+- launch the app
+
+Uninstall: double-click **`uninstall.bat`**.
+
+## Run without installer
 
 ```bat
 cd /d D:\Projects\Deskline
 python -m pip install -r requirements.txt
-python -m deskline
+Deskline.bat
 ```
 
-Or double-click `start.bat`.
+Or: `start.bat` / `python -m deskline`
 
-Open http://127.0.0.1:8787 if the browser does not open.
+Dashboard: http://127.0.0.1:8787
 
 ## Controls
 
