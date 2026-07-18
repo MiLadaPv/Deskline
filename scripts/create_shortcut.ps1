@@ -1,8 +1,4 @@
 #Requires -Version 5.1
-<#
-.SYNOPSIS
-  Create / refresh Deskline desktop and Start Menu shortcuts with icon.
-#>
 $ErrorActionPreference = 'Stop'
 
 $InstallRoot = Join-Path $env:LOCALAPPDATA 'Programs\Deskline'
@@ -31,7 +27,7 @@ function New-DesklineShortcut {
   $s.Arguments = '"' + $LauncherVbs + '"'
   $s.WorkingDirectory = $InstallRoot
   $s.WindowStyle = 7
-  $s.Description = 'Deskline — личный трекер времени'
+  $s.Description = 'Deskline local productivity tracker'
   if ($Icon -and (Test-Path $Icon)) {
     $s.IconLocation = "$Icon,0"
   }
@@ -44,9 +40,19 @@ $icon = if (Test-Path $IconDst) { $IconDst } else { $null }
 $desktopCandidates = @(
   (Join-Path $env:USERPROFILE 'Desktop'),
   (Join-Path $env:USERPROFILE 'OneDrive\Desktop'),
-  (Join-Path $env:USERPROFILE 'OneDrive\Рабочий стол'),
-  [Environment]::GetFolderPath('Desktop')
-) | Where-Object { $_ -and (Test-Path $_) } | Select-Object -Unique
+  (Join-Path $env:USERPROFILE 'OneDrive\Rabochiy stol')
+)
+# Also resolve localized OneDrive Desktop folder if present
+$od = Join-Path $env:USERPROFILE 'OneDrive'
+if (Test-Path $od) {
+  Get-ChildItem $od -Directory -ErrorAction SilentlyContinue | Where-Object {
+    $_.Name -match 'Desktop|stol|Стол|стол'
+  } | ForEach-Object {
+    $desktopCandidates += $_.FullName
+  }
+}
+$desktopCandidates += [Environment]::GetFolderPath('Desktop')
+$desktopCandidates = $desktopCandidates | Where-Object { $_ -and (Test-Path $_) } | Select-Object -Unique
 
 foreach ($desktop in $desktopCandidates) {
   New-DesklineShortcut -Path (Join-Path $desktop 'Deskline.lnk') -Icon $icon
