@@ -6,6 +6,14 @@ const fmtDur = (sec) => {
   return `${m}м`;
 };
 
+const fmtBytes = (n) => {
+  n = Math.max(0, Number(n) || 0);
+  if (n < 1024) return `${n} Б`;
+  if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} КБ`;
+  if (n < 1024 * 1024 * 1024) return `${(n / (1024 * 1024)).toFixed(1)} МБ`;
+  return `${(n / (1024 * 1024 * 1024)).toFixed(2)} ГБ`;
+};
+
 async function api(path, opts = {}) {
   const res = await fetch(path, {
     headers: { "Content-Type": "application/json", ...(opts.headers || {}) },
@@ -78,6 +86,36 @@ function escapeHtml(s) {
     .replaceAll('"', "&quot;");
 }
 
+function updateStorageHint(cfg) {
+  const el = document.getElementById("shotsStorageHint");
+  if (!el) return;
+  const storage = cfg.screenshots_storage || {};
+  const path = cfg.screenshots_path || storage.path || "%LOCALAPPDATA%\\Deskline\\screenshots";
+  const count = storage.count ?? 0;
+  const bytes = storage.bytes ?? 0;
+  el.textContent = `Папка: ${path} · ${count} файл(ов), ${fmtBytes(bytes)}`;
+}
+
+function openLightbox(url, caption) {
+  const box = document.getElementById("shotLightbox");
+  const img = document.getElementById("lightboxImg");
+  const cap = document.getElementById("lightboxCaption");
+  img.src = url;
+  img.alt = caption || "Скриншот";
+  cap.textContent = caption || "";
+  box.hidden = false;
+  document.body.style.overflow = "hidden";
+  document.getElementById("lightboxClose").focus();
+}
+
+function closeLightbox() {
+  const box = document.getElementById("shotLightbox");
+  if (box.hidden) return;
+  box.hidden = true;
+  document.getElementById("lightboxImg").removeAttribute("src");
+  document.body.style.overflow = "";
+}
+
 async function refreshSummary() {
   const summary = await api("/api/summary/today");
   document.getElementById("focusValue").textContent = `${summary.focus_pct}%`;
@@ -112,10 +150,13 @@ async function refreshShots() {
   }
   grid.innerHTML = rows
     .map(
-      (r) => `<figure class="shot">
-        <img src="${r.url}" alt="screenshot" loading="lazy" />
-        <figcaption>${escapeHtml(r.taken_at)} · ${escapeHtml(r.reason)}</figcaption>
-      </figure>`
+      (r) => {
+        const caption = `${r.taken_at} · ${r.reason}`;
+        return `<figure class="shot" tabindex="0" role="button" data-url="${escapeHtml(r.url)}" data-caption="${escapeHtml(caption)}">
+        <img src="${escapeHtml(r.url)}" alt="screenshot" loading="lazy" />
+        <figcaption>${escapeHtml(caption)}</figcaption>
+      </figure>`;
+      }
     )
     .join("");
 }
@@ -126,8 +167,10 @@ async function loadSettings() {
   form.screenshot_interval_sec.value = cfg.screenshot_interval_sec;
   form.screenshots_enabled.checked = !!cfg.screenshots_enabled;
   form.screenshot_on_app_switch.checked = !!cfg.screenshot_on_app_switch;
+  form.screenshot_retention_days.value = cfg.screenshot_retention_days ?? 7;
   form.open_dashboard_on_start.checked = !!cfg.open_dashboard_on_start;
   form.autostart.checked = !!cfg.autostart;
+  updateStorageHint(cfg);
 }
 
 function wireUi() {
@@ -145,6 +188,28 @@ function wireUi() {
     await refreshStatus();
   });
 
+  const shotsGrid = document.getElementById("shotsGrid");
+  shotsGrid.addEventListener("click", (ev) => {
+    const shot = ev.target.closest(".shot");
+    if (!shot) return;
+    openLightbox(shot.dataset.url, shot.dataset.caption);
+  });
+  shotsGrid.addEventListener("keydown", (ev) => {
+    if (ev.key !== "Enter" && ev.key !== " ") return;
+    const shot = ev.target.closest(".shot");
+    if (!shot) return;
+    ev.preventDefault();
+    openLightbox(shot.dataset.url, shot.dataset.caption);
+  });
+
+  document.getElementById("lightboxClose").addEventListener("click", closeLightbox);
+  document.getElementById("shotLightbox").addEventListener("click", (ev) => {
+    if (ev.target.id === "shotLightbox") closeLightbox();
+  });
+  document.addEventListener("keydown", (ev) => {
+    if (ev.key === "Escape") closeLightbox();
+  });
+
   document.getElementById("settingsForm").addEventListener("submit", async (ev) => {
     ev.preventDefault();
     const form = ev.currentTarget;
@@ -152,11 +217,21 @@ function wireUi() {
       screenshot_interval_sec: Number(form.screenshot_interval_sec.value),
       screenshots_enabled: form.screenshots_enabled.checked,
       screenshot_on_app_switch: form.screenshot_on_app_switch.checked,
+      screenshot_retention_days: Number(form.screenshot_retention_days.value),
       open_dashboard_on_start: form.open_dashboard_on_start.checked,
       autostart: form.autostart.checked,
     };
-    await api("/api/settings", { method: "PUT", body: JSON.stringify(body) });
+    const saved = await api("/api/settings", { method: "PUT", body: JSON.stringify(body) });
+    updateStorageHint(saved);
     alert("Сохранено");
+  });
+
+  document.getElementById("purgeShotsBtn").addEventListener("click", async () => {
+    if (!confirm("Удалить скриншоты старше срока хранения из настроек?")) return;
+    const result = await api("/api/screenshots/purge", { method: "POST" });
+    updateStorageHint({ screenshots_storage: result.screenshots_storage });
+    await refreshShots();
+    alert(`Удалено файлов: ${result.deleted_files || 0}`);
   });
 
   document.getElementById("clearBtn").addEventListener("click", async () => {
@@ -164,6 +239,7 @@ function wireUi() {
     await api("/api/data/clear", { method: "POST" });
     await refreshSummary();
     await refreshShots();
+    await loadSettings();
   });
 }
 

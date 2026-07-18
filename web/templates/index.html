@@ -64,6 +64,7 @@
 
     <section id="panel-shots" class="panel">
       <h2>Скриншоты</h2>
+      <p class="hint">Нажмите на миниатюру, чтобы открыть крупно. Файлы только на этом ПК.</p>
       <div class="shots-grid" id="shotsGrid"></div>
     </section>
 
@@ -82,6 +83,12 @@
           <input type="checkbox" name="screenshot_on_app_switch" />
           Скриншот при смене приложения
         </label>
+        <label>
+          Хранить скриншоты (дней)
+          <input type="number" name="screenshot_retention_days" min="0" max="3650" step="1" />
+        </label>
+        <p class="hint">0 = не удалять автоматически. По умолчанию 7 дней.</p>
+        <p class="hint" id="shotsStorageHint">Папка скриншотов…</p>
         <label class="check">
           <input type="checkbox" name="open_dashboard_on_start" />
           Открывать дашборд при запуске
@@ -92,10 +99,17 @@
         </label>
         <button type="submit" class="btn">Сохранить</button>
       </form>
+      <button type="button" class="btn" id="purgeShotsBtn">Удалить старые скриншоты сейчас</button>
       <button type="button" class="btn danger" id="clearBtn">Очистить все локальные данные</button>
       <p class="hint">Данные в %LOCALAPPDATA%\Deskline — никуда не загружаются.</p>
     </section>
   </main>
+
+  <div id="shotLightbox" class="lightbox" hidden>
+    <button type="button" class="lightbox-close" id="lightboxClose" aria-label="Закрыть">×</button>
+    <img id="lightboxImg" alt="Скриншот" />
+    <p class="lightbox-caption" id="lightboxCaption"></p>
+  </div>
 
   <footer class="foot">
     <span>Deskline v{{ version }}</span>

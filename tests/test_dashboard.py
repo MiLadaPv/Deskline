@@ -22,3 +22,11 @@ def test_dashboard_index_ok(tmp_path, monkeypatch):
     res = client.get("/")
     assert res.status_code == 200
     assert "Deskline" in res.text
+    assert 'id="shotLightbox"' in res.text
+
+    settings = client.get("/api/settings")
+    assert settings.status_code == 200
+    body = settings.json()
+    assert body["screenshot_retention_days"] == 7
+    assert "screenshots_path" in body
+    assert "screenshots_storage" in body

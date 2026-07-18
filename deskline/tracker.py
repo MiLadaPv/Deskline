@@ -20,6 +20,7 @@ class Tracker:
         self._current_key: tuple[str, str] | None = None
         self._current_session_id: int | None = None
         self._last_screenshot_at = 0.0
+        self._last_purge_at = 0.0
         self._status_listeners: list[Callable[[dict], None]] = []
         self.cfg = load_config()
 
@@ -27,6 +28,7 @@ class Tracker:
         if open_sess:
             self._current_session_id = open_sess.id
             self._current_key = (open_sess.app_name, open_sess.window_title)
+        self.purge_old_screenshots()
 
     @property
     def paused(self) -> bool:
@@ -90,11 +92,21 @@ class Tracker:
     def reload_config(self) -> None:
         with self._lock:
             self.cfg = load_config()
+        self.purge_old_screenshots()
+
+    def purge_old_screenshots(self) -> dict:
+        days = int(self.cfg.get("screenshot_retention_days", 7))
+        result = self.db.purge_old_screenshots(days)
+        self._last_purge_at = time.time()
+        return result
 
     def _loop(self) -> None:
         while not self._stop.is_set():
             try:
                 self._tick()
+                now = time.time()
+                if now - self._last_purge_at >= 3600:
+                    self.purge_old_screenshots()
             except Exception:
                 pass
             interval = float(self.cfg.get("poll_interval_sec", 2.0))

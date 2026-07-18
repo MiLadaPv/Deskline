@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from pathlib import Path
+from typing import Any
 
 import mss
 from PIL import Image
@@ -25,3 +26,30 @@ def capture_screenshot(prefix: str = "shot") -> Path:
             img = img.resize((max_w, int(img.height * ratio)), Image.Resampling.LANCZOS)
         img.save(out, format="JPEG", quality=72, optimize=True)
     return out
+
+
+def delete_screenshot_file(path: str | Path) -> bool:
+    p = Path(path)
+    try:
+        if p.is_file():
+            p.unlink()
+            return True
+    except OSError:
+        return False
+    return False
+
+
+def screenshots_storage_info() -> dict[str, Any]:
+    ensure_data_dirs()
+    files = [p for p in SCREENSHOTS_DIR.iterdir() if p.is_file()]
+    total = 0
+    for p in files:
+        try:
+            total += p.stat().st_size
+        except OSError:
+            pass
+    return {
+        "path": str(SCREENSHOTS_DIR),
+        "count": len(files),
+        "bytes": total,
+    }

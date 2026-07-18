@@ -12,6 +12,7 @@ from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel, Field
 
 from deskline import __version__
+from deskline.capture import screenshots_storage_info
 from deskline.config import (
     APP_NAME,
     BASE_URL,
@@ -32,6 +33,7 @@ class SettingsUpdate(BaseModel):
     screenshot_interval_sec: int | None = None
     screenshot_on_app_switch: bool | None = None
     screenshots_enabled: bool | None = None
+    screenshot_retention_days: int | None = Field(default=None, ge=0, le=3650)
     open_dashboard_on_start: bool | None = None
     autostart: bool | None = None
 
@@ -115,7 +117,7 @@ def create_app(tracker: Tracker, db: Database | None = None) -> FastAPI:
         path = SCREENSHOTS_DIR / safe
         if not path.exists() or not path.is_file():
             raise HTTPException(404, "Screenshot not found")
-        return FileResponse(path)
+        return FileResponse(path, media_type="image/jpeg")
 
     @app.post("/api/control/pause")
     def pause() -> dict[str, Any]:
@@ -129,7 +131,9 @@ def create_app(tracker: Tracker, db: Database | None = None) -> FastAPI:
 
     @app.get("/api/settings")
     def get_settings() -> dict[str, Any]:
-        return load_config()
+        cfg = load_config()
+        storage = screenshots_storage_info()
+        return {**cfg, "screenshots_path": storage["path"], "screenshots_storage": storage}
 
     @app.put("/api/settings")
     def put_settings(body: SettingsUpdate) -> dict[str, Any]:
@@ -140,7 +144,14 @@ def create_app(tracker: Tracker, db: Database | None = None) -> FastAPI:
         tracker.reload_config()
         if "autostart" in data:
             _set_autostart(bool(saved.get("autostart")))
-        return saved
+        storage = screenshots_storage_info()
+        return {**saved, "screenshots_path": storage["path"], "screenshots_storage": storage}
+
+    @app.post("/api/screenshots/purge")
+    def purge_screenshots() -> dict[str, Any]:
+        result = tracker.purge_old_screenshots()
+        storage = screenshots_storage_info()
+        return {**result, "screenshots_storage": storage}
 
     @app.put("/api/rules/{app_name}")
     def put_rule(app_name: str, body: RuleUpdate) -> dict[str, str]:

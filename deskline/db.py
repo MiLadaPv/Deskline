@@ -7,8 +7,9 @@ from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Any, Iterator
 
+from deskline.capture import delete_screenshot_file
 from deskline.classify import display_name_for_app, is_system_noise, resolve_activity
-from deskline.config import DB_PATH, ensure_data_dirs
+from deskline.config import DB_PATH, SCREENSHOTS_DIR, ensure_data_dirs
 
 
 def _utcnow() -> datetime:
@@ -355,7 +356,48 @@ class Database:
             ).fetchall()
         return [dict(r) for r in rows]
 
+    def purge_old_screenshots(self, retention_days: int) -> dict[str, int]:
+        """Delete screenshot files and DB rows older than retention_days. 0 = keep forever."""
+        if retention_days <= 0:
+            return {"deleted_rows": 0, "deleted_files": 0}
+
+        cutoff = _utcnow() - timedelta(days=int(retention_days))
+        deleted_rows = 0
+        deleted_files = 0
+
+        with self.connect() as conn:
+            rows = conn.execute(
+                "SELECT id, path FROM screenshots WHERE taken_at < ?",
+                (_iso(cutoff),),
+            ).fetchall()
+            for row in rows:
+                if delete_screenshot_file(row["path"]):
+                    deleted_files += 1
+                conn.execute("DELETE FROM screenshots WHERE id = ?", (row["id"],))
+                deleted_rows += 1
+
+        ensure_data_dirs()
+        cutoff_ts = cutoff.timestamp()
+        for path in SCREENSHOTS_DIR.iterdir():
+            if not path.is_file():
+                continue
+            try:
+                if path.stat().st_mtime < cutoff_ts:
+                    if delete_screenshot_file(path):
+                        deleted_files += 1
+            except OSError:
+                continue
+
+        return {"deleted_rows": deleted_rows, "deleted_files": deleted_files}
+
     def clear_all_data(self) -> None:
         with self.connect() as conn:
+            rows = conn.execute("SELECT path FROM screenshots").fetchall()
+            for row in rows:
+                delete_screenshot_file(row["path"])
             conn.execute("DELETE FROM screenshots")
             conn.execute("DELETE FROM sessions")
+        ensure_data_dirs()
+        for path in SCREENSHOTS_DIR.iterdir():
+            if path.is_file():
+                delete_screenshot_file(path)

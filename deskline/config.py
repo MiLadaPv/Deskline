@@ -35,6 +35,7 @@ DEFAULT_CONFIG: dict[str, Any] = {
     "screenshot_interval_sec": 300,
     "screenshot_on_app_switch": True,
     "screenshots_enabled": True,
+    "screenshot_retention_days": 7,
     "open_dashboard_on_start": True,
     "autostart": False,
     "paused": False,
