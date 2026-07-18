@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Deskline</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Sora:wght@400;500;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/static/css/app.css" />
+</head>
+<body>
+  <div class="atmosphere" aria-hidden="true"></div>
+  <header class="top">
+    <div class="brand-block">
+      <p class="eyebrow">Local · private · Windows</p>
+      <h1 class="brand">Deskline</h1>
+      <p class="tagline">See where your hours go — without sending them anywhere.</p>
+    </div>
+    <div class="hero-actions">
+      <div class="focus-metric" id="focusMetric">
+        <span class="focus-label">Focus today</span>
+        <strong class="focus-value" id="focusValue">—</strong>
+        <span class="focus-sub" id="focusSub">loading…</span>
+      </div>
+      <button type="button" class="btn primary" id="toggleBtn">Pause</button>
+    </div>
+  </header>
+
+  <nav class="tabs" role="tablist">
+    <button class="tab active" data-tab="today">Today</button>
+    <button class="tab" data-tab="apps">Apps</button>
+    <button class="tab" data-tab="sites">Sites</button>
+    <button class="tab" data-tab="shots">Screenshots</button>
+    <button class="tab" data-tab="settings">Settings</button>
+  </nav>
+
+  <main>
+    <section id="panel-today" class="panel active">
+      <h2>Today</h2>
+      <div class="cats" id="catBars"></div>
+      <ol class="rank-list" id="topAppsToday"></ol>
+    </section>
+
+    <section id="panel-apps" class="panel">
+      <h2>Applications</h2>
+      <ol class="rank-list" id="appsList"></ol>
+    </section>
+
+    <section id="panel-sites" class="panel">
+      <h2>Sites</h2>
+      <p class="hint">Detected from browser window titles (no extension, no cloud).</p>
+      <ol class="rank-list" id="sitesList"></ol>
+    </section>
+
+    <section id="panel-shots" class="panel">
+      <h2>Screenshots</h2>
+      <div class="shots-grid" id="shotsGrid"></div>
+    </section>
+
+    <section id="panel-settings" class="panel">
+      <h2>Settings</h2>
+      <form id="settingsForm" class="settings-form">
+        <label>
+          Screenshot interval (sec)
+          <input type="number" name="screenshot_interval_sec" min="60" step="30" />
+        </label>
+        <label class="check">
+          <input type="checkbox" name="screenshots_enabled" />
+          Enable screenshots
+        </label>
+        <label class="check">
+          <input type="checkbox" name="screenshot_on_app_switch" />
+          Capture on app switch
+        </label>
+        <label class="check">
+          <input type="checkbox" name="open_dashboard_on_start" />
+          Open dashboard on start
+        </label>
+        <label class="check">
+          <input type="checkbox" name="autostart" />
+          Start with Windows
+        </label>
+        <button type="submit" class="btn">Save settings</button>
+      </form>
+      <button type="button" class="btn danger" id="clearBtn">Clear all local data</button>
+      <p class="hint">Data lives in %LOCALAPPDATA%\Deskline — never uploaded.</p>
+    </section>
+  </main>
+
+  <footer class="foot">
+    <span>Deskline v{{ version }}</span>
+    <span id="statusLine">…</span>
+  </footer>
+  <script src="/static/js/app.js"></script>
+</body>
+</html>
