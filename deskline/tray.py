@@ -1,20 +1,45 @@
 from __future__ import annotations
 
 import threading
+from pathlib import Path
 from typing import Callable
 
 from PIL import Image, ImageDraw
 
+from deskline.config import PROJECT_ROOT
 
-def _make_icon(recording: bool) -> Image.Image:
+
+def _brand_base() -> Image.Image:
+    candidates = [
+        PROJECT_ROOT / "assets" / "tray.png",
+        PROJECT_ROOT / "assets" / "deskline-icon.png",
+        Path(__file__).resolve().parent.parent / "assets" / "tray.png",
+        Path(__file__).resolve().parent.parent / "assets" / "deskline-icon.png",
+    ]
+    for path in candidates:
+        if path.exists():
+            img = Image.open(path).convert("RGBA")
+            return img.resize((64, 64), Image.Resampling.LANCZOS)
+
+    # Fallback geometric mark matching brand colors
     img = Image.new("RGBA", (64, 64), (0, 0, 0, 0))
     draw = ImageDraw.Draw(img)
-    # Paper disc
-    draw.ellipse((4, 4, 60, 60), fill=(245, 236, 220, 255), outline=(34, 48, 42, 255), width=3)
+    draw.rounded_rectangle((2, 2, 61, 61), radius=14, fill=(243, 235, 224, 255))
+    draw.line((20, 14, 20, 50), fill=(31, 42, 36, 220), width=3)
+    draw.rounded_rectangle((26, 16, 48, 22), radius=3, fill=(47, 111, 94, 255))
+    draw.rounded_rectangle((26, 28, 42, 34), radius=3, fill=(47, 111, 94, 220))
+    draw.rounded_rectangle((26, 40, 36, 46), radius=3, fill=(47, 111, 94, 180))
+    return img
+
+
+def _make_icon(recording: bool) -> Image.Image:
+    img = _brand_base().copy()
+    draw = ImageDraw.Draw(img)
+    # Status badge bottom-right
     if recording:
-        draw.ellipse((22, 22, 42, 42), fill=(196, 74, 58, 255))
+        draw.ellipse((42, 42, 58, 58), fill=(196, 90, 58, 255), outline=(243, 235, 224, 255), width=2)
     else:
-        draw.rectangle((22, 22, 42, 42), fill=(90, 110, 100, 255))
+        draw.rounded_rectangle((44, 44, 56, 56), radius=2, fill=(90, 110, 100, 255), outline=(243, 235, 224, 255), width=2)
     return img
 
 

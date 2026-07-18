@@ -10,6 +10,7 @@ a = Analysis(
     binaries=[],
     datas=[
         (str(root / 'web'), 'web'),
+        (str(root / 'assets'), 'assets'),
     ],
     hiddenimports=[
         'uvicorn.logging',
