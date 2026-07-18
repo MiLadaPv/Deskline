@@ -54,9 +54,9 @@ def create_app(tracker: Tracker, db: Database | None = None) -> FastAPI:
     @app.get("/", response_class=HTMLResponse)
     def index(request: Request) -> HTMLResponse:
         return templates.TemplateResponse(
+            request,
             "index.html",
             {
-                "request": request,
                 "app_name": APP_NAME,
                 "version": __version__,
                 "base_url": BASE_URL,
