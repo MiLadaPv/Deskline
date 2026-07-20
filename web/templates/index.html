@@ -46,16 +46,20 @@
     </div>
   </header>
 
-  <nav class="tabs" role="tablist">
-    <button class="tab active" data-tab="today">Сегодня</button>
-    <button class="tab" data-tab="day">День</button>
-    <button class="tab" data-tab="activities">Занятия</button>
-    <button class="tab" data-tab="apps">Приложения</button>
-    <button class="tab" data-tab="sites">Сайты</button>
-    <button class="tab" data-tab="projects">Проекты</button>
-    <button class="tab" data-tab="ratings">Рейтинги</button>
-    <button class="tab" data-tab="shots">Скриншоты</button>
-    <button class="tab" data-tab="settings">Настройки</button>
+  <nav class="tabs" role="tablist" aria-label="Разделы">
+    <div class="tab-group">
+      <button class="tab active" data-tab="today" type="button">Сегодня</button>
+      <button class="tab" data-tab="day" type="button">День</button>
+      <button class="tab" data-tab="usage" type="button">Где время</button>
+    </div>
+    <div class="tab-group">
+      <button class="tab" data-tab="projects" type="button">Проекты</button>
+      <button class="tab" data-tab="ratings" type="button">Рейтинги</button>
+      <button class="tab" data-tab="shots" type="button">Скриншоты</button>
+    </div>
+    <div class="tab-group tab-group-end">
+      <button class="tab" data-tab="settings" type="button">Настройки</button>
+    </div>
   </nav>
 
   <main>
@@ -111,22 +115,28 @@
       <ol class="timeline" id="timelineList"></ol>
     </section>
 
-    <section id="panel-activities" class="panel">
-      <h2>Занятия</h2>
-      <p class="hint">Для браузера — YouTube, почта, мессенджер, поиск и т.д. (по заголовку вкладки).</p>
-      <ol class="rank-list" id="activitiesList"></ol>
-    </section>
-
-    <section id="panel-apps" class="panel">
-      <h2>Приложения</h2>
-      <p class="hint">Человекочитаемые имена, без сырых .exe</p>
-      <ol class="rank-list" id="appsList"></ol>
-    </section>
-
-    <section id="panel-sites" class="panel">
-      <h2>Сайты</h2>
-      <p class="hint">Определяются из заголовка окна браузера (без расширения).</p>
-      <ol class="rank-list" id="sitesList"></ol>
+    <section id="panel-usage" class="panel">
+      <div class="panel-head">
+        <h2>Где время</h2>
+      </div>
+      <p class="hint">Три разных среза одного дня — не дубли, а разные углы взгляда.</p>
+      <div class="seg" role="tablist" aria-label="Срез времени">
+        <button type="button" class="seg-btn active" data-usage="activities">Занятия</button>
+        <button type="button" class="seg-btn" data-usage="apps">Приложения</button>
+        <button type="button" class="seg-btn" data-usage="sites">Сайты</button>
+      </div>
+      <div class="usage-pane active" id="usage-activities" data-usage-pane="activities">
+        <p class="hint usage-hint"><strong>Занятия</strong> — что вы делали: YouTube, почта, мессенджер, VS Code. Браузер дробится по смыслу вкладки, а не одним «Edge».</p>
+        <ol class="rank-list" id="activitiesList"></ol>
+      </div>
+      <div class="usage-pane" id="usage-apps" data-usage-pane="apps" hidden>
+        <p class="hint usage-hint"><strong>Приложения</strong> — по программе целиком: весь Edge / Telegram / Cursor одной строкой.</p>
+        <ol class="rank-list" id="appsList"></ol>
+      </div>
+      <div class="usage-pane" id="usage-sites" data-usage-pane="sites" hidden>
+        <p class="hint usage-hint"><strong>Сайты</strong> — только домены из браузера: youtube.com, github.com…</p>
+        <ol class="rank-list" id="sitesList"></ol>
+      </div>
     </section>
 
     <section id="panel-projects" class="panel">

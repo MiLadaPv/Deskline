@@ -33,11 +33,27 @@ async function api(path, opts = {}) {
 }
 
 function setActiveTab(name) {
+  const aliases = { activities: "usage", apps: "usage", sites: "usage" };
+  const tab = aliases[name] || name;
   document.querySelectorAll(".tab").forEach((t) => {
-    t.classList.toggle("active", t.dataset.tab === name);
+    t.classList.toggle("active", t.dataset.tab === tab);
   });
   document.querySelectorAll(".panel").forEach((p) => {
-    p.classList.toggle("active", p.id === `panel-${name}`);
+    p.classList.toggle("active", p.id === `panel-${tab}`);
+  });
+  if (aliases[name]) setUsageSlice(name);
+}
+
+function setUsageSlice(slice) {
+  const allowed = ["activities", "apps", "sites"];
+  const key = allowed.includes(slice) ? slice : "activities";
+  document.querySelectorAll(".seg-btn").forEach((b) => {
+    b.classList.toggle("active", b.dataset.usage === key);
+  });
+  document.querySelectorAll("[data-usage-pane]").forEach((pane) => {
+    const on = pane.dataset.usagePane === key;
+    pane.classList.toggle("active", on);
+    pane.hidden = !on;
   });
 }
 
@@ -722,6 +738,10 @@ function wireUi() {
       if (tab.dataset.tab === "ratings") refreshRatings();
       if (tab.dataset.tab === "projects") refreshProjects();
     });
+  });
+
+  document.querySelectorAll(".seg-btn").forEach((btn) => {
+    btn.addEventListener("click", () => setUsageSlice(btn.dataset.usage));
   });
 
   document.getElementById("toggleBtn").addEventListener("click", async (e) => {
