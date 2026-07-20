@@ -559,8 +559,13 @@ main {
 }
 
 .shot.shot-distracting {
-  border: 2px solid var(--danger);
-  box-shadow: 0 0 0 1px rgba(163, 59, 44, 0.2);
+  border: 5px solid var(--danger);
+  box-shadow: 0 0 0 2px rgba(163, 59, 44, 0.28);
+}
+
+.lightbox.flag-distracting img {
+  outline: 6px solid var(--danger);
+  outline-offset: 6px;
 }
 
 .shot img {
@@ -654,11 +659,6 @@ main {
 
 .lightbox-prev { left: 16px; }
 .lightbox-next { right: 16px; }
-
-.lightbox.flag-distracting img {
-  outline: 3px solid var(--danger);
-  outline-offset: 4px;
-}
 
 .settings-form {
   display: grid;

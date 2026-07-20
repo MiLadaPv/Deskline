@@ -540,12 +540,44 @@ async function refreshStatus() {
   if (ver && st.version) ver.textContent = `Deskline v${st.version}`;
 }
 
+function fmtShotWhen(iso) {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return String(iso);
+  const today = new Date();
+  const sameDay =
+    d.getFullYear() === today.getFullYear() &&
+    d.getMonth() === today.getMonth() &&
+    d.getDate() === today.getDate();
+  const time = d.toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" });
+  if (sameDay) return time;
+  return d.toLocaleString("ru-RU", {
+    day: "numeric",
+    month: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+function fmtShotReason(reason) {
+  const map = {
+    app_switch: "Смена приложения",
+    interval: "По расписанию",
+    manual: "Вручную",
+  };
+  return map[reason] || reason || "Скриншот";
+}
+
+function shotCaption(row) {
+  return `${fmtShotWhen(row.taken_at)} · ${fmtShotReason(row.reason)}`;
+}
+
 async function refreshShots() {
   const rows = await api("/api/screenshots");
   const grid = document.getElementById("shotsGrid");
   lightboxItems = rows.map((r) => ({
     url: r.url,
-    caption: `${r.taken_at} · ${r.reason}`,
+    caption: shotCaption(r),
     flag: !!r.flag_distracting,
   }));
   if (!rows.length) {
@@ -554,7 +586,7 @@ async function refreshShots() {
   }
   grid.innerHTML = rows
     .map((r, i) => {
-      const caption = `${r.taken_at} · ${r.reason}`;
+      const caption = shotCaption(r);
       const flag = r.flag_distracting ? "shot-distracting" : "";
       return `<figure class="shot ${flag}" tabindex="0" role="button" data-index="${i}" data-url="${escapeHtml(r.url)}" data-caption="${escapeHtml(caption)}" data-flag="${r.flag_distracting ? "1" : "0"}">
         <img src="${escapeHtml(r.url)}" alt="screenshot" loading="lazy" />
