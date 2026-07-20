@@ -35,6 +35,11 @@ DEFAULT_CONFIG: dict[str, Any] = {
     "min_session_sec": 3.0,
     # No keyboard/mouse for this long → idle (TD-style; does not cut productive time)
     "idle_after_sec": 180.0,
+    # After idle + this grace → "Are you still working?" then auto-pause
+    "still_working_grace_sec": 60.0,
+    "poor_time_popup": True,
+    "poor_time_min_sec": 60.0,
+    "blur_screenshots": False,
     "screenshot_interval_sec": 300,
     "screenshot_on_app_switch": True,
     "screenshots_enabled": True,

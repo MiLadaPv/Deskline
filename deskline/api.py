@@ -43,6 +43,10 @@ class SettingsUpdate(BaseModel):
     poll_interval_sec: float | None = None
     min_session_sec: float | None = None
     idle_after_sec: float | None = Field(default=None, ge=30, le=3600)
+    still_working_grace_sec: float | None = Field(default=None, ge=15, le=600)
+    poor_time_popup: bool | None = None
+    poor_time_min_sec: float | None = Field(default=None, ge=15, le=3600)
+    blur_screenshots: bool | None = None
     screenshot_interval_sec: int | None = None
     screenshot_on_app_switch: bool | None = None
     screenshots_enabled: bool | None = None
@@ -52,7 +56,8 @@ class SettingsUpdate(BaseModel):
 
 
 class RuleUpdate(BaseModel):
-    category: str = Field(pattern="^(productive|neutral|distracting)$")
+    kind: str = Field(default="app", pattern="^(app|site)$")
+    category: str = Field(pattern="^(productive|neutral|distracting|unrated)$")
 
 
 class PasswordBody(BaseModel):
@@ -199,6 +204,14 @@ def create_app(tracker: Tracker, db: Database | None = None) -> FastAPI:
     def summary_today() -> dict[str, Any]:
         return db.summary_for_day(date.today())
 
+    @app.get("/api/timeline/today")
+    def timeline_today() -> list[dict[str, Any]]:
+        return db.timeline_for_day(date.today())
+
+    @app.get("/api/ratings")
+    def ratings() -> list[dict[str, Any]]:
+        return db.ratings_for_day(date.today())
+
     @app.get("/api/apps")
     def apps(
         from_ts: str | None = Query(default=None, alias="from"),
@@ -293,10 +306,23 @@ def create_app(tracker: Tracker, db: Database | None = None) -> FastAPI:
         storage = screenshots_storage_info()
         return {**result, "screenshots_storage": storage}
 
-    @app.put("/api/rules/{app_name}")
-    def put_rule(app_name: str, body: RuleUpdate) -> dict[str, str]:
-        db.set_app_rule(app_name, body.category)
-        return {"app_name": app_name.lower(), "category": body.category}
+    @app.put("/api/rules/{key}")
+    def put_rule(key: str, body: RuleUpdate) -> dict[str, str]:
+        safe = key.strip().lower()
+        if body.kind == "site":
+            db.set_site_rule(safe, body.category)
+            return {"kind": "site", "key": safe, "category": body.category}
+        db.set_app_rule(safe, body.category)
+        return {"kind": "app", "key": safe, "category": body.category}
+
+    @app.delete("/api/rules/{key}")
+    def delete_rule(key: str, kind: str = Query(default="app")) -> dict[str, Any]:
+        safe = key.strip().lower()
+        if kind == "site":
+            db.delete_site_rule(safe)
+        else:
+            db.delete_app_rule(safe)
+        return {"ok": True, "kind": kind, "key": safe}
 
     @app.post("/api/data/clear")
     def clear_data() -> dict[str, bool]:

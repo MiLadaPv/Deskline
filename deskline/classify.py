@@ -4,7 +4,20 @@ import re
 from typing import Any
 from urllib.parse import urlparse
 
-Category = str  # productive | neutral | distracting
+Category = str  # productive | neutral | distracting | unrated
+
+
+def normalize_category(cat: str | None) -> Category:
+    c = (cat or "neutral").strip().lower()
+    if c in {"productive", "neutral", "distracting", "unrated"}:
+        return c
+    return "neutral"
+
+
+def category_for_focus(cat: str | None) -> Category:
+    """Unrated does not count as focus (treated like neutral), matching Time Doctor."""
+    c = normalize_category(cat)
+    return "neutral" if c == "unrated" else c
 ActivityKind = str
 
 BROWSER_PROCESSES = {
@@ -435,11 +448,11 @@ def resolve_activity(
     if matched:
         kind, label, cat = matched
         if site and site in user_site_rules:
-            cat = user_site_rules[site]
+            cat = normalize_category(user_site_rules[site])
         elif site:
             for key, ucat in user_site_rules.items():
                 if site == key or site.endswith("." + key):
-                    cat = ucat
+                    cat = normalize_category(ucat)
                     break
         if is_browser(app):
             # Prefer activity label over "Microsoft Edge"
@@ -462,9 +475,11 @@ def resolve_activity(
 
     if is_browser(app):
         # Unknown site — never dump everything into a single "Браузер" bucket
-        cat = "neutral"
+        cat: Category = "unrated"
         if app in user_app_rules:
-            cat = user_app_rules[app]
+            cat = normalize_category(user_app_rules[app])
+        elif site and site in DEFAULT_SITE_RULES:
+            cat = DEFAULT_SITE_RULES[site]
         if site:
             label = site
             kind: ActivityKind = "other"
@@ -486,9 +501,9 @@ def resolve_activity(
     else:
         kind, label = "other", display
 
-    cat: Category = "neutral"
+    cat = "unrated"
     if app in user_app_rules:
-        cat = user_app_rules[app]
+        cat = normalize_category(user_app_rules[app])
     elif app in DEFAULT_APP_RULES:
         cat = DEFAULT_APP_RULES[app]
     elif kind in {"messaging", "video", "social"}:

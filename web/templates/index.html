@@ -36,9 +36,11 @@
 
   <nav class="tabs" role="tablist">
     <button class="tab active" data-tab="today">Сегодня</button>
+    <button class="tab" data-tab="day">День</button>
     <button class="tab" data-tab="activities">Занятия</button>
     <button class="tab" data-tab="apps">Приложения</button>
     <button class="tab" data-tab="sites">Сайты</button>
+    <button class="tab" data-tab="ratings">Рейтинги</button>
     <button class="tab" data-tab="shots">Скриншоты</button>
     <button class="tab" data-tab="settings">Настройки</button>
   </nav>
@@ -49,6 +51,12 @@
       <div class="cats" id="catBars"></div>
       <h3 class="subhead">Топ занятий</h3>
       <ol class="rank-list" id="topAppsToday"></ol>
+    </section>
+
+    <section id="panel-day" class="panel">
+      <h2>День</h2>
+      <p class="hint">Хронология сессий. Idle — время без клавиатуры и мыши.</p>
+      <ol class="timeline" id="timelineList"></ol>
     </section>
 
     <section id="panel-activities" class="panel">
@@ -69,6 +77,12 @@
       <ol class="rank-list" id="sitesList"></ol>
     </section>
 
+    <section id="panel-ratings" class="panel">
+      <h2>Рейтинги</h2>
+      <p class="hint">Как в Time Doctor: отметьте Фокус / Нейтрально / Отвлечение / Без оценки. Влияет на «Фокус %».</p>
+      <div class="ratings-list" id="ratingsList"></div>
+    </section>
+
     <section id="panel-shots" class="panel">
       <h2>Скриншоты</h2>
       <p class="hint">Нажмите на миниатюру, чтобы открыть крупно. Файлы только на этом ПК.</p>
@@ -82,7 +96,15 @@
           Считать idle после (сек без ввода)
           <input type="number" name="idle_after_sec" min="30" max="3600" step="30" />
         </label>
-        <p class="hint">Как в Time Doctor: idle не уменьшает фокус, но снижает «Активность». Для созвонов порог мягче (15 мин).</p>
+        <p class="hint">Idle не уменьшает фокус, но снижает «Активность». Для созвонов порог мягче (15 мин).</p>
+        <label class="check">
+          <input type="checkbox" name="poor_time_popup" />
+          Напоминать об отвлечениях (Poor Time Use)
+        </label>
+        <label class="check">
+          <input type="checkbox" name="blur_screenshots" />
+          Размывать скриншоты (privacy)
+        </label>
         <label>
           Интервал скриншотов (сек)
           <input type="number" name="screenshot_interval_sec" min="60" step="30" />

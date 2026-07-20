@@ -259,6 +259,8 @@ async function loadSettings() {
   const cfg = await api("/api/settings");
   const form = document.getElementById("settingsForm");
   form.idle_after_sec.value = cfg.idle_after_sec ?? 180;
+  form.poor_time_popup.checked = cfg.poor_time_popup !== false;
+  form.blur_screenshots.checked = !!cfg.blur_screenshots;
   form.screenshot_interval_sec.value = cfg.screenshot_interval_sec;
   form.screenshots_enabled.checked = !!cfg.screenshots_enabled;
   form.screenshot_on_app_switch.checked = !!cfg.screenshot_on_app_switch;
@@ -268,12 +270,87 @@ async function loadSettings() {
   updateStorageHint(cfg);
 }
 
+const CAT_LABELS = {
+  productive: "Фокус",
+  neutral: "Нейтрально",
+  distracting: "Отвлечение",
+  unrated: "Без оценки",
+};
+
+function fmtClock(iso) {
+  if (!iso) return "";
+  const d = new Date(iso);
+  return d.toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" });
+}
+
+async function refreshTimeline() {
+  const rows = await api("/api/timeline/today");
+  const el = document.getElementById("timelineList");
+  if (!rows.length) {
+    el.innerHTML = `<li><span class="timeline-time">—</span><span class="rank-icon">•</span><span class="rank-name">Пока нет сессий</span><span class="rank-meta"></span></li>`;
+    return;
+  }
+  el.innerHTML = rows
+    .map((r) => {
+      const icon = r.icon_url
+        ? `<img class="rank-icon-img" src="${escapeHtml(r.icon_url)}" alt="" width="28" height="28" decoding="async" />`
+        : `<span class="rank-icon">•</span>`;
+      const idle =
+        r.idle_sec >= 60
+          ? `<span class="timeline-idle">idle ${fmtDur(r.idle_sec)}</span>`
+          : "";
+      return `<li>
+        <span class="timeline-time">${fmtClock(r.started_at)}</span>
+        ${icon}
+        <span>
+          <span class="rank-name">${escapeHtml(r.name)}</span>
+          ${idle}
+        </span>
+        <span class="rank-meta">${fmtDur(r.sec)}</span>
+      </li>`;
+    })
+    .join("");
+}
+
+async function refreshRatings() {
+  const rows = await api("/api/ratings");
+  const el = document.getElementById("ratingsList");
+  if (!rows.length) {
+    el.innerHTML = `<p class="hint">Сегодня ещё нет приложений и сайтов для оценки.</p>`;
+    return;
+  }
+  el.innerHTML = rows
+    .map((r) => {
+      const icon = r.icon_url
+        ? `<img class="rank-icon-img" src="${escapeHtml(r.icon_url)}" alt="" width="28" height="28" decoding="async" />`
+        : `<span class="rank-icon">•</span>`;
+      const kindLabel = r.kind === "site" ? "сайт" : "приложение";
+      const btns = ["productive", "neutral", "distracting", "unrated"]
+        .map((c) => {
+          const active = r.category === c ? "active" : "";
+          return `<button type="button" class="cat-${c} ${active}" data-kind="${escapeHtml(r.kind)}" data-key="${escapeHtml(r.key)}" data-cat="${c}">${CAT_LABELS[c]}</button>`;
+        })
+        .join("");
+      return `<div class="rating-row">
+        ${icon}
+        <div>
+          <div class="rating-name">${escapeHtml(r.name)}</div>
+          <div class="rating-meta">${kindLabel} · ${fmtDur(r.sec)}</div>
+        </div>
+        <div class="rating-btns">${btns}</div>
+      </div>`;
+    })
+    .join("");
+}
+
 function wireUi() {
   document.querySelectorAll(".tab").forEach((tab) => {
     tab.addEventListener("click", () => {
       setActiveTab(tab.dataset.tab);
       if (tab.dataset.tab === "shots") refreshShots();
       if (tab.dataset.tab === "settings") loadSettings();
+      if (tab.dataset.tab === "day") refreshTimeline();
+      if (tab.dataset.tab === "ratings") refreshRatings();
     });
   });
 
@@ -298,6 +375,21 @@ function wireUi() {
     openLightbox(shot.dataset.url, shot.dataset.caption);
   });
 
+  document.getElementById("ratingsList").addEventListener("click", async (ev) => {
+    const btn = ev.target.closest("button[data-key]");
+    if (!btn) return;
+    const kind = btn.dataset.kind;
+    const key = btn.dataset.key;
+    const category = btn.dataset.cat;
+    await api(`/api/rules/${encodeURIComponent(key)}`, {
+      method: "PUT",
+      body: JSON.stringify({ kind, category }),
+    });
+    lastSummaryKey = "";
+    await refreshRatings();
+    await refreshSummary();
+  });
+
   document.getElementById("lightboxClose").addEventListener("click", closeLightbox);
   document.getElementById("shotLightbox").addEventListener("click", (ev) => {
     if (ev.target.id === "shotLightbox") closeLightbox();
@@ -311,6 +403,8 @@ function wireUi() {
     const form = ev.currentTarget;
     const body = {
       idle_after_sec: Number(form.idle_after_sec.value),
+      poor_time_popup: form.poor_time_popup.checked,
+      blur_screenshots: form.blur_screenshots.checked,
       screenshot_interval_sec: Number(form.screenshot_interval_sec.value),
       screenshots_enabled: form.screenshots_enabled.checked,
       screenshot_on_app_switch: form.screenshot_on_app_switch.checked,

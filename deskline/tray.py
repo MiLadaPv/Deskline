@@ -7,6 +7,7 @@ from typing import Callable
 from PIL import Image, ImageDraw
 
 from deskline.config import PROJECT_ROOT
+from deskline.notify import set_tray_icon
 
 
 def _brand_base() -> Image.Image:
@@ -21,7 +22,6 @@ def _brand_base() -> Image.Image:
             img = Image.open(path).convert("RGBA")
             return img.resize((64, 64), Image.Resampling.LANCZOS)
 
-    # Fallback geometric mark matching brand colors
     img = Image.new("RGBA", (64, 64), (0, 0, 0, 0))
     draw = ImageDraw.Draw(img)
     draw.rounded_rectangle((2, 2, 61, 61), radius=14, fill=(243, 235, 224, 255))
@@ -35,7 +35,6 @@ def _brand_base() -> Image.Image:
 def _make_icon(recording: bool) -> Image.Image:
     img = _brand_base().copy()
     draw = ImageDraw.Draw(img)
-    # Status badge bottom-right
     if recording:
         draw.ellipse((42, 42, 58, 58), fill=(196, 90, 58, 255), outline=(243, 235, 224, 255), width=2)
     else:
@@ -57,7 +56,11 @@ def start_tray(
 
     def title() -> str:
         st = get_status()
-        return "Deskline · Recording" if not st.get("paused") else "Deskline · Paused"
+        if st.get("paused"):
+            return "Deskline · Paused"
+        if st.get("idle"):
+            return "Deskline · Idle"
+        return "Deskline · Recording"
 
     def refresh(icon: "pystray.Icon") -> None:
         st = get_status()
@@ -76,6 +79,7 @@ def start_tray(
         on_open()
 
     def quit_app(icon: "pystray.Icon", _item: object) -> None:
+        set_tray_icon(None)
         icon.stop()
         on_quit()
 
@@ -87,6 +91,7 @@ def start_tray(
         Item("Quit", quit_app),
     )
     icon = pystray.Icon("Deskline", icon_img, title(), menu)
+    set_tray_icon(icon)
 
     def run() -> None:
         icon.run()

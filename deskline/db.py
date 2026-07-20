@@ -8,7 +8,13 @@ from pathlib import Path
 from typing import Any, Iterator
 
 from deskline.capture import delete_screenshot_file
-from deskline.classify import display_name_for_app, is_browser, is_system_noise, resolve_activity
+from deskline.classify import (
+    display_name_for_app,
+    is_browser,
+    is_system_noise,
+    normalize_category,
+    resolve_activity,
+)
 from deskline.config import DB_PATH, SCREENSHOTS_DIR, ensure_data_dirs
 from deskline.icons import ensure_app_icon, icon_url_for_app
 
@@ -130,6 +136,7 @@ class Database:
         return {r["site"]: r["category"] for r in rows}
 
     def set_app_rule(self, app_name: str, category: str) -> None:
+        category = normalize_category(category)
         with self.connect() as conn:
             conn.execute(
                 """
@@ -140,6 +147,7 @@ class Database:
             )
 
     def set_site_rule(self, site: str, category: str) -> None:
+        category = normalize_category(category)
         with self.connect() as conn:
             conn.execute(
                 """
@@ -148,6 +156,14 @@ class Database:
                 """,
                 (site.lower(), category),
             )
+
+    def delete_app_rule(self, app_name: str) -> None:
+        with self.connect() as conn:
+            conn.execute("DELETE FROM app_rules WHERE app_name=?", (app_name.lower(),))
+
+    def delete_site_rule(self, site: str) -> None:
+        with self.connect() as conn:
+            conn.execute("DELETE FROM site_rules WHERE site=?", (site.lower(),))
 
     def start_session(
         self,
@@ -339,7 +355,10 @@ class Database:
             idle_full = min(max(0.0, idle_full), full_span)
             idle_part = idle_full * (dur / full_span) if full_span > 0 else 0.0
             idle_tracked += min(idle_part, dur)
-            cat = meta["category"] if meta["category"] in by_cat else "neutral"
+            raw_cat = normalize_category(meta["category"])
+            cat = "neutral" if raw_cat == "unrated" else raw_cat
+            if cat not in by_cat:
+                cat = "neutral"
             by_cat[cat] += dur
             app_label = meta["display_name"]
             exe = (meta["app_name"] or "unknown.exe").lower()
@@ -450,6 +469,98 @@ class Database:
 
     def activities_range(self, start: datetime, end: datetime) -> list[dict[str, Any]]:
         return self.summary_range(start, end)["by_activity"]
+
+    def timeline_for_day(self, day: date | None = None) -> list[dict[str, Any]]:
+        """Chronological session segments for a day (merged consecutive same activity)."""
+        day = day or date.today()
+        start = datetime.combine(day, datetime.min.time()).astimezone()
+        end = start + timedelta(days=1)
+        with self.connect() as conn:
+            rows = conn.execute(
+                """
+                SELECT * FROM sessions
+                WHERE started_at < ? AND (ended_at IS NULL OR ended_at >= ?)
+                ORDER BY started_at
+                """,
+                (_iso(end), _iso(start)),
+            ).fetchall()
+
+        now = _utcnow()
+        items: list[dict[str, Any]] = []
+        for row in rows:
+            keys = set(row.keys())
+            s = _parse(row["started_at"]) or start
+            e = _parse(row["ended_at"]) or now
+            seg_start = max(s, start)
+            seg_end = min(e, end)
+            dur = max(0.0, (seg_end - seg_start).total_seconds())
+            if dur < 3:
+                continue
+            meta = self._enrich(row)
+            if meta["hidden"]:
+                continue
+            full_span = max(0.0, (e - s).total_seconds()) or dur
+            idle_full = float(row["idle_sec"] or 0) if "idle_sec" in keys else 0.0
+            idle_part = min(dur, idle_full * (dur / full_span) if full_span else 0.0)
+            items.append(
+                {
+                    "started_at": _iso(seg_start),
+                    "ended_at": _iso(seg_end),
+                    "sec": round(dur, 1),
+                    "idle_sec": round(idle_part, 1),
+                    "name": meta["activity_label"],
+                    "app_name": meta["app_name"],
+                    "display_name": meta["display_name"],
+                    "category": normalize_category(meta["category"]),
+                    "icon_url": icon_url_for_app(meta["app_name"]),
+                }
+            )
+        return items
+
+    def ratings_for_day(self, day: date | None = None) -> list[dict[str, Any]]:
+        """Apps and sites seen today with effective category for the ratings editor."""
+        day = day or date.today()
+        start = datetime.combine(day, datetime.min.time()).astimezone()
+        end = start + timedelta(days=1)
+        summary = self.summary_range(start, end)
+        user_apps = self.get_app_rules()
+        user_sites = self.get_site_rules()
+        rows: list[dict[str, Any]] = []
+
+        for item in summary["by_app"]:
+            exe = (item.get("app_name") or "").lower()
+            meta = resolve_activity(exe, None, None, user_apps, user_sites)
+            cat = normalize_category(meta["category"])
+            rows.append(
+                {
+                    "kind": "app",
+                    "key": exe,
+                    "name": item["name"],
+                    "category": cat,
+                    "sec": item["sec"],
+                    "icon_url": item.get("icon_url") or icon_url_for_app(exe),
+                    "user_override": exe in user_apps,
+                }
+            )
+
+        for item in summary["by_site"]:
+            site = (item.get("name") or "").lower()
+            meta = resolve_activity("msedge.exe", None, site, user_apps, user_sites)
+            cat = normalize_category(meta["category"])
+            rows.append(
+                {
+                    "kind": "site",
+                    "key": site,
+                    "name": site,
+                    "category": cat,
+                    "sec": item["sec"],
+                    "icon_url": item.get("icon_url") or icon_url_for_app("msedge.exe"),
+                    "user_override": site in user_sites,
+                }
+            )
+
+        rows.sort(key=lambda r: r["sec"], reverse=True)
+        return rows
 
     def screenshots_for_date(self, day: date | None = None) -> list[dict[str, Any]]:
         day = day or date.today()

@@ -5,9 +5,9 @@ from pathlib import Path
 from typing import Any
 
 import mss
-from PIL import Image
+from PIL import Image, ImageFilter
 
-from deskline.config import SCREENSHOTS_DIR, ensure_data_dirs
+from deskline.config import SCREENSHOTS_DIR, ensure_data_dirs, load_config
 
 
 def capture_screenshot(prefix: str = "shot") -> Path:
@@ -15,15 +15,20 @@ def capture_screenshot(prefix: str = "shot") -> Path:
     ensure_data_dirs()
     ts = datetime.now().strftime("%Y%m%d_%H%M%S")
     out = SCREENSHOTS_DIR / f"{prefix}_{ts}.jpg"
+    cfg = load_config()
+    blur = bool(cfg.get("blur_screenshots"))
     with mss.mss() as sct:
         monitor = sct.monitors[0]
         shot = sct.grab(monitor)
         img = Image.frombytes("RGB", shot.size, shot.bgra, "raw", "BGRX")
-        # Shrink large captures for storage
         max_w = 1600
         if img.width > max_w:
             ratio = max_w / img.width
             img = img.resize((max_w, int(img.height * ratio)), Image.Resampling.LANCZOS)
+        if blur:
+            # Soft privacy blur (readable layout, not text)
+            radius = max(4, img.width // 200)
+            img = img.filter(ImageFilter.GaussianBlur(radius=radius))
         img.save(out, format="JPEG", quality=72, optimize=True)
     return out
 
