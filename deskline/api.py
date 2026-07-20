@@ -44,6 +44,7 @@ class SettingsUpdate(BaseModel):
     min_session_sec: float | None = None
     idle_after_sec: float | None = Field(default=None, ge=30, le=3600)
     still_working_grace_sec: float | None = Field(default=None, ge=15, le=600)
+    sleep_gap_sec: float | None = Field(default=None, ge=60, le=3600)
     poor_time_popup: bool | None = None
     poor_time_min_sec: float | None = Field(default=None, ge=15, le=3600)
     blur_screenshots: bool | None = None
@@ -53,6 +54,36 @@ class SettingsUpdate(BaseModel):
     screenshot_retention_days: int | None = Field(default=None, ge=0, le=3650)
     open_dashboard_on_start: bool | None = None
     autostart: bool | None = None
+    work_mode: bool | None = None
+    work_chat_keywords: list[str] | None = None
+    current_project_id: int | None = None
+    current_task_id: int | None = None
+
+
+class ProjectCreate(BaseModel):
+    name: str = Field(min_length=1, max_length=120)
+    color: str = Field(default="#2f6f5e", max_length=32)
+
+
+class ProjectUpdate(BaseModel):
+    name: str | None = Field(default=None, min_length=1, max_length=120)
+    color: str | None = Field(default=None, max_length=32)
+    archived: bool | None = None
+
+
+class TaskCreate(BaseModel):
+    name: str = Field(min_length=1, max_length=120)
+    project_id: int
+
+
+class TaskUpdate(BaseModel):
+    name: str | None = Field(default=None, min_length=1, max_length=120)
+    done: bool | None = None
+
+
+class FocusUpdate(BaseModel):
+    project_id: int | None = None
+    task_id: int | None = None
 
 
 class RuleUpdate(BaseModel):
@@ -204,12 +235,70 @@ def create_app(tracker: Tracker, db: Database | None = None) -> FastAPI:
         return st
 
     @app.get("/api/summary/today")
-    def summary_today() -> dict[str, Any]:
-        return db.summary_for_day(date.today())
+    def summary_today(project_id: int | None = None) -> dict[str, Any]:
+        return db.summary_for_day(date.today(), project_id=project_id)
 
     @app.get("/api/timeline/today")
     def timeline_today() -> list[dict[str, Any]]:
         return db.timeline_for_day(date.today())
+
+    @app.get("/api/projects")
+    def projects(include_archived: bool = False) -> list[dict[str, Any]]:
+        return db.list_projects(include_archived=include_archived)
+
+    @app.post("/api/projects")
+    def create_project(body: ProjectCreate) -> dict[str, Any]:
+        return db.create_project(body.name, body.color)
+
+    @app.put("/api/projects/{project_id}")
+    def update_project(project_id: int, body: ProjectUpdate) -> dict[str, Any]:
+        row = db.update_project(
+            project_id, name=body.name, color=body.color, archived=body.archived
+        )
+        if not row:
+            raise HTTPException(404, "Project not found")
+        return row
+
+    @app.delete("/api/projects/{project_id}")
+    def delete_project(project_id: int) -> dict[str, Any]:
+        ok = db.delete_project(project_id)
+        if not ok:
+            raise HTTPException(404, "Project not found")
+        return {"ok": True}
+
+    @app.get("/api/tasks")
+    def tasks(project_id: int | None = None) -> list[dict[str, Any]]:
+        return db.list_tasks(project_id)
+
+    @app.post("/api/tasks")
+    def create_task(body: TaskCreate) -> dict[str, Any]:
+        return db.create_task(body.project_id, body.name)
+
+    @app.put("/api/tasks/{task_id}")
+    def update_task(task_id: int, body: TaskUpdate) -> dict[str, Any]:
+        row = db.update_task(task_id, name=body.name, done=body.done)
+        if not row:
+            raise HTTPException(404, "Task not found")
+        return row
+
+    @app.delete("/api/tasks/{task_id}")
+    def delete_task(task_id: int) -> dict[str, Any]:
+        ok = db.delete_task(task_id)
+        if not ok:
+            raise HTTPException(404, "Task not found")
+        return {"ok": True}
+
+    @app.post("/api/focus")
+    def set_focus(body: FocusUpdate) -> dict[str, Any]:
+        cfg = load_config()
+        cfg["current_project_id"] = body.project_id
+        cfg["current_task_id"] = body.task_id
+        saved = save_config(cfg)
+        tracker.reload_config()
+        return {
+            "current_project_id": saved.get("current_project_id"),
+            "current_task_id": saved.get("current_task_id"),
+        }
 
     @app.get("/api/ratings")
     def ratings() -> list[dict[str, Any]]:

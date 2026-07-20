@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import threading
 import time
+from datetime import datetime
 from typing import Callable
 
 from deskline.capture import capture_screenshot
@@ -9,7 +10,8 @@ from deskline.classify import extract_site_from_title, normalize_category, resol
 from deskline.config import load_config, save_config
 from deskline.db import Database
 from deskline.idle import is_idle, seconds_since_last_input
-from deskline.notify import ask_yes_no, notify
+from deskline.notify import ask_still_working, notify
+from deskline.power import DEFAULT_SLEEP_GAP_SEC, is_sleep_gap
 from deskline.windows import get_active_window
 
 
@@ -23,9 +25,11 @@ class Tracker:
         self._current_session_id: int | None = None
         self._current_category: str = "neutral"
         self._current_label: str | None = None
+        self._current_app_path: str | None = None
         self._distracting_since: float | None = None
         self._last_poor_notify: dict[str, float] = {}
         self._still_working_prompting = False
+        self._suppress_still_working_until = 0.0
         self._idle_since: float | None = None
         self._last_screenshot_at = 0.0
         self._last_purge_at = 0.0
@@ -40,6 +44,7 @@ class Tracker:
             self._current_key = (open_sess.app_name, open_sess.window_title)
             self._current_category = normalize_category(open_sess.category)
             self._current_label = open_sess.activity_label or open_sess.display_name
+            self._current_app_path = open_sess.app_path
         self.purge_old_screenshots()
 
     @property
@@ -54,7 +59,12 @@ class Tracker:
         current_title = self._current_key[1] if self._current_key else None
         label = self._current_label
         if current_app and not label:
-            meta = resolve_activity(current_app, current_title)
+            meta = resolve_activity(
+                current_app,
+                current_title,
+                work_mode=bool(self.cfg.get("work_mode")),
+                work_chat_keywords=list(self.cfg.get("work_chat_keywords") or []),
+            )
             label = meta.get("activity_label") or meta.get("display_name")
         return {
             "paused": self.paused,
@@ -66,6 +76,9 @@ class Tracker:
             "current_category": self._current_category,
             "idle": self._idle,
             "idle_for_sec": round(seconds_since_last_input(), 1),
+            "work_mode": bool(self.cfg.get("work_mode")),
+            "current_project_id": self.cfg.get("current_project_id"),
+            "current_task_id": self.cfg.get("current_task_id"),
         }
 
     def _emit(self) -> None:
@@ -110,6 +123,7 @@ class Tracker:
             self._last_tick_at = time.time()
             self._idle_since = None
             self._still_working_prompting = False
+            self._suppress_still_working_until = 0.0
         self._emit()
 
     def reload_config(self) -> None:
@@ -139,13 +153,19 @@ class Tracker:
         with self._lock:
             cfg = dict(self.cfg)
             now = time.time()
-            dt = max(0.0, now - self._last_tick_at)
+            prev_tick = self._last_tick_at
+            dt = max(0.0, now - prev_tick)
             self._last_tick_at = now
 
             if cfg.get("paused"):
                 self._idle = False
                 self._idle_since = None
                 return
+
+            sleep_gap = float(cfg.get("sleep_gap_sec", DEFAULT_SLEEP_GAP_SEC))
+            if is_sleep_gap(dt, sleep_gap):
+                self._handle_sleep_wake(prev_tick, now)
+                # Continue into normal tick so a fresh session starts after wake
 
             win = get_active_window()
             if not win:
@@ -161,15 +181,18 @@ class Tracker:
                 self._still_working_prompting = False
 
             key = (win.app_name, win.window_title)
-            switched = self._current_key != key
+            switched = self._current_key != key or self._current_session_id is None
 
+            # Only accrue idle for small real-time gaps (never sleep wall-clock)
+            poll = float(cfg.get("poll_interval_sec", 2.0))
+            idle_dt = min(dt, poll * 3) if not is_sleep_gap(dt, sleep_gap) else 0.0
             if (
                 not switched
                 and self._current_session_id is not None
                 and self._idle
-                and dt > 0
+                and idle_dt > 0
             ):
-                self.db.add_idle_seconds(self._current_session_id, dt)
+                self.db.add_idle_seconds(self._current_session_id, idle_dt)
 
             if switched:
                 self._close_current_unlocked()
@@ -180,7 +203,19 @@ class Tracker:
                     site,
                     self.db.get_app_rules(),
                     self.db.get_site_rules(),
+                    work_mode=bool(cfg.get("work_mode")),
+                    work_chat_keywords=list(cfg.get("work_chat_keywords") or []),
                 )
+                project_id = cfg.get("current_project_id")
+                task_id = cfg.get("current_task_id")
+                try:
+                    project_id = int(project_id) if project_id is not None else None
+                except (TypeError, ValueError):
+                    project_id = None
+                try:
+                    task_id = int(task_id) if task_id is not None else None
+                except (TypeError, ValueError):
+                    task_id = None
                 self._current_session_id = self.db.start_session(
                     app_name=win.app_name,
                     window_title=win.window_title,
@@ -190,6 +225,9 @@ class Tracker:
                     activity_kind=meta["activity_kind"],
                     activity_label=meta["activity_label"],
                     app_path=win.app_path,
+                    project_id=project_id,
+                    task_id=task_id,
+                    started_at=datetime.fromtimestamp(now).astimezone(),
                 )
                 try:
                     from deskline.icons import ensure_app_icon
@@ -198,6 +236,7 @@ class Tracker:
                 except Exception:
                     pass
                 self._current_key = key
+                self._current_app_path = win.app_path
                 self._current_category = normalize_category(meta["category"])
                 self._current_label = meta.get("activity_label") or meta.get("display_name")
                 self._distracting_since = (
@@ -228,8 +267,25 @@ class Tracker:
 
         self._emit()
 
+    def _handle_sleep_wake(self, prev_tick: float, now: float) -> None:
+        """Close session at last awake moment; reset idle/prompt state. Do not pause."""
+        if self._current_session_id is not None:
+            ended = datetime.fromtimestamp(prev_tick).astimezone()
+            self.db.end_session(self._current_session_id, ended_at=ended)
+            self._current_session_id = None
+        # Force a new session on the next focus sample
+        self._current_key = None
+        self._idle = False
+        self._idle_since = None
+        self._distracting_since = None
+        self._still_working_prompting = False
+        # Suppress still-working prompt after wake (user just returned)
+        self._suppress_still_working_until = now + 300.0
+
     def _maybe_poor_time(self, cfg: dict, now: float) -> None:
         if not cfg.get("poor_time_popup", True):
+            return
+        if not cfg.get("work_mode"):
             return
         if self._current_category != "distracting" or self._distracting_since is None:
             return
@@ -239,7 +295,7 @@ class Tracker:
             return
         label = self._current_label or (self._current_key[0] if self._current_key else "app")
         last = self._last_poor_notify.get(label, 0.0)
-        if now - last < 600:  # at most once per 10 min per label
+        if now - last < 600:
             return
         self._last_poor_notify[label] = now
         mins = max(1, int(held // 60))
@@ -250,7 +306,8 @@ class Tracker:
             return
         if self._still_working_prompting or self.paused:
             return
-        # is_idle() already waited idle_after_sec; grace starts when idle was detected
+        if now < self._suppress_still_working_until:
+            return
         grace = float(cfg.get("still_working_grace_sec", 60.0))
         if now - self._idle_since < grace:
             return
@@ -264,20 +321,22 @@ class Tracker:
         ).start()
 
     def _ask_still_working(self, label: str) -> None:
-        notify("Deskline", "Давно нет ввода — вы ещё работаете?")
-        yes = ask_yes_no(
+        notify("Deskline", "Давно нет ввода — вы ещё за компьютером?")
+        answer = ask_still_working(
             "Deskline",
-            f"Нет ввода уже некоторое время ({label}).\n\nВы ещё работаете?",
+            f"Нет клавиатуры и мыши уже некоторое время.\nСейчас: {label}\n\n"
+            "Если это был перерыв или сон — выберите «Да, работаю» или просто подождите.",
+            timeout_sec=45.0,
         )
         with self._lock:
             self._still_working_prompting = False
-            if yes:
+            if answer in ("yes", "timeout"):
                 self._idle_since = None
                 self._idle = False
+                pause_now = False
             else:
-                # release lock before pause (pause takes lock)
-                pass
-        if not yes:
+                pause_now = True
+        if pause_now:
             self.pause()
             notify("Deskline", "Трекинг на паузе")
 
@@ -295,4 +354,5 @@ class Tracker:
         self._current_session_id = None
         self._current_key = None
         self._current_label = None
+        self._current_app_path = None
         self._distracting_since = None

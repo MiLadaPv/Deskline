@@ -124,7 +124,7 @@ DEFAULT_APP_RULES: dict[str, Category] = {
     "discord.exe": "distracting",
     "spotify.exe": "distracting",
     "steam.exe": "distracting",
-    "telegram.exe": "distracting",
+    "telegram.exe": "neutral",
 }
 
 DEFAULT_SITE_RULES: dict[str, Category] = {
@@ -160,11 +160,11 @@ SITE_ACTIVITIES: dict[str, tuple[ActivityKind, str, Category]] = {
     "mail.ru": ("email", "Почта", "productive"),
     "outlook.live.com": ("email", "Почта", "productive"),
     "outlook.office.com": ("email", "Почта", "productive"),
-    "web.telegram.org": ("messaging", "Мессенджер", "distracting"),
-    "web.whatsapp.com": ("messaging", "Мессенджер", "distracting"),
+    "web.telegram.org": ("messaging", "Мессенджер", "neutral"),
+    "web.whatsapp.com": ("messaging", "Мессенджер", "neutral"),
     "web.skype.com": ("messaging", "Мессенджер", "neutral"),
-    "messenger.yandex.ru": ("messaging", "Яндекс Мессенджер", "distracting"),
-    "discord.com": ("messaging", "Discord", "distracting"),
+    "messenger.yandex.ru": ("messaging", "Яндекс Мессенджер", "neutral"),
+    "discord.com": ("messaging", "Discord", "neutral"),
     "vk.com": ("social", "Соцсети", "distracting"),
     "instagram.com": ("social", "Соцсети", "distracting"),
     "facebook.com": ("social", "Соцсети", "distracting"),
@@ -466,6 +466,9 @@ def resolve_activity(
     site: str | None = None,
     user_app_rules: dict[str, str] | None = None,
     user_site_rules: dict[str, str] | None = None,
+    *,
+    work_mode: bool = False,
+    work_chat_keywords: list[str] | None = None,
 ) -> dict[str, Any]:
     """Resolve human-facing labels for a window session."""
     app = normalize_app(app_name)
@@ -473,6 +476,7 @@ def resolve_activity(
     display = display_name_for_app(app)
     user_app_rules = user_app_rules or {}
     user_site_rules = user_site_rules or {}
+    keywords = [k.strip().lower() for k in (work_chat_keywords or []) if str(k).strip()]
 
     if is_system_noise(app):
         return {
@@ -488,23 +492,24 @@ def resolve_activity(
     matched = _match_site_activity(site)
     if matched:
         kind, label, cat = matched
+        user_override = False
         if site and site in user_site_rules:
             cat = normalize_category(user_site_rules[site])
+            user_override = True
         elif site:
             for key, ucat in user_site_rules.items():
                 if site == key or site.endswith("." + key):
                     cat = normalize_category(ucat)
+                    user_override = True
                     break
-        if is_browser(app):
-            # Prefer activity label over "Microsoft Edge"
-            return {
-                "display_name": display,
-                "activity_kind": kind,
-                "activity_label": label,
-                "category": cat,
-                "url_hint": site,
-                "hidden": False,
-            }
+        cat = _apply_work_context(
+            cat,
+            kind,
+            window_title,
+            work_mode=work_mode,
+            keywords=keywords,
+            user_override=user_override,
+        )
         return {
             "display_name": display,
             "activity_kind": kind,
@@ -517,8 +522,10 @@ def resolve_activity(
     if is_browser(app):
         # Unknown site — never dump everything into a single "Браузер" bucket
         cat: Category = "unrated"
+        user_override = False
         if app in user_app_rules:
             cat = normalize_category(user_app_rules[app])
+            user_override = True
         elif site and site in DEFAULT_SITE_RULES:
             cat = DEFAULT_SITE_RULES[site]
         if site:
@@ -527,6 +534,14 @@ def resolve_activity(
         else:
             label = _page_title_activity(window_title)
             kind = "other"
+        cat = _apply_work_context(
+            cat,
+            kind,
+            window_title,
+            work_mode=work_mode,
+            keywords=keywords,
+            user_override=user_override,
+        )
         return {
             "display_name": display,
             "activity_kind": kind,
@@ -543,14 +558,25 @@ def resolve_activity(
         kind, label = "other", display
 
     cat = "unrated"
+    user_override = False
     if app in user_app_rules:
         cat = normalize_category(user_app_rules[app])
+        user_override = True
     elif app in DEFAULT_APP_RULES:
         cat = DEFAULT_APP_RULES[app]
     elif kind in {"messaging", "video", "social"}:
-        cat = "distracting"
+        cat = "distracting" if kind != "messaging" else "neutral"
     elif kind in {"work", "email", "remote"}:
         cat = "productive"
+
+    cat = _apply_work_context(
+        cat,
+        kind,
+        window_title,
+        work_mode=work_mode,
+        keywords=keywords,
+        user_override=user_override,
+    )
 
     return {
         "display_name": display,
@@ -560,3 +586,22 @@ def resolve_activity(
         "url_hint": site,
         "hidden": False,
     }
+
+
+def _apply_work_context(
+    cat: Category,
+    kind: ActivityKind,
+    window_title: str | None,
+    *,
+    work_mode: bool,
+    keywords: list[str],
+    user_override: bool,
+) -> Category:
+    if user_override:
+        return cat
+    title = (window_title or "").lower()
+    if keywords and any(k in title for k in keywords):
+        return "productive"
+    if work_mode and kind == "messaging":
+        return "productive"
+    return cat

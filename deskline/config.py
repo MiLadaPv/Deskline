@@ -35,8 +35,10 @@ DEFAULT_CONFIG: dict[str, Any] = {
     "min_session_sec": 3.0,
     # No keyboard/mouse for this long → idle (TD-style; does not cut productive time)
     "idle_after_sec": 180.0,
-    # After idle + this grace → "Are you still working?" then auto-pause
+    # After idle + this grace → "Are you still working?"
     "still_working_grace_sec": 60.0,
+    # Wall-clock gap between ticks treated as sleep/suspend (not counted)
+    "sleep_gap_sec": 120.0,
     "poor_time_popup": True,
     "poor_time_min_sec": 60.0,
     "blur_screenshots": False,
@@ -47,6 +49,12 @@ DEFAULT_CONFIG: dict[str, Any] = {
     "open_dashboard_on_start": True,
     "autostart": False,
     "paused": False,
+    # When True, messaging activities count as productive (unless user override)
+    "work_mode": False,
+    # Title substrings → force productive (work chats)
+    "work_chat_keywords": [],
+    "current_project_id": None,
+    "current_task_id": None,
 }
 
 

@@ -150,48 +150,124 @@ function updateStorageHint(cfg) {
   el.textContent = `Папка: ${path} · ${count} файл(ов), ${fmtBytes(bytes)}`;
 }
 
-function openLightbox(url, caption) {
+let lightboxItems = [];
+let lightboxIndex = 0;
+
+function openLightboxAt(index) {
+  if (!lightboxItems.length) return;
+  lightboxIndex = ((index % lightboxItems.length) + lightboxItems.length) % lightboxItems.length;
+  const item = lightboxItems[lightboxIndex];
   const box = document.getElementById("shotLightbox");
   const img = document.getElementById("lightboxImg");
   const cap = document.getElementById("lightboxCaption");
-  img.src = url;
-  img.alt = caption || "Скриншот";
-  cap.textContent = caption || "";
+  img.src = item.url;
+  img.alt = item.caption || "Скриншот";
+  cap.textContent = `${item.caption || ""} · ${lightboxIndex + 1}/${lightboxItems.length}`;
+  box.classList.toggle("flag-distracting", !!item.flag);
   box.hidden = false;
   document.body.style.overflow = "hidden";
-  document.getElementById("lightboxClose").focus();
+}
+
+function openLightbox(url, caption, flag) {
+  const idx = lightboxItems.findIndex((x) => x.url === url);
+  if (idx >= 0) openLightboxAt(idx);
+  else {
+    lightboxItems = [{ url, caption, flag: !!flag }];
+    openLightboxAt(0);
+  }
+}
+
+function stepLightbox(delta) {
+  if (document.getElementById("shotLightbox").hidden) return;
+  openLightboxAt(lightboxIndex + delta);
 }
 
 function closeLightbox() {
   const box = document.getElementById("shotLightbox");
   if (box.hidden) return;
   box.hidden = true;
+  box.classList.remove("flag-distracting");
   document.getElementById("lightboxImg").removeAttribute("src");
   document.body.style.overflow = "";
 }
 
-function summaryKey(summary) {
-  return JSON.stringify({
-    focus_pct: summary.focus_pct,
-    activity_pct: summary.activity_pct,
-    focus_min: Math.floor((summary.focus_sec || 0) / 60),
-    active_min: Math.floor((summary.active_sec || 0) / 60),
-    idle_min: Math.floor((summary.idle_sec || 0) / 60),
-    total_min: Math.floor((summary.total_sec || 0) / 60),
-    by_category: {
-      productive: Math.floor((summary.by_category?.productive || 0) / 60),
-      neutral: Math.floor((summary.by_category?.neutral || 0) / 60),
-      distracting: Math.floor((summary.by_category?.distracting || 0) / 60),
-    },
-    by_activity: listSignature(summary.by_activity),
-    by_app: listSignature(summary.by_app),
-    by_site: listSignature(summary.by_site),
-  });
+let projectCache = [];
+let filterProjectId = "";
+
+function fillProjectSelects(projects, currentId) {
+  projectCache = projects || [];
+  const opts =
+    `<option value="">Проект: не выбран</option>` +
+    projectCache
+      .map(
+        (p) =>
+          `<option value="${p.id}" ${String(currentId) === String(p.id) ? "selected" : ""}>${escapeHtml(p.name)}</option>`
+      )
+      .join("");
+  const filterOpts =
+    `<option value="">Все</option>` +
+    projectCache
+      .map((p) => `<option value="${p.id}">${escapeHtml(p.name)}</option>`)
+      .join("");
+  const cur = document.getElementById("currentProjectSelect");
+  const fil = document.getElementById("filterProjectToday");
+  if (cur) {
+    const keep = cur.value;
+    cur.innerHTML = opts;
+    if (currentId != null) cur.value = String(currentId);
+    else if (keep) cur.value = keep;
+  }
+  if (fil) {
+    const keep = fil.value;
+    fil.innerHTML = filterOpts;
+    fil.value = keep || filterProjectId || "";
+  }
+}
+
+async function refreshProjects() {
+  const [projects, summary, settings] = await Promise.all([
+    api("/api/projects"),
+    api("/api/summary/today"),
+    api("/api/settings"),
+  ]);
+  fillProjectSelects(projects, settings.current_project_id);
+  const workToggle = document.getElementById("workModeToggle");
+  if (workToggle) workToggle.checked = !!settings.work_mode;
+
+  const list = document.getElementById("projectsList");
+  if (list) {
+    if (!projects.length) {
+      list.innerHTML = `<p class="hint">Создайте первый проект — например «Клиент A» или «Учёба».</p>`;
+    } else {
+      list.innerHTML = projects
+        .map((p) => {
+          const active = String(settings.current_project_id) === String(p.id);
+          return `<div class="project-card" style="--pc:${escapeHtml(p.color || "#2f6f5e")}">
+            <div class="project-name">${escapeHtml(p.name)}</div>
+            <div class="project-actions">
+              <button type="button" class="btn ${active ? "primary" : ""}" data-focus-project="${p.id}">${active ? "Сейчас" : "Выбрать"}</button>
+              <button type="button" class="btn danger" data-del-project="${p.id}">Удалить</button>
+            </div>
+          </div>`;
+        })
+        .join("");
+    }
+  }
+
+  const byProj = summary.by_project || [];
+  const nameById = Object.fromEntries(projects.map((p) => [String(p.id), p.name]));
+  const timeRows = byProj.map((r) => ({
+    name: nameById[String(r.project_id)] || `Проект #${r.project_id}`,
+    sec: r.sec,
+  }));
+  const timeEl = document.getElementById("projectTimeList");
+  if (timeEl) renderList(timeEl, timeRows, "Пока нет времени по проектам");
 }
 
 async function refreshSummary() {
-  const summary = await api("/api/summary/today");
-  const key = summaryKey(summary);
+  const q = filterProjectId ? `?project_id=${encodeURIComponent(filterProjectId)}` : "";
+  const summary = await api(`/api/summary/today${q}`);
+  const key = summaryKey(summary) + `|p:${filterProjectId}`;
   if (key === lastSummaryKey) return;
   lastSummaryKey = key;
 
@@ -220,6 +296,8 @@ async function refreshStatus() {
     idle: !!st.idle,
     current_label: st.current_label || "",
     current_app: st.current_app || "",
+    work_mode: !!st.work_mode,
+    project: st.current_project_id || "",
   });
   if (key === lastStatusKey) return;
   lastStatusKey = key;
@@ -227,11 +305,14 @@ async function refreshStatus() {
   const btn = document.getElementById("toggleBtn");
   btn.textContent = st.paused ? "Продолжить" : "Пауза";
   btn.dataset.paused = st.paused ? "1" : "0";
+  const workToggle = document.getElementById("workModeToggle");
+  if (workToggle) workToggle.checked = !!st.work_mode;
   const label = st.current_label || st.current_app || "";
   let line = "Запись";
   if (st.paused) line = "Пауза";
   else if (st.idle) line = label ? `Idle · ${label}` : "Idle";
   else if (label) line = `Запись · ${label}`;
+  if (st.work_mode) line = `На работе · ${line}`;
   document.getElementById("statusLine").textContent = line;
   const ver = document.getElementById("appVersion");
   if (ver && st.version) ver.textContent = `Deskline v${st.version}`;
@@ -240,20 +321,24 @@ async function refreshStatus() {
 async function refreshShots() {
   const rows = await api("/api/screenshots");
   const grid = document.getElementById("shotsGrid");
+  lightboxItems = rows.map((r) => ({
+    url: r.url,
+    caption: `${r.taken_at} · ${r.reason}`,
+    flag: !!r.flag_distracting,
+  }));
   if (!rows.length) {
     grid.innerHTML = `<p class="hint">Сегодня скриншотов нет.</p>`;
     return;
   }
   grid.innerHTML = rows
-    .map(
-      (r) => {
-        const caption = `${r.taken_at} · ${r.reason}`;
-        return `<figure class="shot" tabindex="0" role="button" data-url="${escapeHtml(r.url)}" data-caption="${escapeHtml(caption)}">
+    .map((r, i) => {
+      const caption = `${r.taken_at} · ${r.reason}`;
+      const flag = r.flag_distracting ? "shot-distracting" : "";
+      return `<figure class="shot ${flag}" tabindex="0" role="button" data-index="${i}" data-url="${escapeHtml(r.url)}" data-caption="${escapeHtml(caption)}" data-flag="${r.flag_distracting ? "1" : "0"}">
         <img src="${escapeHtml(r.url)}" alt="screenshot" loading="lazy" />
         <figcaption>${escapeHtml(caption)}</figcaption>
       </figure>`;
-      }
-    )
+    })
     .join("");
 }
 
@@ -269,7 +354,33 @@ async function loadSettings() {
   form.screenshot_retention_days.value = cfg.screenshot_retention_days ?? 7;
   form.open_dashboard_on_start.checked = !!cfg.open_dashboard_on_start;
   form.autostart.checked = !!cfg.autostart;
+  if (form.work_mode) form.work_mode.checked = !!cfg.work_mode;
+  if (form.work_chat_keywords) {
+    const kw = cfg.work_chat_keywords || [];
+    form.work_chat_keywords.value = Array.isArray(kw) ? kw.join(", ") : "";
+  }
   updateStorageHint(cfg);
+  const workToggle = document.getElementById("workModeToggle");
+  if (workToggle) workToggle.checked = !!cfg.work_mode;
+}
+
+function summaryKey(summary) {
+  return JSON.stringify({
+    focus_pct: summary.focus_pct,
+    activity_pct: summary.activity_pct,
+    focus_min: Math.floor((summary.focus_sec || 0) / 60),
+    active_min: Math.floor((summary.active_sec || 0) / 60),
+    idle_min: Math.floor((summary.idle_sec || 0) / 60),
+    total_min: Math.floor((summary.total_sec || 0) / 60),
+    by_category: {
+      productive: Math.floor((summary.by_category?.productive || 0) / 60),
+      neutral: Math.floor((summary.by_category?.neutral || 0) / 60),
+      distracting: Math.floor((summary.by_category?.distracting || 0) / 60),
+    },
+    by_activity: listSignature(summary.by_activity),
+    by_app: listSignature(summary.by_app),
+    by_site: listSignature(summary.by_site),
+  });
 }
 
 const CAT_LABELS = {
@@ -353,6 +464,7 @@ function wireUi() {
       if (tab.dataset.tab === "settings") loadSettings();
       if (tab.dataset.tab === "day") refreshTimeline();
       if (tab.dataset.tab === "ratings") refreshRatings();
+      if (tab.dataset.tab === "projects") refreshProjects();
     });
   });
 
@@ -363,18 +475,100 @@ function wireUi() {
     await refreshStatus();
   });
 
+  const workToggle = document.getElementById("workModeToggle");
+  if (workToggle) {
+    workToggle.addEventListener("change", async () => {
+      await api("/api/settings", {
+        method: "PUT",
+        body: JSON.stringify({ work_mode: workToggle.checked }),
+      });
+      lastSummaryKey = "";
+      lastStatusKey = "";
+      await refreshSummary();
+      await refreshStatus();
+      await refreshShots();
+    });
+  }
+
+  const projectSelect = document.getElementById("currentProjectSelect");
+  if (projectSelect) {
+    projectSelect.addEventListener("change", async () => {
+      const v = projectSelect.value;
+      await api("/api/focus", {
+        method: "POST",
+        body: JSON.stringify({
+          project_id: v ? Number(v) : null,
+          task_id: null,
+        }),
+      });
+      lastStatusKey = "";
+      await refreshProjects();
+    });
+  }
+
+  const filterToday = document.getElementById("filterProjectToday");
+  if (filterToday) {
+    filterToday.addEventListener("change", async () => {
+      filterProjectId = filterToday.value || "";
+      lastSummaryKey = "";
+      await refreshSummary();
+    });
+  }
+
+  const projectForm = document.getElementById("projectCreateForm");
+  if (projectForm) {
+    projectForm.addEventListener("submit", async (ev) => {
+      ev.preventDefault();
+      const name = projectForm.name.value.trim();
+      const color = projectForm.color.value;
+      if (!name) return;
+      await api("/api/projects", {
+        method: "POST",
+        body: JSON.stringify({ name, color }),
+      });
+      projectForm.reset();
+      projectForm.color.value = "#2f6f5e";
+      await refreshProjects();
+    });
+  }
+
+  const projectsList = document.getElementById("projectsList");
+  if (projectsList) {
+    projectsList.addEventListener("click", async (ev) => {
+      const focusBtn = ev.target.closest("[data-focus-project]");
+      if (focusBtn) {
+        await api("/api/focus", {
+          method: "POST",
+          body: JSON.stringify({
+            project_id: Number(focusBtn.dataset.focusProject),
+            task_id: null,
+          }),
+        });
+        await refreshProjects();
+        return;
+      }
+      const delBtn = ev.target.closest("[data-del-project]");
+      if (delBtn) {
+        if (!confirm("Удалить проект?")) return;
+        await api(`/api/projects/${delBtn.dataset.delProject}`, { method: "DELETE" });
+        await refreshProjects();
+      }
+    });
+  }
+
   const shotsGrid = document.getElementById("shotsGrid");
   shotsGrid.addEventListener("click", (ev) => {
     const shot = ev.target.closest(".shot");
     if (!shot) return;
-    openLightbox(shot.dataset.url, shot.dataset.caption);
+    const idx = Number(shot.dataset.index || 0);
+    openLightboxAt(idx);
   });
   shotsGrid.addEventListener("keydown", (ev) => {
     if (ev.key !== "Enter" && ev.key !== " ") return;
     const shot = ev.target.closest(".shot");
     if (!shot) return;
     ev.preventDefault();
-    openLightbox(shot.dataset.url, shot.dataset.caption);
+    openLightboxAt(Number(shot.dataset.index || 0));
   });
 
   document.getElementById("ratingsList").addEventListener("click", async (ev) => {
@@ -393,16 +587,49 @@ function wireUi() {
   });
 
   document.getElementById("lightboxClose").addEventListener("click", closeLightbox);
+  document.getElementById("lightboxPrev").addEventListener("click", (ev) => {
+    ev.stopPropagation();
+    stepLightbox(-1);
+  });
+  document.getElementById("lightboxNext").addEventListener("click", (ev) => {
+    ev.stopPropagation();
+    stepLightbox(1);
+  });
   document.getElementById("shotLightbox").addEventListener("click", (ev) => {
     if (ev.target.id === "shotLightbox") closeLightbox();
   });
+  document.getElementById("shotLightbox").addEventListener(
+    "wheel",
+    (ev) => {
+      if (document.getElementById("shotLightbox").hidden) return;
+      ev.preventDefault();
+      if (ev.deltaY > 0) stepLightbox(1);
+      else if (ev.deltaY < 0) stepLightbox(-1);
+    },
+    { passive: false }
+  );
   document.addEventListener("keydown", (ev) => {
+    const box = document.getElementById("shotLightbox");
+    if (box.hidden) return;
     if (ev.key === "Escape") closeLightbox();
+    if (ev.key === "ArrowLeft") {
+      ev.preventDefault();
+      stepLightbox(-1);
+    }
+    if (ev.key === "ArrowRight") {
+      ev.preventDefault();
+      stepLightbox(1);
+    }
   });
 
   document.getElementById("settingsForm").addEventListener("submit", async (ev) => {
     ev.preventDefault();
     const form = ev.currentTarget;
+    const kwRaw = form.work_chat_keywords ? form.work_chat_keywords.value : "";
+    const keywords = String(kwRaw || "")
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean);
     const body = {
       idle_after_sec: Number(form.idle_after_sec.value),
       poor_time_popup: form.poor_time_popup.checked,
@@ -413,9 +640,15 @@ function wireUi() {
       screenshot_retention_days: Number(form.screenshot_retention_days.value),
       open_dashboard_on_start: form.open_dashboard_on_start.checked,
       autostart: form.autostart.checked,
+      work_mode: form.work_mode ? form.work_mode.checked : false,
+      work_chat_keywords: keywords,
     };
     const saved = await api("/api/settings", { method: "PUT", body: JSON.stringify(body) });
     updateStorageHint(saved);
+    lastSummaryKey = "";
+    lastStatusKey = "";
+    await refreshSummary();
+    await refreshStatus();
     alert("Сохранено");
   });
 
@@ -461,7 +694,7 @@ function wireUi() {
 
 async function boot() {
   wireUi();
-  await Promise.all([refreshSummary(), refreshStatus()]);
+  await Promise.all([refreshSummary(), refreshStatus(), refreshProjects()]);
   setInterval(() => {
     refreshSummary().catch(() => {});
     refreshStatus().catch(() => {});

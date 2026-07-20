@@ -56,6 +56,8 @@ class SessionRow:
     activity_label: str | None = None
     app_path: str | None = None
     idle_sec: float = 0.0
+    project_id: int | None = None
+    task_id: int | None = None
 
 
 class Database:
@@ -118,6 +120,23 @@ class Database:
                     site TEXT PRIMARY KEY,
                     category TEXT NOT NULL
                 );
+
+                CREATE TABLE IF NOT EXISTS projects (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    name TEXT NOT NULL,
+                    color TEXT NOT NULL DEFAULT '#2f6f5e',
+                    archived INTEGER NOT NULL DEFAULT 0,
+                    created_at TEXT NOT NULL
+                );
+
+                CREATE TABLE IF NOT EXISTS tasks (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    project_id INTEGER NOT NULL,
+                    name TEXT NOT NULL,
+                    done INTEGER NOT NULL DEFAULT 0,
+                    created_at TEXT NOT NULL,
+                    FOREIGN KEY(project_id) REFERENCES projects(id) ON DELETE CASCADE
+                );
                 """
             )
             cols = {r[1] for r in conn.execute("PRAGMA table_info(sessions)").fetchall()}
@@ -127,6 +146,8 @@ class Database:
                 ("activity_label", "TEXT"),
                 ("app_path", "TEXT"),
                 ("idle_sec", "REAL NOT NULL DEFAULT 0"),
+                ("project_id", "INTEGER"),
+                ("task_id", "INTEGER"),
             ):
                 if col not in cols:
                     conn.execute(f"ALTER TABLE sessions ADD COLUMN {col} {decl}")
@@ -182,6 +203,8 @@ class Database:
         activity_kind: str | None = None,
         activity_label: str | None = None,
         app_path: str | None = None,
+        project_id: int | None = None,
+        task_id: int | None = None,
     ) -> int:
         started = started_at or _utcnow()
         with self.connect() as conn:
@@ -189,9 +212,10 @@ class Database:
                 """
                 INSERT INTO sessions(
                     app_name, window_title, url_hint, started_at, category,
-                    display_name, activity_kind, activity_label, app_path
+                    display_name, activity_kind, activity_label, app_path,
+                    project_id, task_id
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     app_name,
@@ -203,6 +227,8 @@ class Database:
                     activity_kind,
                     activity_label,
                     app_path,
+                    project_id,
+                    task_id,
                 ),
             )
             return int(cur.lastrowid)
@@ -259,6 +285,8 @@ class Database:
             activity_label=row["activity_label"] if "activity_label" in keys else None,
             app_path=row["app_path"] if "app_path" in keys else None,
             idle_sec=float(row["idle_sec"] or 0) if "idle_sec" in keys else 0.0,
+            project_id=int(row["project_id"]) if "project_id" in keys and row["project_id"] is not None else None,
+            task_id=int(row["task_id"]) if "task_id" in keys and row["task_id"] is not None else None,
         )
 
     def add_idle_seconds(self, session_id: int, seconds: float) -> None:
@@ -270,7 +298,7 @@ class Database:
                 (float(seconds), session_id),
             )
 
-    def _enrich(self, row: sqlite3.Row) -> dict[str, Any]:
+    def _enrich(self, row: sqlite3.Row, *, work_mode: bool = False, work_chat_keywords: list[str] | None = None) -> dict[str, Any]:
         keys = set(row.keys())
         app = row["app_name"]
         title = row["window_title"]
@@ -284,7 +312,13 @@ class Database:
         # rows were saved as a useless catch-all "Браузер".
         stale_browser = is_browser(app) and (not label or label in {"Браузер", "Браузер · другое"})
         if is_browser(app) or stale_browser or not display or not label or not kind:
-            resolved = resolve_activity(app, title, site)
+            resolved = resolve_activity(
+                app,
+                title,
+                site,
+                work_mode=work_mode,
+                work_chat_keywords=work_chat_keywords,
+            )
             if is_browser(app):
                 display = resolved["display_name"]
                 kind = resolved["activity_kind"]
@@ -298,6 +332,12 @@ class Database:
                 cat = cat or resolved["category"]
                 site = site or resolved.get("url_hint")
         hidden = is_system_noise(app) or kind == "system"
+        project_id = None
+        task_id = None
+        if "project_id" in keys and row["project_id"] is not None:
+            project_id = int(row["project_id"])
+        if "task_id" in keys and row["task_id"] is not None:
+            task_id = int(row["task_id"])
         return {
             "app_name": app,
             "app_path": app_path,
@@ -307,15 +347,28 @@ class Database:
             "category": cat or "neutral",
             "url_hint": site,
             "hidden": hidden,
+            "project_id": project_id,
+            "task_id": task_id,
         }
 
-    def summary_for_day(self, day: date | None = None) -> dict[str, Any]:
+    def summary_for_day(self, day: date | None = None, project_id: int | None = None) -> dict[str, Any]:
         day = day or date.today()
         start = datetime.combine(day, datetime.min.time()).astimezone()
         end = start + timedelta(days=1)
-        return self.summary_range(start, end)
+        return self.summary_range(start, end, project_id=project_id)
 
-    def summary_range(self, start: datetime, end: datetime) -> dict[str, Any]:
+    def summary_range(
+        self,
+        start: datetime,
+        end: datetime,
+        project_id: int | None = None,
+    ) -> dict[str, Any]:
+        from deskline.config import load_config
+
+        cfg = load_config()
+        work_mode = bool(cfg.get("work_mode"))
+        keywords = list(cfg.get("work_chat_keywords") or [])
+
         with self.connect() as conn:
             rows = conn.execute(
                 """
@@ -330,6 +383,7 @@ class Database:
         by_app: dict[str, float] = {}
         by_site: dict[str, float] = {}
         by_activity: dict[str, float] = {}
+        by_project: dict[int, float] = {}
         activity_kinds: dict[str, str] = {}
         app_kinds: dict[str, str] = {}
         app_exe_by_label: dict[str, str] = {}
@@ -352,8 +406,10 @@ class Database:
             if dur <= 0:
                 continue
             total += dur
-            meta = self._enrich(row)
+            meta = self._enrich(row, work_mode=work_mode, work_chat_keywords=keywords)
             if meta["hidden"]:
+                continue
+            if project_id is not None and meta.get("project_id") != project_id:
                 continue
             tracked += dur
             # Scale idle to the overlapping segment (TD: idle is orthogonal to category)
@@ -389,6 +445,9 @@ class Database:
                 by_site[site] = by_site.get(site, 0.0) + dur
                 site_bucket = activity_site_secs.setdefault(act, {})
                 site_bucket[site] = site_bucket.get(site, 0.0) + dur
+            pid = meta.get("project_id")
+            if pid is not None:
+                by_project[int(pid)] = by_project.get(int(pid), 0.0) + dur
 
         def _top_exe(label: str) -> str:
             secs = activity_app_secs.get(label) or {}
@@ -487,6 +546,15 @@ class Database:
                 key=lambda x: x["sec"],
                 reverse=True,
             ),
+            "by_project": sorted(
+                [
+                    {"project_id": k, "sec": v}
+                    for k, v in by_project.items()
+                    if v >= 1.0
+                ],
+                key=lambda x: x["sec"],
+                reverse=True,
+            ),
         }
 
     def apps_range(self, start: datetime, end: datetime) -> list[dict[str, Any]]:
@@ -500,6 +568,11 @@ class Database:
 
     def timeline_for_day(self, day: date | None = None) -> list[dict[str, Any]]:
         """Chronological session segments for a day (merged consecutive same activity)."""
+        from deskline.config import load_config
+
+        cfg = load_config()
+        work_mode = bool(cfg.get("work_mode"))
+        keywords = list(cfg.get("work_chat_keywords") or [])
         day = day or date.today()
         start = datetime.combine(day, datetime.min.time()).astimezone()
         end = start + timedelta(days=1)
@@ -524,7 +597,7 @@ class Database:
             dur = max(0.0, (seg_end - seg_start).total_seconds())
             if dur < 3:
                 continue
-            meta = self._enrich(row)
+            meta = self._enrich(row, work_mode=work_mode, work_chat_keywords=keywords)
             if meta["hidden"]:
                 continue
             full_span = max(0.0, (e - s).total_seconds()) or dur
@@ -546,6 +619,7 @@ class Database:
                     "display_name": meta["display_name"],
                     "category": normalize_category(meta["category"]),
                     "site": site,
+                    "project_id": meta.get("project_id"),
                     "icon_url": icon,
                 }
             )
@@ -597,20 +671,32 @@ class Database:
         return rows
 
     def screenshots_for_date(self, day: date | None = None) -> list[dict[str, Any]]:
+        from deskline.config import load_config
+
         day = day or date.today()
         start = datetime.combine(day, datetime.min.time()).astimezone()
         end = start + timedelta(days=1)
+        work_mode = bool(load_config().get("work_mode"))
         with self.connect() as conn:
             rows = conn.execute(
                 """
-                SELECT id, path, taken_at, session_id, reason
-                FROM screenshots
-                WHERE taken_at >= ? AND taken_at < ?
-                ORDER BY taken_at DESC
+                SELECT sh.id, sh.path, sh.taken_at, sh.session_id, sh.reason,
+                       s.category AS session_category
+                FROM screenshots sh
+                LEFT JOIN sessions s ON s.id = sh.session_id
+                WHERE sh.taken_at >= ? AND sh.taken_at < ?
+                ORDER BY sh.taken_at DESC
                 """,
                 (_iso(start), _iso(end)),
             ).fetchall()
-        return [dict(r) for r in rows]
+        out: list[dict[str, Any]] = []
+        for r in rows:
+            item = dict(r)
+            cat = normalize_category(item.get("session_category") or "neutral")
+            item["category"] = cat
+            item["flag_distracting"] = bool(work_mode and cat == "distracting")
+            out.append(item)
+        return out
 
     def purge_old_screenshots(self, retention_days: int) -> dict[str, int]:
         """Delete screenshot files and DB rows older than retention_days. 0 = keep forever."""
@@ -645,6 +731,108 @@ class Database:
                 continue
 
         return {"deleted_rows": deleted_rows, "deleted_files": deleted_files}
+
+        return {"deleted_rows": deleted_rows, "deleted_files": deleted_files}
+
+    def list_projects(self, include_archived: bool = False) -> list[dict[str, Any]]:
+        with self.connect() as conn:
+            if include_archived:
+                rows = conn.execute(
+                    "SELECT * FROM projects ORDER BY archived, name COLLATE NOCASE"
+                ).fetchall()
+            else:
+                rows = conn.execute(
+                    "SELECT * FROM projects WHERE archived=0 ORDER BY name COLLATE NOCASE"
+                ).fetchall()
+        return [dict(r) for r in rows]
+
+    def create_project(self, name: str, color: str = "#2f6f5e") -> dict[str, Any]:
+        name = (name or "").strip() or "Проект"
+        color = (color or "#2f6f5e").strip()
+        with self.connect() as conn:
+            cur = conn.execute(
+                "INSERT INTO projects(name, color, archived, created_at) VALUES(?, ?, 0, ?)",
+                (name, color, _iso(_utcnow())),
+            )
+            pid = int(cur.lastrowid)
+            row = conn.execute("SELECT * FROM projects WHERE id=?", (pid,)).fetchone()
+        return dict(row)
+
+    def update_project(
+        self,
+        project_id: int,
+        *,
+        name: str | None = None,
+        color: str | None = None,
+        archived: bool | None = None,
+    ) -> dict[str, Any] | None:
+        with self.connect() as conn:
+            row = conn.execute("SELECT * FROM projects WHERE id=?", (project_id,)).fetchone()
+            if not row:
+                return None
+            new_name = name.strip() if name is not None else row["name"]
+            new_color = color.strip() if color is not None else row["color"]
+            new_arch = int(archived) if archived is not None else row["archived"]
+            conn.execute(
+                "UPDATE projects SET name=?, color=?, archived=? WHERE id=?",
+                (new_name, new_color, new_arch, project_id),
+            )
+            row = conn.execute("SELECT * FROM projects WHERE id=?", (project_id,)).fetchone()
+        return dict(row)
+
+    def delete_project(self, project_id: int) -> bool:
+        with self.connect() as conn:
+            cur = conn.execute("DELETE FROM projects WHERE id=?", (project_id,))
+            return cur.rowcount > 0
+
+    def list_tasks(self, project_id: int | None = None) -> list[dict[str, Any]]:
+        with self.connect() as conn:
+            if project_id is None:
+                rows = conn.execute(
+                    "SELECT * FROM tasks ORDER BY done, name COLLATE NOCASE"
+                ).fetchall()
+            else:
+                rows = conn.execute(
+                    "SELECT * FROM tasks WHERE project_id=? ORDER BY done, name COLLATE NOCASE",
+                    (project_id,),
+                ).fetchall()
+        return [dict(r) for r in rows]
+
+    def create_task(self, project_id: int, name: str) -> dict[str, Any]:
+        name = (name or "").strip() or "Задача"
+        with self.connect() as conn:
+            cur = conn.execute(
+                "INSERT INTO tasks(project_id, name, done, created_at) VALUES(?, ?, 0, ?)",
+                (project_id, name, _iso(_utcnow())),
+            )
+            tid = int(cur.lastrowid)
+            row = conn.execute("SELECT * FROM tasks WHERE id=?", (tid,)).fetchone()
+        return dict(row)
+
+    def update_task(
+        self,
+        task_id: int,
+        *,
+        name: str | None = None,
+        done: bool | None = None,
+    ) -> dict[str, Any] | None:
+        with self.connect() as conn:
+            row = conn.execute("SELECT * FROM tasks WHERE id=?", (task_id,)).fetchone()
+            if not row:
+                return None
+            new_name = name.strip() if name is not None else row["name"]
+            new_done = int(done) if done is not None else row["done"]
+            conn.execute(
+                "UPDATE tasks SET name=?, done=? WHERE id=?",
+                (new_name, new_done, task_id),
+            )
+            row = conn.execute("SELECT * FROM tasks WHERE id=?", (task_id,)).fetchone()
+        return dict(row)
+
+    def delete_task(self, task_id: int) -> bool:
+        with self.connect() as conn:
+            cur = conn.execute("DELETE FROM tasks WHERE id=?", (task_id,))
+            return cur.rowcount > 0
 
     def clear_all_data(self) -> None:
         with self.connect() as conn:
