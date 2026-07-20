@@ -10,6 +10,31 @@ Local-first Windows productivity tracker. Your activity stays on your PC — no 
 - Daily focus report on a local dashboard
 - System tray: **Recording** / **Paused**
 
+## Desktop app (Tauri)
+
+Native window around the same local tracker:
+
+```bat
+cd /d D:\Projects\Deskline\deskline-desktop
+npm install
+npm run dev
+```
+
+Or:
+
+```bat
+powershell -ExecutionPolicy Bypass -File scripts\run_desktop.ps1
+```
+
+Release build (NSIS/MSI):
+
+```bat
+cd /d D:\Projects\Deskline\deskline-desktop
+npm run build
+```
+
+Details: [deskline-desktop/README.md](deskline-desktop/README.md)
+
 ## Privacy
 
 - Data directory: `%LOCALAPPDATA%\Deskline`

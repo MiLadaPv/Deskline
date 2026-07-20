@@ -8,3 +8,5 @@ build/
 *.egg-info/
 .DS_Store
 release/*.exe
+deskline-desktop/src-tauri/target/
+deskline-desktop/node_modules/
