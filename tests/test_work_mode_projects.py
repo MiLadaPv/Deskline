@@ -154,6 +154,9 @@ def test_daily_trends_shape(tmp_path: Path, monkeypatch):
     assert trends[-1]["day"] == date.today().isoformat()
     assert "by_category" in trends[-1]
     assert trends[-1]["total_sec"] >= 3500
+
+
+def test_screenshot_flag_distracting_only_in_work_mode(tmp_path: Path, monkeypatch):
     shots = tmp_path / "shots"
     shots.mkdir()
     monkeypatch.setattr("deskline.config.SCREENSHOTS_DIR", shots)
