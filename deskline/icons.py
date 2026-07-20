@@ -18,6 +18,21 @@ _WEAK_CACHE_MAX_BYTES = 400
 _PLACEHOLDER_NAME = "placeholder.png"
 _SITE_PREFIX = "site_"
 _FAVICON_TIMEOUT_SEC = 3.0
+_APP_ICON_PADDING = 5
+_SITE_ICON_PADDING = 2
+_APP_ICON_MAX_FILL = 0.88
+
+# Extra favicon URLs for hosts where /favicon.ico and Google s2 fail.
+_SITE_FAVICON_OVERRIDES: dict[str, list[str]] = {
+    "messenger.yandex.ru": [
+        "https://favicon.yandex.net/favicon/v2/messenger.yandex.ru?size=32",
+        "https://yandex.ru/favicon.ico",
+    ],
+    "mail.yandex.ru": [
+        "https://favicon.yandex.net/favicon/v2/mail.yandex.ru?size=32",
+        "https://yandex.ru/favicon.ico",
+    ],
+}
 
 
 def icon_cache_name(app_name: str) -> str:
@@ -79,8 +94,23 @@ def shared_placeholder_path() -> Path:
     return out
 
 
+def is_placeholder_path(path: Path | None) -> bool:
+    return bool(path) and Path(path).name == _PLACEHOLDER_NAME
+
+
+def resolve_icon_url(site: str | None = None, app_name: str | None = None) -> str:
+    """Prefer a real site favicon; fall back to the app icon instead of a teal placeholder."""
+    if site:
+        path = ensure_site_icon(site)
+        if path.exists() and not is_placeholder_path(path) and not is_weak_icon_cache(path):
+            return icon_url_for_site(site)
+    if app_name:
+        return icon_url_for_app(app_name)
+    return icon_url_for_app("unknown.exe")
+
+
 def is_weak_icon_cache(path: Path) -> bool:
-    """True if missing, empty, or a Deskline placeholder left by a failed extract."""
+    """True if missing, empty, blank, or a Deskline placeholder left by a failed extract."""
     if not path.exists() or not path.is_file():
         return True
     if path.name == _PLACEHOLDER_NAME:
@@ -95,11 +125,13 @@ def is_weak_icon_cache(path: Path) -> bool:
                 return True
         except OSError:
             pass
-    # Site favicons are often tiny solid PNGs; do not treat them as weak by size.
     if path.name.startswith(_SITE_PREFIX):
-        return False
+        return _cached_icon_is_blank(path)
     # Legacy per-app placeholders were a solid teal circle (~110–220 bytes).
     if size <= 220:
+        return True
+    # Old extracts with padding=2 fill the cell and look cropped in the UI — re-extract.
+    if _app_icon_too_tight(path):
         return True
     return False
 
@@ -278,7 +310,12 @@ def _path_from_uninstall_key(key, name_l: str) -> Path | None:
     return None
 
 
-def _trim_and_fit(img: Image.Image, size: int = 32, padding: int = 2) -> Image.Image:
+def _trim_and_fit(
+    img: Image.Image,
+    size: int = 32,
+    padding: int = 2,
+    max_fill: float = 1.0,
+) -> Image.Image:
     """Crop transparent padding and fit content into a size×size canvas."""
     rgba = img.convert("RGBA")
     bbox = rgba.getbbox()
@@ -287,6 +324,8 @@ def _trim_and_fit(img: Image.Image, size: int = 32, padding: int = 2) -> Image.I
     inner = max(1, size - 2 * padding)
     w, h = rgba.size
     scale = min(inner / max(w, 1), inner / max(h, 1))
+    if max_fill < 1.0:
+        scale = min(scale, float(max_fill))
     new_w = max(1, int(round(w * scale)))
     new_h = max(1, int(round(h * scale)))
     rgba = rgba.resize((new_w, new_h), Image.Resampling.LANCZOS)
@@ -295,6 +334,52 @@ def _trim_and_fit(img: Image.Image, size: int = 32, padding: int = 2) -> Image.I
     oy = (size - new_h) // 2
     canvas.paste(rgba, (ox, oy), rgba)
     return canvas
+
+
+def _icon_has_usable_content(img: Image.Image, min_side: int = 8) -> bool:
+    """Reject fully transparent / 1×1 / near-empty favicons."""
+    try:
+        rgba = img.convert("RGBA")
+    except Exception:
+        return False
+    bbox = rgba.getbbox()
+    if not bbox:
+        return False
+    w = bbox[2] - bbox[0]
+    h = bbox[3] - bbox[1]
+    if w < min_side or h < min_side:
+        return False
+    alpha = rgba.split()[3]
+    hist = alpha.histogram()
+    opaque = sum(hist[32:])  # alpha >= 32
+    return opaque >= 16
+
+
+def _cached_icon_is_blank(path: Path) -> bool:
+    try:
+        with Image.open(path) as img:
+            return not _icon_has_usable_content(img)
+    except Exception:
+        return True
+
+
+def _app_icon_too_tight(path: Path, margin: int = 1) -> bool:
+    """True when content touches the canvas edge (old padding=2 extracts)."""
+    try:
+        with Image.open(path) as img:
+            rgba = img.convert("RGBA")
+            bbox = rgba.getbbox()
+            if not bbox:
+                return True
+            w, h = rgba.size
+            return (
+                bbox[0] <= margin
+                or bbox[1] <= margin
+                or bbox[2] >= w - margin
+                or bbox[3] >= h - margin
+            )
+    except Exception:
+        return False
 
 
 def ensure_app_icon(app_name: str | None, app_path: str | None = None) -> Path:
@@ -342,15 +427,33 @@ def ensure_site_icon(site: str | None) -> Path:
 
 
 def _fetch_site_favicon(host: str, out: Path) -> bool:
-    urls = [
-        f"https://{host}/favicon.ico",
-        f"https://www.google.com/s2/favicons?domain={host}&sz=64",
-    ]
+    urls: list[str] = []
+    urls.extend(_SITE_FAVICON_OVERRIDES.get(host, []))
+    urls.extend(
+        [
+            f"https://{host}/favicon.ico",
+            f"https://www.google.com/s2/favicons?domain={host}&sz=64",
+            f"https://favicon.yandex.net/favicon/v2/{host}?size=32",
+        ]
+    )
+    # Apex fallback for subdomains (messenger.yandex.ru → yandex.ru)
+    parts = host.split(".")
+    if len(parts) > 2:
+        apex = ".".join(parts[-2:])
+        if apex != host:
+            urls.append(f"https://{apex}/favicon.ico")
+            urls.append(f"https://favicon.yandex.net/favicon/v2/{apex}?size=32")
+            urls.append(f"https://www.google.com/s2/favicons?domain={apex}&sz=64")
+
+    seen: set[str] = set()
     for url in urls:
+        if url in seen:
+            continue
+        seen.add(url)
         try:
             req = urllib.request.Request(
                 url,
-                headers={"User-Agent": "Deskline/0.2"},
+                headers={"User-Agent": "Deskline/0.4"},
                 method="GET",
             )
             with urllib.request.urlopen(req, timeout=_FAVICON_TIMEOUT_SEC) as resp:
@@ -369,9 +472,13 @@ def _fetch_site_favicon(host: str, out: Path) -> bool:
 def _bytes_to_icon_png(data: bytes, out: Path, size: int = 32) -> bool:
     try:
         img = Image.open(io.BytesIO(data))
-        img = _trim_and_fit(img, size=size, padding=2)
+        if not _icon_has_usable_content(img):
+            return False
+        img = _trim_and_fit(img, size=size, padding=_SITE_ICON_PADDING)
+        if not _icon_has_usable_content(img, min_side=6):
+            return False
         img.save(out, format="PNG")
-        return out.exists() and out.stat().st_size > 0
+        return out.exists() and out.stat().st_size > 0 and not _cached_icon_is_blank(out)
     except Exception:
         return False
 
@@ -426,7 +533,12 @@ def _hicon_to_png(hicon: int, out: Path, size: int = 32) -> bool:
         0,
         1,
     )
-    img = _trim_and_fit(img, size=size, padding=2)
+    img = _trim_and_fit(
+        img,
+        size=size,
+        padding=_APP_ICON_PADDING,
+        max_fill=_APP_ICON_MAX_FILL,
+    )
     img.save(out, format="PNG")
     return out.exists() and out.stat().st_size > 0
 

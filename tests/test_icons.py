@@ -139,6 +139,60 @@ def test_trim_and_fit_fills_canvas():
     assert bh >= 24
 
 
+def test_trim_and_fit_app_padding_keeps_margin():
+    """Edge-like circular logo must not touch the canvas edge."""
+    img = Image.new("RGBA", (64, 64), (0, 0, 0, 0))
+    for x in range(64):
+        for y in range(64):
+            dx, dy = x - 31.5, y - 31.5
+            if dx * dx + dy * dy <= 30 * 30:
+                img.putpixel((x, y), (0, 120, 215, 255))
+    out = _trim_and_fit(img, size=32, padding=5, max_fill=0.88)
+    bbox = out.getbbox()
+    assert bbox is not None
+    assert bbox[0] >= 2
+    assert bbox[1] >= 2
+    assert bbox[2] <= 30
+    assert bbox[3] <= 30
+
+
+def test_bytes_to_icon_rejects_blank_transparent(tmp_path: Path, monkeypatch):
+    from deskline.icons import _bytes_to_icon_png
+
+    icons = tmp_path / "icons"
+    icons.mkdir()
+    monkeypatch.setattr("deskline.icons.ICONS_DIR", icons)
+    blank = Image.new("RGBA", (1, 1), (0, 0, 0, 0))
+    buf = __import__("io").BytesIO()
+    blank.save(buf, format="PNG")
+    out = icons / "site_blank.png"
+    assert _bytes_to_icon_png(buf.getvalue(), out) is False
+    assert not out.exists()
+
+
+def test_weak_site_cache_detects_blank(tmp_path: Path, monkeypatch):
+    icons = tmp_path / "icons"
+    icons.mkdir()
+    monkeypatch.setattr("deskline.icons.ICONS_DIR", icons)
+    monkeypatch.setattr("deskline.config.ICONS_DIR", icons)
+    blank = icons / "site_messenger.yandex.ru.png"
+    Image.new("RGBA", (32, 32), (0, 0, 0, 0)).save(blank, format="PNG")
+    assert is_weak_icon_cache(blank)
+
+
+def test_resolve_icon_url_falls_back_to_app(tmp_path: Path, monkeypatch):
+    from deskline.icons import resolve_icon_url
+
+    icons = tmp_path / "icons"
+    icons.mkdir()
+    monkeypatch.setattr("deskline.icons.ICONS_DIR", icons)
+    monkeypatch.setattr("deskline.config.ICONS_DIR", icons)
+
+    with patch("deskline.icons._fetch_site_favicon", return_value=False):
+        url = resolve_icon_url(site="messenger.yandex.ru", app_name="msedge.exe")
+    assert url == "/media/icons/msedge.exe.png"
+
+
 def test_ensure_site_icon_caches_favicon(tmp_path: Path, monkeypatch):
     icons = tmp_path / "icons"
     monkeypatch.setattr("deskline.icons.ICONS_DIR", icons)

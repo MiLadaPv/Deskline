@@ -22,6 +22,7 @@ from deskline.icons import (
     ensure_site_icon,
     icon_url_for_app,
     icon_url_for_site,
+    resolve_icon_url,
 )
 
 MIN_DISPLAY_SEC = 60.0
@@ -496,9 +497,7 @@ class Database:
 
         def _icon_for_activity(label: str) -> str:
             site = _top_site(label) or site_for_activity_label(label)
-            if site:
-                return icon_url_for_site(site)
-            return icon_url_for_app(_top_exe(label))
+            return resolve_icon_url(site=site, app_name=_top_exe(label))
 
         for exe, path in app_path_by_exe.items():
             try:
@@ -571,7 +570,7 @@ class Database:
                         "name": k,
                         "sec": v,
                         "kind": "search",
-                        "icon_url": icon_url_for_site(k),
+                        "icon_url": resolve_icon_url(site=k, app_name="msedge.exe"),
                     }
                     for k, v in by_site.items()
                     if v >= MIN_DISPLAY_SEC
@@ -637,10 +636,7 @@ class Database:
             idle_full = float(row["idle_sec"] or 0) if "idle_sec" in keys else 0.0
             idle_part = min(dur, idle_full * (dur / full_span) if full_span else 0.0)
             site = meta.get("url_hint") or site_for_activity_label(meta["activity_label"])
-            if site:
-                icon = icon_url_for_site(site)
-            else:
-                icon = icon_url_for_app(meta["app_name"])
+            icon = resolve_icon_url(site=site, app_name=meta["app_name"])
             items.append(
                 {
                     "started_at": _iso(seg_start),
@@ -695,7 +691,7 @@ class Database:
                     "name": site,
                     "category": cat,
                     "sec": item["sec"],
-                    "icon_url": item.get("icon_url") or icon_url_for_app("msedge.exe"),
+                    "icon_url": resolve_icon_url(site=site, app_name="msedge.exe"),
                     "user_override": site in user_sites,
                 }
             )

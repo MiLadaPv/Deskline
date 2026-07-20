@@ -355,7 +355,7 @@ function renderList(el, rows, emptyText) {
   el.innerHTML = sliced
     .map((r) => {
       const icon = r.icon_url
-        ? `<img class="rank-icon-img" src="${escapeHtml(r.icon_url)}" alt="" width="32" height="32" decoding="async" onerror="this.replaceWith(Object.assign(document.createElement('span'),{className:'rank-icon',textContent:'•'}))" />`
+        ? iconImgHtml(r.icon_url)
         : `<span class="rank-icon" aria-hidden="true">•</span>`;
       return `<li>
         ${icon}
@@ -372,6 +372,14 @@ function escapeHtml(s) {
     .replaceAll("<", "&lt;")
     .replaceAll(">", "&gt;")
     .replaceAll('"', "&quot;");
+}
+
+const ICON_ONERROR =
+  "this.replaceWith(Object.assign(document.createElement('span'),{className:'rank-icon',textContent:'•'}))";
+
+function iconImgHtml(url) {
+  if (!url) return `<span class="rank-icon" aria-hidden="true">•</span>`;
+  return `<img class="rank-icon-img" src="${escapeHtml(url)}" alt="" width="32" height="32" decoding="async" onerror="${ICON_ONERROR}" />`;
 }
 
 function updateStorageHint(cfg) {
@@ -677,7 +685,7 @@ async function refreshTimeline() {
   el.innerHTML = rows
     .map((r) => {
       const icon = r.icon_url
-        ? `<img class="rank-icon-img" src="${escapeHtml(r.icon_url)}" alt="" width="32" height="32" decoding="async" />`
+        ? iconImgHtml(r.icon_url)
         : `<span class="rank-icon">•</span>`;
       const idle =
         r.idle_sec >= 60
@@ -707,7 +715,7 @@ async function refreshRatings() {
   el.innerHTML = rows
     .map((r) => {
       const icon = r.icon_url
-        ? `<img class="rank-icon-img" src="${escapeHtml(r.icon_url)}" alt="" width="32" height="32" decoding="async" />`
+        ? iconImgHtml(r.icon_url)
         : `<span class="rank-icon">•</span>`;
       const kindLabel = r.kind === "site" ? "сайт" : "приложение";
       const btns = ["productive", "neutral", "distracting", "unrated"]
