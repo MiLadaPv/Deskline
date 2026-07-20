@@ -44,7 +44,14 @@ function setActiveTab(name) {
 function listSignature(rows) {
   return (rows || [])
     .slice(0, 15)
-    .map((r) => `${r.name}|${Math.round(r.sec || 0)}|${r.icon_url || ""}`)
+    .map((r) => `${r.name}|${Math.floor((r.sec || 0) / 60)}|${r.icon_url || ""}`)
+    .join(";");
+}
+
+function listStructure(rows) {
+  return (rows || [])
+    .slice(0, 15)
+    .map((r) => `${r.name}|${r.icon_url || ""}`)
     .join(";");
 }
 
@@ -88,21 +95,33 @@ function renderBars(byCategory, total, { animate = true } = {}) {
 }
 
 function renderList(el, rows, emptyText) {
-  const signature = rows.length
-    ? listSignature(rows)
+  const sliced = (rows || []).slice(0, 15);
+  const signature = sliced.length
+    ? listSignature(sliced)
     : `empty:${emptyText || "Пока нет данных"}`;
   if (el.dataset.sig === signature) return;
+
+  const structure = sliced.length ? listStructure(sliced) : `empty`;
+  if (el.dataset.struct === structure && sliced.length) {
+    const metas = el.querySelectorAll(".rank-meta");
+    sliced.forEach((r, i) => {
+      if (metas[i]) metas[i].textContent = fmtDur(r.sec);
+    });
+    el.dataset.sig = signature;
+    return;
+  }
+
+  el.dataset.struct = structure;
   el.dataset.sig = signature;
 
-  if (!rows.length) {
+  if (!sliced.length) {
     el.innerHTML = `<li><span class="rank-icon" aria-hidden="true">•</span><span class="rank-name">${emptyText || "Пока нет данных"}</span><span class="rank-meta">Оставьте Deskline включённым</span></li>`;
     return;
   }
-  el.innerHTML = rows
-    .slice(0, 15)
+  el.innerHTML = sliced
     .map((r) => {
       const icon = r.icon_url
-        ? `<img class="rank-icon-img" src="${escapeHtml(r.icon_url)}" alt="" width="28" height="28" loading="lazy" onerror="this.replaceWith(Object.assign(document.createElement('span'),{className:'rank-icon',textContent:'•'}))" />`
+        ? `<img class="rank-icon-img" src="${escapeHtml(r.icon_url)}" alt="" width="28" height="28" decoding="async" onerror="this.replaceWith(Object.assign(document.createElement('span'),{className:'rank-icon',textContent:'•'}))" />`
         : `<span class="rank-icon" aria-hidden="true">•</span>`;
       return `<li>
         ${icon}
@@ -154,9 +173,13 @@ function closeLightbox() {
 function summaryKey(summary) {
   return JSON.stringify({
     focus_pct: summary.focus_pct,
-    focus_sec: Math.round(summary.focus_sec || 0),
-    total_sec: Math.round(summary.total_sec || 0),
-    by_category: summary.by_category,
+    focus_min: Math.floor((summary.focus_sec || 0) / 60),
+    total_min: Math.floor((summary.total_sec || 0) / 60),
+    by_category: {
+      productive: Math.floor((summary.by_category?.productive || 0) / 60),
+      neutral: Math.floor((summary.by_category?.neutral || 0) / 60),
+      distracting: Math.floor((summary.by_category?.distracting || 0) / 60),
+    },
     by_activity: listSignature(summary.by_activity),
     by_app: listSignature(summary.by_app),
     by_site: listSignature(summary.by_site),
@@ -171,7 +194,7 @@ async function refreshSummary() {
 
   document.getElementById("focusValue").textContent = `${summary.focus_pct}%`;
   document.getElementById("focusSub").textContent = `${fmtDur(summary.focus_sec)} из ${fmtDur(summary.total_sec)}`;
-  renderBars(summary.by_category, summary.total_sec);
+  renderBars(summary.by_category, summary.total_sec, { animate: false });
   const activities = summary.by_activity || [];
   renderList(document.getElementById("topAppsToday"), activities, "Занятий пока нет");
   renderList(document.getElementById("activitiesList"), activities, "Занятий пока нет");

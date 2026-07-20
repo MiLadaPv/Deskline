@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Any, Iterator
 
 from deskline.capture import delete_screenshot_file
-from deskline.classify import display_name_for_app, is_system_noise, resolve_activity
+from deskline.classify import display_name_for_app, is_browser, is_system_noise, resolve_activity
 from deskline.config import DB_PATH, SCREENSHOTS_DIR, ensure_data_dirs
 from deskline.icons import ensure_app_icon, icon_url_for_app
 
@@ -246,12 +246,23 @@ class Database:
         label = row["activity_label"] if "activity_label" in keys else None
         app_path = row["app_path"] if "app_path" in keys else None
         cat = row["category"]
-        if not display or not label or not kind:
+        # Always re-resolve browsers: Edge titles rarely include domains, and old
+        # rows were saved as a useless catch-all "Браузер".
+        stale_browser = is_browser(app) and (not label or label in {"Браузер", "Браузер · другое"})
+        if is_browser(app) or stale_browser or not display or not label or not kind:
             resolved = resolve_activity(app, title, site)
-            display = display or resolved["display_name"]
-            kind = kind or resolved["activity_kind"]
-            label = label or resolved["activity_label"]
-            cat = cat or resolved["category"]
+            if is_browser(app):
+                display = resolved["display_name"]
+                kind = resolved["activity_kind"]
+                label = resolved["activity_label"]
+                cat = resolved["category"]
+                site = resolved.get("url_hint") or site
+            else:
+                display = display or resolved["display_name"]
+                kind = kind or resolved["activity_kind"]
+                label = label or resolved["activity_label"]
+                cat = cat or resolved["category"]
+                site = site or resolved.get("url_hint")
         hidden = is_system_noise(app) or kind == "system"
         return {
             "app_name": app,

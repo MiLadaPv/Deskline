@@ -19,6 +19,41 @@ def test_extract_site_from_title_common_patterns():
     assert extract_site_from_title("Cool video - YouTube", "msedge.exe") == "youtube.com"
 
 
+def test_extract_site_from_edge_multitab_titles():
+    habr = extract_site_from_title(
+        "Джейлбрейкаем чатботы: ChatGPT без фильтров / Хабр и еще 28 страниц — Личный: Microsoft Edge",
+        "msedge.exe",
+    )
+    assert habr == "habr.com"
+    yt = extract_site_from_title(
+        "(106) 30 MIN BURPEE HIIT CHALLENGE - YouTube — Личный: Microsoft Edge",
+        "msedge.exe",
+    )
+    assert yt == "youtube.com"
+
+
+def test_browser_activity_not_generic_browser():
+    meta = resolve_activity(
+        "msedge.exe",
+        "Джейлбрейкаем чатботы / Хабр и еще 28 страниц — Личный: Microsoft Edge",
+    )
+    assert meta["activity_label"] == "Habr"
+    assert meta["activity_label"] != "Браузер"
+
+    yt = resolve_activity(
+        "msedge.exe",
+        "(106) Workout - YouTube и еще 2 страницы — Личный: Microsoft Edge",
+    )
+    assert yt["activity_label"] == "YouTube"
+
+    page = resolve_activity(
+        "msedge.exe",
+        "Курсы по квантовой физике и еще 37 страниц — Личный: Microsoft Edge",
+    )
+    assert page["activity_label"] != "Браузер"
+    assert "Курсы по квантовой физике" in page["activity_label"]
+
+
 def test_display_names():
     assert display_name_for_app("msedge.exe") == "Microsoft Edge"
     assert display_name_for_app("mstsc.exe") == "Remote Desktop"

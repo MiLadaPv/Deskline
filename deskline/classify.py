@@ -168,6 +168,12 @@ SITE_ACTIVITIES: dict[str, tuple[ActivityKind, str, Category]] = {
     "chatgpt.com": ("work", "AI-чат", "productive"),
     "chat.openai.com": ("work", "AI-чат", "productive"),
     "claude.ai": ("work", "AI-чат", "productive"),
+    "habr.com": ("work", "Habr", "productive"),
+    "zoom.us": ("messaging", "Созвоны", "productive"),
+    "bbc.co.uk": ("other", "BBC", "neutral"),
+    "bbc.com": ("other", "BBC", "neutral"),
+    "linkedin.com": ("social", "LinkedIn", "neutral"),
+    "wikipedia.org": ("work", "Wikipedia", "productive"),
     "amazon.com": ("shopping", "Покупки", "neutral"),
     "ozon.ru": ("shopping", "Покупки", "neutral"),
     "wildberries.ru": ("shopping", "Покупки", "neutral"),
@@ -182,6 +188,77 @@ SEARCH_HOSTS = {
     "bing.com",
     "duckduckgo.com",
 }
+
+# Keywords in tab titles → site (Edge often omits the domain)
+TITLE_BRAND_HINTS: list[tuple[str, str]] = [
+    ("youtube", "youtube.com"),
+    ("habr", "habr.com"),
+    ("хабр", "habr.com"),
+    ("github", "github.com"),
+    ("gitlab", "gitlab.com"),
+    ("chatgpt", "chatgpt.com"),
+    ("openai", "chatgpt.com"),
+    ("claude.ai", "claude.ai"),
+    ("gmail", "gmail.com"),
+    ("whatsapp", "web.whatsapp.com"),
+    ("telegram", "web.telegram.org"),
+    ("discord", "discord.com"),
+    ("zoom", "zoom.us"),
+    ("notion", "notion.so"),
+    ("figma", "figma.com"),
+    ("reddit", "reddit.com"),
+    ("instagram", "instagram.com"),
+    ("facebook", "facebook.com"),
+    ("twitter", "twitter.com"),
+    ("stackoverflow", "stackoverflow.com"),
+    ("stack overflow", "stackoverflow.com"),
+    ("bbc", "bbc.co.uk"),
+    ("netflix", "netflix.com"),
+    ("twitch", "twitch.tv"),
+    ("tiktok", "tiktok.com"),
+    ("vk.com", "vk.com"),
+    ("вконтакте", "vk.com"),
+    ("яндекс.почта", "mail.yandex.ru"),
+    ("yandex mail", "mail.yandex.ru"),
+    ("mail.ru", "mail.ru"),
+    ("outlook", "outlook.live.com"),
+    ("linkedin", "linkedin.com"),
+    ("wikipedia", "wikipedia.org"),
+]
+
+_NEW_TAB_TITLES = {
+    "новая вкладка",
+    "new tab",
+    "new tab - personal",
+    "startsida",
+    "about:blank",
+    "edge://newtab",
+    "chrome://newtab",
+}
+
+_BROWSER_EXTRA_PAGES = re.compile(
+    r"\s+и еще\s+\d+\s+страниц\w*\b",
+    re.IGNORECASE,
+)
+_BROWSER_APP_TAIL = re.compile(
+    r"\s*[—\-–|]\s*(?:личный:\s*|work:\s*|рабочий:\s*)?"
+    r"(?:microsoft\s*edge|google\s*chrome|mozilla\s*firefox|firefox|opera|brave|vivaldi|yandex(?:\s*browser)?)\s*$",
+    re.IGNORECASE,
+)
+
+
+def clean_browser_title(window_title: str | None) -> str:
+    """Strip Edge/Chrome multi-tab and app-name suffixes from the window title."""
+    title = (window_title or "").strip()
+    if not title:
+        return ""
+    # Normalize rare unicode spaces Edge inserts in "Microsoft Edge"
+    title = title.replace("\u200b", "").replace("\xa0", " ")
+    title = _BROWSER_EXTRA_PAGES.sub("", title)
+    title = _BROWSER_APP_TAIL.sub("", title)
+    title = re.sub(r"\s+[—\-–|]\s*$", "", title)
+    return title.strip(" -—|·")
+
 
 APP_ACTIVITY_DEFAULTS: dict[str, tuple[ActivityKind, str]] = {
     "telegram.exe": ("messaging", "Мессенджер"),
@@ -234,11 +311,15 @@ def display_name_for_app(app_name: str | None) -> str:
 
 def extract_site_from_title(window_title: str | None, app_name: str | None = None) -> str | None:
     """Best-effort domain extraction from browser window titles."""
-    title = (window_title or "").strip()
-    if not title:
+    raw = (window_title or "").strip()
+    if not raw:
         return None
 
     app = normalize_app(app_name)
+    title = clean_browser_title(raw) if (not app or is_browser(app)) else raw
+    if not title:
+        title = raw
+
     if app and not is_browser(app):
         if "://" not in title and not re.search(r"\b[\w.-]+\.[a-z]{2,}\b", title, re.I):
             return None
@@ -248,7 +329,7 @@ def extract_site_from_title(window_title: str | None, app_name: str | None = Non
         host = urlparse(url_match.group(1)).hostname
         return _clean_host(host)
 
-    for sep in (" - ", " — ", " | ", " – "):
+    for sep in (" - ", " — ", " | ", " – ", " / "):
         if sep in title:
             parts = [p.strip() for p in title.split(sep) if p.strip()]
             for part in reversed(parts):
@@ -260,15 +341,24 @@ def extract_site_from_title(window_title: str | None, app_name: str | None = Non
     if token:
         return _clean_host(token.group(1))
 
-    # Brand hints without domain in title
     low = title.lower()
-    if "youtube" in low:
-        return "youtube.com"
-    if "gmail" in low:
-        return "gmail.com"
-    if "whatsapp" in low:
-        return "web.whatsapp.com"
+    for needle, host in TITLE_BRAND_HINTS:
+        if needle in low:
+            return host
     return None
+
+
+def _page_title_activity(window_title: str | None) -> str:
+    """Human label from a browser tab title when no site rule matched."""
+    page = clean_browser_title(window_title)
+    if not page:
+        return "Новая вкладка"
+    low = page.lower()
+    if low in _NEW_TAB_TITLES or low.startswith("new tab"):
+        return "Новая вкладка"
+    if len(page) > 52:
+        return page[:49].rstrip(" -—|·") + "…"
+    return page
 
 
 def _maybe_host(value: str) -> str | None:
@@ -371,15 +461,20 @@ def resolve_activity(
         }
 
     if is_browser(app):
-        # Unknown site in browser
+        # Unknown site — never dump everything into a single "Браузер" bucket
         cat = "neutral"
         if app in user_app_rules:
             cat = user_app_rules[app]
-        label = site if site else "Браузер · другое"
+        if site:
+            label = site
+            kind: ActivityKind = "other"
+        else:
+            label = _page_title_activity(window_title)
+            kind = "other"
         return {
             "display_name": display,
-            "activity_kind": "other" if site else "other",
-            "activity_label": label if site else "Браузер",
+            "activity_kind": kind,
+            "activity_label": label,
             "category": cat,
             "url_hint": site,
             "hidden": False,

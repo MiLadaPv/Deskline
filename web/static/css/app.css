@@ -235,26 +235,18 @@ main {
   margin: 0;
   padding: 0;
   display: grid;
-  gap: 10px;
+  gap: 0;
 }
 
 .rank-list li {
   display: grid;
-  grid-template-columns: auto 1fr auto;
+  grid-template-columns: 28px minmax(0, 1fr) auto;
   align-items: center;
-  gap: 12px;
+  column-gap: 12px;
   padding: 14px 0;
   border-bottom: 1px solid var(--line);
-  opacity: 0;
-  animation: rise 0.5s ease forwards;
   font-family: var(--sans);
 }
-
-.rank-list li:nth-child(1) { animation-delay: 0.05s; }
-.rank-list li:nth-child(2) { animation-delay: 0.1s; }
-.rank-list li:nth-child(3) { animation-delay: 0.15s; }
-.rank-list li:nth-child(4) { animation-delay: 0.2s; }
-.rank-list li:nth-child(5) { animation-delay: 0.25s; }
 
 .rank-icon {
   width: 28px;
@@ -266,16 +258,20 @@ main {
   color: var(--accent);
   font-size: 0.95rem;
   line-height: 1;
-  flex-shrink: 0;
+  justify-self: center;
+  align-self: center;
 }
 
 .rank-icon-img {
   width: 28px;
   height: 28px;
   object-fit: contain;
+  object-position: center;
   border-radius: 6px;
   background: transparent;
-  flex-shrink: 0;
+  display: block;
+  justify-self: center;
+  align-self: center;
 }
 
 .rank-name {
@@ -283,10 +279,18 @@ main {
   font-weight: 500;
   font-size: 1rem;
   letter-spacing: 0;
+  line-height: 1.25;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .rank-meta {
   font-family: var(--sans);
   font-weight: 500;
+  line-height: 1.25;
+  white-space: nowrap;
+  align-self: center;
   color: var(--ink-soft);
   font-size: 0.92rem;
 }
