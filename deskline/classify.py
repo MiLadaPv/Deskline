@@ -60,6 +60,10 @@ SYSTEM_APPS = {
     "applicationframehost.exe",
     "systemsettings.exe",
     "securityhealthsystray.exe",
+    # Remote Desktop client itself — track work on the PC, not the RDP window
+    "mstsc.exe",
+    "msrdc.exe",
+    "rdpclip.exe",
 }
 
 DEFAULT_APP_RULES: dict[str, Category] = {
@@ -80,7 +84,6 @@ DEFAULT_APP_RULES: dict[str, Category] = {
     "spotify.exe": "distracting",
     "steam.exe": "distracting",
     "telegram.exe": "distracting",
-    "mstsc.exe": "productive",
 }
 
 DEFAULT_SITE_RULES: dict[str, Category] = {
@@ -157,7 +160,6 @@ APP_ACTIVITY_DEFAULTS: dict[str, tuple[ActivityKind, str]] = {
     "discord.exe": ("messaging", "Discord"),
     "slack.exe": ("messaging", "Slack"),
     "outlook.exe": ("email", "Почта"),
-    "mstsc.exe": ("remote", "Удалённый рабочий стол"),
     "spotify.exe": ("video", "Музыка"),
     "steam.exe": ("other", "Игры"),
     "code.exe": ("work", "Разработка"),

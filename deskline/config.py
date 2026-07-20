@@ -27,6 +27,7 @@ WEB_ROOT = PROJECT_ROOT / "web"
 DATA_ROOT = Path.home() / "AppData" / "Local" / "Deskline"
 DB_PATH = DATA_ROOT / "deskline.db"
 SCREENSHOTS_DIR = DATA_ROOT / "screenshots"
+ICONS_DIR = DATA_ROOT / "icons"
 CONFIG_PATH = DATA_ROOT / "config.json"
 
 DEFAULT_CONFIG: dict[str, Any] = {
@@ -45,6 +46,7 @@ DEFAULT_CONFIG: dict[str, Any] = {
 def ensure_data_dirs() -> None:
     DATA_ROOT.mkdir(parents=True, exist_ok=True)
     SCREENSHOTS_DIR.mkdir(parents=True, exist_ok=True)
+    ICONS_DIR.mkdir(parents=True, exist_ok=True)
 
 
 def load_config() -> dict[str, Any]:

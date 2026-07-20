@@ -10,6 +10,7 @@ from typing import Any, Iterator
 from deskline.capture import delete_screenshot_file
 from deskline.classify import display_name_for_app, is_system_noise, resolve_activity
 from deskline.config import DB_PATH, SCREENSHOTS_DIR, ensure_data_dirs
+from deskline.icons import ensure_app_icon, icon_url_for_app
 
 
 def _utcnow() -> datetime:
@@ -39,6 +40,7 @@ class SessionRow:
     display_name: str | None = None
     activity_kind: str | None = None
     activity_label: str | None = None
+    app_path: str | None = None
 
 
 class Database:
@@ -108,6 +110,7 @@ class Database:
                 ("display_name", "TEXT"),
                 ("activity_kind", "TEXT"),
                 ("activity_label", "TEXT"),
+                ("app_path", "TEXT"),
             ):
                 if col not in cols:
                     conn.execute(f"ALTER TABLE sessions ADD COLUMN {col} {decl}")
@@ -152,6 +155,7 @@ class Database:
         display_name: str | None = None,
         activity_kind: str | None = None,
         activity_label: str | None = None,
+        app_path: str | None = None,
     ) -> int:
         started = started_at or _utcnow()
         with self.connect() as conn:
@@ -159,9 +163,9 @@ class Database:
                 """
                 INSERT INTO sessions(
                     app_name, window_title, url_hint, started_at, category,
-                    display_name, activity_kind, activity_label
+                    display_name, activity_kind, activity_label, app_path
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     app_name,
@@ -172,6 +176,7 @@ class Database:
                     display_name,
                     activity_kind,
                     activity_label,
+                    app_path,
                 ),
             )
             return int(cur.lastrowid)
@@ -226,6 +231,7 @@ class Database:
             display_name=row["display_name"] if "display_name" in keys else None,
             activity_kind=row["activity_kind"] if "activity_kind" in keys else None,
             activity_label=row["activity_label"] if "activity_label" in keys else None,
+            app_path=row["app_path"] if "app_path" in keys else None,
         )
 
     def _enrich(self, row: sqlite3.Row) -> dict[str, Any]:
@@ -236,6 +242,7 @@ class Database:
         display = row["display_name"] if "display_name" in keys else None
         kind = row["activity_kind"] if "activity_kind" in keys else None
         label = row["activity_label"] if "activity_label" in keys else None
+        app_path = row["app_path"] if "app_path" in keys else None
         cat = row["category"]
         if not display or not label or not kind:
             resolved = resolve_activity(app, title, site)
@@ -246,6 +253,7 @@ class Database:
         hidden = is_system_noise(app) or kind == "system"
         return {
             "app_name": app,
+            "app_path": app_path,
             "display_name": display or display_name_for_app(app),
             "activity_kind": kind or "other",
             "activity_label": label or display_name_for_app(app),
@@ -277,6 +285,9 @@ class Database:
         by_activity: dict[str, float] = {}
         activity_kinds: dict[str, str] = {}
         app_kinds: dict[str, str] = {}
+        app_exe_by_label: dict[str, str] = {}
+        app_path_by_exe: dict[str, str] = {}
+        activity_app_secs: dict[str, dict[str, float]] = {}
         by_kind: dict[str, float] = {}
         total = 0.0
         tracked = 0.0
@@ -298,18 +309,43 @@ class Database:
             cat = meta["category"] if meta["category"] in by_cat else "neutral"
             by_cat[cat] += dur
             app_label = meta["display_name"]
+            exe = (meta["app_name"] or "unknown.exe").lower()
             by_app[app_label] = by_app.get(app_label, 0.0) + dur
             if app_label not in app_kinds:
                 app_kinds[app_label] = meta["activity_kind"] or "other"
+            if app_label not in app_exe_by_label:
+                app_exe_by_label[app_label] = exe
+            if meta.get("app_path") and exe not in app_path_by_exe:
+                app_path_by_exe[exe] = meta["app_path"]
             act = meta["activity_label"]
             by_activity[act] = by_activity.get(act, 0.0) + dur
             kind = meta["activity_kind"] or "other"
             if act not in activity_kinds:
                 activity_kinds[act] = kind
+            bucket = activity_app_secs.setdefault(act, {})
+            bucket[exe] = bucket.get(exe, 0.0) + dur
             by_kind[kind] = by_kind.get(kind, 0.0) + dur
             site = meta["url_hint"]
             if site:
                 by_site[site] = by_site.get(site, 0.0) + dur
+
+        def _top_exe(label: str) -> str:
+            secs = activity_app_secs.get(label) or {}
+            if not secs:
+                return "unknown.exe"
+            return max(secs.items(), key=lambda kv: kv[1])[0]
+
+        for exe, path in app_path_by_exe.items():
+            try:
+                ensure_app_icon(exe, path)
+            except Exception:
+                pass
+        for exe in {_top_exe(a) for a in by_activity} | set(app_exe_by_label.values()):
+            if exe not in app_path_by_exe:
+                try:
+                    ensure_app_icon(exe, None)
+                except Exception:
+                    pass
 
         focus = by_cat["productive"]
         focus_pct = (focus / tracked * 100.0) if tracked else 0.0
@@ -322,7 +358,13 @@ class Database:
             "by_kind": by_kind,
             "by_activity": sorted(
                 [
-                    {"name": k, "sec": v, "kind": activity_kinds.get(k, "other")}
+                    {
+                        "name": k,
+                        "sec": v,
+                        "kind": activity_kinds.get(k, "other"),
+                        "app_name": _top_exe(k),
+                        "icon_url": icon_url_for_app(_top_exe(k)),
+                    }
                     for k, v in by_activity.items()
                 ],
                 key=lambda x: x["sec"],
@@ -330,14 +372,28 @@ class Database:
             ),
             "by_app": sorted(
                 [
-                    {"name": k, "sec": v, "kind": app_kinds.get(k, "other")}
+                    {
+                        "name": k,
+                        "sec": v,
+                        "kind": app_kinds.get(k, "other"),
+                        "app_name": app_exe_by_label.get(k, "unknown.exe"),
+                        "icon_url": icon_url_for_app(app_exe_by_label.get(k)),
+                    }
                     for k, v in by_app.items()
                 ],
                 key=lambda x: x["sec"],
                 reverse=True,
             ),
             "by_site": sorted(
-                [{"name": k, "sec": v, "kind": "search"} for k, v in by_site.items()],
+                [
+                    {
+                        "name": k,
+                        "sec": v,
+                        "kind": "search",
+                        "icon_url": icon_url_for_app("msedge.exe"),
+                    }
+                    for k, v in by_site.items()
+                ],
                 key=lambda x: x["sec"],
                 reverse=True,
             ),

@@ -144,7 +144,14 @@ class Tracker:
                     display_name=meta["display_name"],
                     activity_kind=meta["activity_kind"],
                     activity_label=meta["activity_label"],
+                    app_path=win.app_path,
                 )
+                try:
+                    from deskline.icons import ensure_app_icon
+
+                    ensure_app_icon(win.app_name, win.app_path)
+                except Exception:
+                    pass
                 self._current_key = key
                 if cfg.get("screenshots_enabled") and cfg.get("screenshot_on_app_switch"):
                     self._shot_unlocked("app_switch")

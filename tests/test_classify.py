@@ -41,14 +41,56 @@ def test_resolve_desktop_apps():
     meta = resolve_activity("telegram.exe", "Chat with Ann")
     assert meta["activity_label"] == "Мессенджер"
     assert meta["display_name"] == "Telegram"
-    rdp = resolve_activity("mstsc.exe", "user - remote")
-    assert rdp["activity_kind"] == "remote"
 
 
 def test_system_noise_hidden():
     meta = resolve_activity("lockapp.exe", "Lock")
     assert meta["hidden"] is True
     assert meta["activity_kind"] == "system"
+
+
+def test_rdp_client_hidden_from_rankings():
+    for exe in ("mstsc.exe", "msrdc.exe", "rdpclip.exe"):
+        meta = resolve_activity(exe, "Remote Desktop Connection")
+        assert meta["hidden"] is True
+        assert meta["activity_kind"] == "system"
+
+
+def test_db_summary_excludes_rdp_client(tmp_path: Path):
+    db = Database(tmp_path / "rdp.db")
+    start = datetime.now().astimezone() - timedelta(minutes=30)
+    sid = db.start_session(
+        "mstsc.exe",
+        "server - Remote Desktop Connection",
+        None,
+        "productive",
+        started_at=start,
+        display_name="Remote Desktop",
+        activity_kind="system",
+        activity_label="Система",
+    )
+    db.end_session(sid, ended_at=start + timedelta(minutes=20))
+    sid2 = db.start_session(
+        "cursor.exe",
+        "main.py",
+        None,
+        "productive",
+        started_at=start + timedelta(minutes=20),
+        display_name="Cursor",
+        activity_kind="work",
+        activity_label="Разработка",
+    )
+    db.end_session(sid2, ended_at=start + timedelta(minutes=30))
+
+    summary = db.summary_for_day()
+    activity_names = [x["name"] for x in summary["by_activity"]]
+    app_names = [x["name"] for x in summary["by_app"]]
+    assert "Remote Desktop" not in activity_names
+    assert "Удалённый рабочий стол" not in activity_names
+    assert "mstsc.exe" not in activity_names
+    assert "Remote Desktop" not in app_names
+    assert "Разработка" in activity_names
+    assert "Cursor" in app_names
 
 
 def test_db_summary_uses_friendly_labels(tmp_path: Path):

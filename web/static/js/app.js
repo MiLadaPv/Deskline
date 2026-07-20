@@ -66,23 +66,6 @@ function renderBars(byCategory, total) {
   });
 }
 
-function kindIcon(kind) {
-  const map = {
-    video: "▶",
-    messaging: "💬",
-    email: "✉",
-    search: "⌕",
-    social: "◎",
-    work: "✎",
-    remote: "⧉",
-    browser: "◉",
-    shopping: "▣",
-    system: "⚙",
-    other: "•",
-  };
-  return map[kind] || map.other;
-}
-
 function renderList(el, rows, emptyText) {
   if (!rows.length) {
     el.innerHTML = `<li><span class="rank-icon" aria-hidden="true">•</span><span class="rank-name">${emptyText || "Пока нет данных"}</span><span class="rank-meta">Оставьте Deskline включённым</span></li>`;
@@ -91,9 +74,11 @@ function renderList(el, rows, emptyText) {
   el.innerHTML = rows
     .slice(0, 15)
     .map((r) => {
-      const kind = r.kind || "other";
+      const icon = r.icon_url
+        ? `<img class="rank-icon-img" src="${escapeHtml(r.icon_url)}" alt="" width="28" height="28" loading="lazy" onerror="this.replaceWith(Object.assign(document.createElement('span'),{className:'rank-icon',textContent:'•'}))" />`
+        : `<span class="rank-icon" aria-hidden="true">•</span>`;
       return `<li>
-        <span class="rank-icon" title="${escapeHtml(kind)}" aria-hidden="true">${kindIcon(kind)}</span>
+        ${icon}
         <span class="rank-name">${escapeHtml(r.name)}</span>
         <span class="rank-meta">${fmtDur(r.sec)}</span>
       </li>`;

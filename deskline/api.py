@@ -29,11 +29,13 @@ from deskline.config import (
     BASE_URL,
     HOST,
     PORT,
+    ICONS_DIR,
     SCREENSHOTS_DIR,
     WEB_ROOT,
     load_config,
     save_config,
 )
+from deskline.icons import icon_path_for_app
 from deskline.db import Database
 from deskline.tracker import Tracker
 
@@ -238,6 +240,21 @@ def create_app(tracker: Tracker, db: Database | None = None) -> FastAPI:
         if not path.exists() or not path.is_file():
             raise HTTPException(404, "Screenshot not found")
         return FileResponse(path, media_type="image/jpeg")
+
+    @app.get("/media/icons/{name}")
+    def media_icon(name: str) -> FileResponse:
+        safe = Path(name).name
+        path = ICONS_DIR / safe
+        if not path.exists() or not path.is_file():
+            # Try generating a placeholder for this name
+            stem = safe[:-4] if safe.endswith(".png") else safe
+            path = icon_path_for_app(stem)
+            from deskline.icons import ensure_app_icon
+
+            ensure_app_icon(stem, None)
+        if not path.exists() or not path.is_file():
+            raise HTTPException(404, "Icon not found")
+        return FileResponse(path, media_type="image/png")
 
     @app.post("/api/control/pause")
     def pause() -> dict[str, Any]:

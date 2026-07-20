@@ -18,10 +18,11 @@ class ActiveWindow:
     app_name: str
     window_title: str
     pid: int
+    app_path: str | None = None
 
 
 def get_active_window() -> ActiveWindow | None:
-    """Return foreground window process name and title on Windows."""
+    """Return foreground window process name, path, and title on Windows."""
     try:
         hwnd = win32gui.GetForegroundWindow() if win32gui else ctypes.windll.user32.GetForegroundWindow()
         if not hwnd:
@@ -38,14 +39,19 @@ def get_active_window() -> ActiveWindow | None:
             ctypes.windll.user32.GetWindowThreadProcessId(hwnd, ctypes.byref(pid))
             pid = int(pid.value)
 
-        app_name = _process_name(pid) or "unknown.exe"
-        return ActiveWindow(app_name=app_name.lower(), window_title=title, pid=pid)
+        path = _process_path(pid)
+        app_name = (path.rsplit("\\", 1)[-1] if path else None) or "unknown.exe"
+        return ActiveWindow(
+            app_name=app_name.lower(),
+            window_title=title,
+            pid=pid,
+            app_path=path,
+        )
     except Exception:
         return None
 
 
-def _process_name(pid: int) -> str | None:
-    # Prefer QueryFullProcessImageName via ctypes (no psutil required)
+def _process_path(pid: int) -> str | None:
     PROCESS_QUERY_LIMITED_INFORMATION = 0x1000
     kernel32 = ctypes.windll.kernel32
     handle = kernel32.OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, False, pid)
@@ -55,8 +61,14 @@ def _process_name(pid: int) -> str | None:
         buf = ctypes.create_unicode_buffer(1024)
         size = wintypes.DWORD(len(buf))
         if kernel32.QueryFullProcessImageNameW(handle, 0, buf, ctypes.byref(size)):
-            path = buf.value
-            return path.rsplit("\\", 1)[-1]
+            return buf.value
     finally:
         kernel32.CloseHandle(handle)
     return None
+
+
+def _process_name(pid: int) -> str | None:
+    path = _process_path(pid)
+    if not path:
+        return None
+    return path.rsplit("\\", 1)[-1]
