@@ -31,14 +31,20 @@
         </div>
       </div>
       <div class="control-strip">
-        <label class="work-toggle" title="В режиме «На работе» мессенджеры считаются фокусом">
+        <label class="work-toggle" title="Мессенджеры считаются фокусом">
           <input type="checkbox" id="workModeToggle" />
           <span>На работе</span>
         </label>
         <label class="focus-select">
-          <span class="sr-only">Текущий проект</span>
+          <span class="sr-only">Проект</span>
           <select id="currentProjectSelect" aria-label="Текущий проект">
-            <option value="">Проект: не выбран</option>
+            <option value="">Проект…</option>
+          </select>
+        </label>
+        <label class="focus-select">
+          <span class="sr-only">Задача</span>
+          <select id="currentTaskSelect" aria-label="Текущая задача" disabled>
+            <option value="">Задача…</option>
           </select>
         </label>
         <button type="button" class="btn primary" id="toggleBtn">Пауза</button>
@@ -74,18 +80,16 @@
         </label>
       </div>
 
-      <div class="kpi-strip" id="kpiStrip" aria-label="Activity Summary"></div>
+      <div class="kpi-strip" id="kpiStrip" aria-label="Сводка за день"></div>
 
       <div class="charts-grid">
         <div class="chart-card">
-          <h3 class="subhead">Продуктивность</h3>
-          <p class="hint">Как в Time Doctor: productive / neutral / unproductive</p>
+          <h3 class="subhead">Фокус и отвлечения</h3>
           <div class="stack-bar" id="prodStack"></div>
           <div class="cats" id="catBars"></div>
         </div>
         <div class="chart-card">
-          <h3 class="subhead">Типы занятий</h3>
-          <p class="hint">Messaging, work, video и др.</p>
+          <h3 class="subhead">Чем занимались</h3>
           <div class="kind-bars" id="kindBars"></div>
         </div>
       </div>
@@ -93,12 +97,10 @@
       <div class="charts-grid trends-grid">
         <div class="chart-card">
           <h3 class="subhead">Часы за неделю</h3>
-          <p class="hint">Hours Tracked — активное время по дням</p>
           <div class="hours-chart" id="hoursChart"></div>
         </div>
         <div class="chart-card">
-          <h3 class="subhead">Продуктивность по дням</h3>
-          <p class="hint">Productivity % — stacked по категориям</p>
+          <h3 class="subhead">Фокус по дням</h3>
           <div class="prod-days-chart" id="prodDaysChart"></div>
         </div>
       </div>
@@ -109,7 +111,6 @@
 
     <section id="panel-day" class="panel">
       <h2>День</h2>
-      <p class="hint">Timeline как в Time Doctor: блоки активности по часам. Idle — без ввода. Сон ПК не засчитывается.</p>
       <div class="gantt-wrap" id="dayGantt"></div>
       <h3 class="subhead">Сессии</h3>
       <ol class="timeline" id="timelineList"></ol>
@@ -119,48 +120,60 @@
       <div class="panel-head">
         <h2>Где время</h2>
       </div>
-      <p class="hint">Три разных среза одного дня — не дубли, а разные углы взгляда.</p>
       <div class="seg" role="tablist" aria-label="Срез времени">
         <button type="button" class="seg-btn active" data-usage="activities">Занятия</button>
         <button type="button" class="seg-btn" data-usage="apps">Приложения</button>
         <button type="button" class="seg-btn" data-usage="sites">Сайты</button>
       </div>
       <div class="usage-pane active" id="usage-activities" data-usage-pane="activities">
-        <p class="hint usage-hint"><strong>Занятия</strong> — что вы делали: YouTube, почта, мессенджер, VS Code. Браузер дробится по смыслу вкладки, а не одним «Edge».</p>
         <ol class="rank-list" id="activitiesList"></ol>
       </div>
       <div class="usage-pane" id="usage-apps" data-usage-pane="apps" hidden>
-        <p class="hint usage-hint"><strong>Приложения</strong> — по программе целиком: весь Edge / Telegram / Cursor одной строкой.</p>
         <ol class="rank-list" id="appsList"></ol>
       </div>
       <div class="usage-pane" id="usage-sites" data-usage-pane="sites" hidden>
-        <p class="hint usage-hint"><strong>Сайты</strong> — только домены из браузера: youtube.com, github.com…</p>
         <ol class="rank-list" id="sitesList"></ol>
       </div>
     </section>
 
     <section id="panel-projects" class="panel">
-      <h2>Проекты</h2>
-      <p class="hint">Как в Time Doctor: выберите текущий проект в шапке — новое время пойдёт на него.</p>
-      <form id="projectCreateForm" class="inline-form">
-        <input type="text" name="name" placeholder="Название проекта" required maxlength="120" />
-        <input type="color" name="color" value="#2f6f5e" title="Цвет" />
-        <button type="submit" class="btn">Добавить</button>
-      </form>
-      <div class="projects-list" id="projectsList"></div>
-      <h3 class="subhead">Время по проектам сегодня</h3>
+      <div class="panel-head">
+        <h2>Проекты и задачи</h2>
+      </div>
+      <div class="pt-workspace">
+        <aside class="pt-col pt-projects">
+          <div class="pt-col-head">
+            <h3 class="subhead">Проекты</h3>
+          </div>
+          <form id="projectCreateForm" class="inline-form pt-form">
+            <input type="text" name="name" placeholder="Новый проект" required maxlength="120" />
+            <input type="color" name="color" value="#2f6f5e" title="Цвет" />
+            <button type="submit" class="btn">+</button>
+          </form>
+          <div class="pt-list" id="projectsList"></div>
+        </aside>
+        <section class="pt-col pt-tasks">
+          <div class="pt-col-head">
+            <h3 class="subhead" id="tasksProjectTitle">Задачи</h3>
+          </div>
+          <form id="taskCreateForm" class="inline-form pt-form">
+            <input type="text" name="name" placeholder="Новая задача" required maxlength="120" />
+            <button type="submit" class="btn" id="taskCreateBtn" disabled>+</button>
+          </form>
+          <div class="pt-list" id="tasksList"></div>
+        </section>
+      </div>
+      <h3 class="subhead">Время сегодня</h3>
       <ol class="rank-list" id="projectTimeList"></ol>
     </section>
 
     <section id="panel-ratings" class="panel">
       <h2>Рейтинги</h2>
-      <p class="hint">Фокус / Нейтрально / Отвлечение / Без оценки. В режиме «На работе» мессенджеры = фокус, если нет своего правила.</p>
       <div class="ratings-list" id="ratingsList"></div>
     </section>
 
     <section id="panel-shots" class="panel">
       <h2>Скриншоты</h2>
-      <p class="hint">Откройте крупно и листайте колесом мыши или стрелками. Красная рамка — отвлечение в режиме «На работе».</p>
       <div class="shots-grid" id="shotsGrid"></div>
     </section>
 
@@ -169,24 +182,23 @@
       <form id="settingsForm" class="settings-form">
         <label class="check">
           <input type="checkbox" name="work_mode" />
-          Режим «На работе» (мессенджеры = фокус)
+          Режим «На работе»
         </label>
         <label>
-          Ключевые слова рабочих чатов (через запятую)
-          <input type="text" name="work_chat_keywords" placeholder="RG-Soft, клиент, standup" />
+          Рабочие чаты (слова в заголовке, через запятую)
+          <input type="text" name="work_chat_keywords" placeholder="клиент, standup, RG-Soft" />
         </label>
         <label>
-          Считать idle после (сек без ввода)
+          Без ввода после (сек)
           <input type="number" name="idle_after_sec" min="30" max="3600" step="30" />
         </label>
-        <p class="hint">Idle не уменьшает фокус, но снижает «Активность». Сон ПК не засчитывается в активное время.</p>
         <label class="check">
           <input type="checkbox" name="poor_time_popup" />
-          Напоминать об отвлечениях (только в режиме «На работе»)
+          Напоминать об отвлечениях в режиме «На работе»
         </label>
         <label class="check">
           <input type="checkbox" name="blur_screenshots" />
-          Размывать скриншоты (privacy)
+          Размывать скриншоты
         </label>
         <label>
           Интервал скриншотов (сек)
@@ -204,7 +216,7 @@
           Хранить скриншоты (дней)
           <input type="number" name="screenshot_retention_days" min="0" max="3650" step="1" />
         </label>
-        <p class="hint">0 = не удалять автоматически. По умолчанию 7 дней.</p>
+        <p class="hint">0 — не удалять. По умолчанию 7.</p>
         <p class="hint" id="shotsStorageHint">Папка скриншотов…</p>
         <label class="check">
           <input type="checkbox" name="open_dashboard_on_start" />

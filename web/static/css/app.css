@@ -825,7 +825,132 @@ main {
   font-size: 0.9rem;
 }
 
-/* —— Time Doctor–style evaluation charts —— */
+/* Projects · Tasks workspace */
+.pt-workspace {
+  display: grid;
+  grid-template-columns: minmax(200px, 0.9fr) minmax(240px, 1.2fr);
+  gap: 14px;
+  margin: 12px 0 22px;
+}
+
+.pt-col {
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.55);
+  padding: 12px;
+  min-height: 280px;
+}
+
+.pt-col-head .subhead {
+  margin: 0 0 10px;
+}
+
+.pt-form {
+  margin: 0 0 12px;
+}
+
+.pt-form .btn {
+  padding: 8px 12px;
+  min-width: 40px;
+}
+
+.pt-list {
+  display: grid;
+  gap: 6px;
+}
+
+.pt-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  text-align: left;
+  border: 1px solid transparent;
+  background: rgba(255, 255, 255, 0.4);
+  padding: 8px 10px;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+
+button.pt-item {
+  appearance: none;
+}
+
+.pt-item:hover {
+  border-color: var(--line);
+}
+
+.pt-item.is-selected,
+.pt-item.is-active {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.pt-item.is-done .pt-item-name {
+  text-decoration: line-through;
+  color: var(--ink-soft);
+}
+
+.pt-project {
+  border-left: 3px solid var(--pc, var(--accent));
+}
+
+.pt-swatch {
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  background: var(--pc, var(--accent));
+  flex-shrink: 0;
+}
+
+.pt-item-main {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.pt-item-name {
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pt-item-meta {
+  font-size: 0.78rem;
+  color: var(--ink-soft);
+}
+
+.pt-check {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  font-size: 1.05rem;
+  color: var(--accent);
+  cursor: pointer;
+  width: 28px;
+  padding: 0;
+}
+
+.pt-del {
+  margin-top: 0 !important;
+  padding: 4px 8px !important;
+  font-size: 0.9rem;
+  line-height: 1;
+}
+
+.pt-item .btn {
+  padding: 6px 10px;
+  font-size: 0.8rem;
+}
+
+@media (max-width: 800px) {
+  .pt-workspace {
+    grid-template-columns: 1fr;
+  }
+}
 .kpi-strip {
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));

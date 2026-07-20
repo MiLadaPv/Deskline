@@ -418,6 +418,7 @@ class Database:
         by_site: dict[str, float] = {}
         by_activity: dict[str, float] = {}
         by_project: dict[int, float] = {}
+        by_task: dict[int, float] = {}
         activity_kinds: dict[str, str] = {}
         app_kinds: dict[str, str] = {}
         app_exe_by_label: dict[str, str] = {}
@@ -482,6 +483,9 @@ class Database:
             pid = meta.get("project_id")
             if pid is not None:
                 by_project[int(pid)] = by_project.get(int(pid), 0.0) + dur
+            tid = meta.get("task_id")
+            if tid is not None:
+                by_task[int(tid)] = by_task.get(int(tid), 0.0) + dur
 
         def _top_exe(label: str) -> str:
             secs = activity_app_secs.get(label) or {}
@@ -582,6 +586,15 @@ class Database:
                 [
                     {"project_id": k, "sec": v}
                     for k, v in by_project.items()
+                    if v >= 1.0
+                ],
+                key=lambda x: x["sec"],
+                reverse=True,
+            ),
+            "by_task": sorted(
+                [
+                    {"task_id": k, "sec": v}
+                    for k, v in by_task.items()
                     if v >= 1.0
                 ],
                 key=lambda x: x["sec"],
@@ -761,8 +774,6 @@ class Database:
 
         return {"deleted_rows": deleted_rows, "deleted_files": deleted_files}
 
-        return {"deleted_rows": deleted_rows, "deleted_files": deleted_files}
-
     def list_projects(self, include_archived: bool = False) -> list[dict[str, Any]]:
         with self.connect() as conn:
             if include_archived:
@@ -784,6 +795,11 @@ class Database:
                 (name, color, _iso(_utcnow())),
             )
             pid = int(cur.lastrowid)
+            # Time Doctor: project needs at least one task to be usable
+            conn.execute(
+                "INSERT INTO tasks(project_id, name, done, created_at) VALUES(?, ?, 0, ?)",
+                (pid, "Основная", _iso(_utcnow())),
+            )
             row = conn.execute("SELECT * FROM projects WHERE id=?", (pid,)).fetchone()
         return dict(row)
 

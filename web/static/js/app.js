@@ -120,9 +120,9 @@ function renderKpis(summary) {
     ? Math.round(((summary.by_category?.distracting || 0) / total) * 100)
     : 0;
   const items = [
-    { label: "Всего", value: fmtDur(total), sub: "tracked" },
+    { label: "Всего", value: fmtDur(total), sub: "за день" },
     { label: "Активно", value: fmtDur(summary.active_sec), sub: `${summary.activity_pct ?? 0}%` },
-    { label: "Idle", value: `${idlePct}%`, sub: fmtDur(summary.idle_sec) },
+    { label: "Без ввода", value: `${idlePct}%`, sub: fmtDur(summary.idle_sec) },
     { label: "Фокус", value: `${summary.focus_pct ?? 0}%`, sub: fmtDur(summary.focus_sec) },
     { label: "Отвлечения", value: `${unprodPct}%`, sub: fmtDur(summary.by_category?.distracting || 0) },
   ];
@@ -173,7 +173,7 @@ function renderKindBars(byKind, total) {
   if (!el) return;
   const KIND_LABELS = {
     work: "Работа",
-    messaging: "Мессенджеры",
+    messaging: "Чаты",
     email: "Почта",
     video: "Видео",
     social: "Соцсети",
@@ -434,12 +434,49 @@ function closeLightbox() {
 }
 
 let projectCache = [];
+let taskCache = [];
 let filterProjectId = "";
+let selectedProjectId = "";
+
+async function setFocus(projectId, taskId) {
+  await api("/api/focus", {
+    method: "POST",
+    body: JSON.stringify({
+      project_id: projectId != null && projectId !== "" ? Number(projectId) : null,
+      task_id: taskId != null && taskId !== "" ? Number(taskId) : null,
+    }),
+  });
+  lastStatusKey = "";
+}
+
+function fillTaskSelect(tasks, currentTaskId) {
+  taskCache = tasks || [];
+  const sel = document.getElementById("currentTaskSelect");
+  if (!sel) return;
+  const open = taskCache.filter((t) => !t.done);
+  if (!selectedProjectId) {
+    sel.innerHTML = `<option value="">Задача…</option>`;
+    sel.disabled = true;
+    return;
+  }
+  sel.disabled = false;
+  sel.innerHTML =
+    `<option value="">Задача…</option>` +
+    open
+      .map(
+        (t) =>
+          `<option value="${t.id}" ${String(currentTaskId) === String(t.id) ? "selected" : ""}>${escapeHtml(t.name)}</option>`
+      )
+      .join("");
+  if (currentTaskId != null && String(currentTaskId)) {
+    sel.value = String(currentTaskId);
+  }
+}
 
 function fillProjectSelects(projects, currentId) {
   projectCache = projects || [];
   const opts =
-    `<option value="">Проект: не выбран</option>` +
+    `<option value="">Проект…</option>` +
     projectCache
       .map(
         (p) =>
@@ -454,16 +491,64 @@ function fillProjectSelects(projects, currentId) {
   const cur = document.getElementById("currentProjectSelect");
   const fil = document.getElementById("filterProjectToday");
   if (cur) {
-    const keep = cur.value;
     cur.innerHTML = opts;
-    if (currentId != null) cur.value = String(currentId);
-    else if (keep) cur.value = keep;
+    if (currentId != null && currentId !== "") cur.value = String(currentId);
   }
   if (fil) {
     const keep = fil.value;
     fil.innerHTML = filterOpts;
     fil.value = keep || filterProjectId || "";
   }
+}
+
+async function renderTasksPane(projectId, settings, summary) {
+  const list = document.getElementById("tasksList");
+  const title = document.getElementById("tasksProjectTitle");
+  const createBtn = document.getElementById("taskCreateBtn");
+  const form = document.getElementById("taskCreateForm");
+  if (!list) return;
+
+  if (!projectId) {
+    if (title) title.textContent = "Задачи";
+    if (createBtn) createBtn.disabled = true;
+    if (form) form.querySelector("input[name=name]").disabled = true;
+    list.innerHTML = `<p class="hint">Выберите проект слева.</p>`;
+    fillTaskSelect([], null);
+    return;
+  }
+
+  const proj = projectCache.find((p) => String(p.id) === String(projectId));
+  if (title) title.textContent = proj ? `Задачи · ${proj.name}` : "Задачи";
+  if (createBtn) createBtn.disabled = false;
+  if (form) form.querySelector("input[name=name]").disabled = false;
+
+  const tasks = await api(`/api/tasks?project_id=${encodeURIComponent(projectId)}`);
+  fillTaskSelect(tasks, settings.current_task_id);
+
+  const secByTask = Object.fromEntries(
+    (summary.by_task || []).map((r) => [String(r.task_id), r.sec])
+  );
+  const focusTask = String(settings.current_task_id || "");
+  if (!tasks.length) {
+    list.innerHTML = `<p class="hint">Добавьте первую задачу.</p>`;
+    return;
+  }
+  list.innerHTML = tasks
+    .map((t) => {
+      const active = focusTask === String(t.id);
+      const done = !!t.done;
+      const sec = secByTask[String(t.id)] || 0;
+      return `<div class="pt-item ${active ? "is-active" : ""} ${done ? "is-done" : ""}" data-task-id="${t.id}">
+        <button type="button" class="pt-check" data-toggle-done="${t.id}" title="${done ? "Вернуть" : "Готово"}">${done ? "✓" : "○"}</button>
+        <div class="pt-item-main">
+          <div class="pt-item-name">${escapeHtml(t.name)}</div>
+          <div class="pt-item-meta">${sec ? fmtDur(sec) : "—"}</div>
+        </div>
+        <button type="button" class="btn ${active ? "primary" : ""}" data-focus-task="${t.id}" ${done ? "disabled" : ""}>${active ? "Сейчас" : "Выбрать"}</button>
+        <button type="button" class="btn danger pt-del" data-del-task="${t.id}">×</button>
+      </div>`;
+    })
+    .join("");
 }
 
 async function refreshProjects() {
@@ -476,25 +561,36 @@ async function refreshProjects() {
   const workToggle = document.getElementById("workModeToggle");
   if (workToggle) workToggle.checked = !!settings.work_mode;
 
+  if (!selectedProjectId && settings.current_project_id) {
+    selectedProjectId = String(settings.current_project_id);
+  }
+  if (selectedProjectId && !projects.some((p) => String(p.id) === selectedProjectId)) {
+    selectedProjectId = projects[0] ? String(projects[0].id) : "";
+  }
+
   const list = document.getElementById("projectsList");
   if (list) {
     if (!projects.length) {
-      list.innerHTML = `<p class="hint">Создайте первый проект — например «Клиент A» или «Учёба».</p>`;
+      list.innerHTML = `<p class="hint">Создайте проект — справа появятся задачи.</p>`;
     } else {
       list.innerHTML = projects
         .map((p) => {
-          const active = String(settings.current_project_id) === String(p.id);
-          return `<div class="project-card" style="--pc:${escapeHtml(p.color || "#2f6f5e")}">
-            <div class="project-name">${escapeHtml(p.name)}</div>
-            <div class="project-actions">
-              <button type="button" class="btn ${active ? "primary" : ""}" data-focus-project="${p.id}">${active ? "Сейчас" : "Выбрать"}</button>
-              <button type="button" class="btn danger" data-del-project="${p.id}">Удалить</button>
-            </div>
-          </div>`;
+          const selected = selectedProjectId === String(p.id);
+          const tracking = String(settings.current_project_id) === String(p.id);
+          return `<button type="button" class="pt-item pt-project ${selected ? "is-selected" : ""} ${tracking ? "is-active" : ""}" data-select-project="${p.id}" style="--pc:${escapeHtml(p.color || "#2f6f5e")}">
+            <span class="pt-swatch" aria-hidden="true"></span>
+            <span class="pt-item-main">
+              <span class="pt-item-name">${escapeHtml(p.name)}</span>
+              ${tracking ? `<span class="pt-item-meta">в учёте</span>` : ""}
+            </span>
+            <span class="btn danger pt-del" data-del-project="${p.id}" role="button">×</span>
+          </button>`;
         })
         .join("");
     }
   }
+
+  await renderTasksPane(selectedProjectId, settings, summary);
 
   const byProj = summary.by_project || [];
   const nameById = Object.fromEntries(projects.map((p) => [String(p.id), p.name]));
@@ -521,7 +617,7 @@ async function refreshSummary() {
     activityValue.textContent = `${summary.activity_pct ?? 0}%`;
   }
   if (activitySub) {
-    activitySub.textContent = `${fmtDur(summary.active_sec)} активно · ${fmtDur(summary.idle_sec)} idle`;
+    activitySub.textContent = `${fmtDur(summary.active_sec)} активно · ${fmtDur(summary.idle_sec)} без ввода`;
   }
   renderKpis(summary);
   renderProdStack(summary.by_category || {}, summary.total_sec || 0);
@@ -778,14 +874,24 @@ function wireUi() {
   if (projectSelect) {
     projectSelect.addEventListener("change", async () => {
       const v = projectSelect.value;
-      await api("/api/focus", {
-        method: "POST",
-        body: JSON.stringify({
-          project_id: v ? Number(v) : null,
-          task_id: null,
-        }),
-      });
-      lastStatusKey = "";
+      selectedProjectId = v || "";
+      let taskId = null;
+      if (v) {
+        const tasks = await api(`/api/tasks?project_id=${encodeURIComponent(v)}`);
+        const first = (tasks || []).find((t) => !t.done);
+        taskId = first ? first.id : null;
+      }
+      await setFocus(v || null, taskId);
+      await refreshProjects();
+    });
+  }
+
+  const taskSelect = document.getElementById("currentTaskSelect");
+  if (taskSelect) {
+    taskSelect.addEventListener("change", async () => {
+      const pid = document.getElementById("currentProjectSelect")?.value || null;
+      const tid = taskSelect.value || null;
+      await setFocus(pid, tid);
       await refreshProjects();
     });
   }
@@ -806,12 +912,33 @@ function wireUi() {
       const name = projectForm.name.value.trim();
       const color = projectForm.color.value;
       if (!name) return;
-      await api("/api/projects", {
+      const created = await api("/api/projects", {
         method: "POST",
         body: JSON.stringify({ name, color }),
       });
       projectForm.reset();
       projectForm.color.value = "#2f6f5e";
+      selectedProjectId = String(created.id);
+      const tasks = await api(`/api/tasks?project_id=${created.id}`);
+      const first = (tasks || []).find((t) => !t.done);
+      await setFocus(created.id, first ? first.id : null);
+      await refreshProjects();
+    });
+  }
+
+  const taskForm = document.getElementById("taskCreateForm");
+  if (taskForm) {
+    taskForm.addEventListener("submit", async (ev) => {
+      ev.preventDefault();
+      if (!selectedProjectId) return;
+      const name = taskForm.name.value.trim();
+      if (!name) return;
+      const created = await api("/api/tasks", {
+        method: "POST",
+        body: JSON.stringify({ project_id: Number(selectedProjectId), name }),
+      });
+      taskForm.reset();
+      await setFocus(selectedProjectId, created.id);
       await refreshProjects();
     });
   }
@@ -819,22 +946,51 @@ function wireUi() {
   const projectsList = document.getElementById("projectsList");
   if (projectsList) {
     projectsList.addEventListener("click", async (ev) => {
-      const focusBtn = ev.target.closest("[data-focus-project]");
+      const delBtn = ev.target.closest("[data-del-project]");
+      if (delBtn) {
+        ev.preventDefault();
+        ev.stopPropagation();
+        if (!confirm("Удалить проект и его задачи?")) return;
+        await api(`/api/projects/${delBtn.dataset.delProject}`, { method: "DELETE" });
+        if (selectedProjectId === String(delBtn.dataset.delProject)) {
+          selectedProjectId = "";
+          await setFocus(null, null);
+        }
+        await refreshProjects();
+        return;
+      }
+      const row = ev.target.closest("[data-select-project]");
+      if (row) {
+        selectedProjectId = String(row.dataset.selectProject);
+        await refreshProjects();
+      }
+    });
+  }
+
+  const tasksList = document.getElementById("tasksList");
+  if (tasksList) {
+    tasksList.addEventListener("click", async (ev) => {
+      const focusBtn = ev.target.closest("[data-focus-task]");
       if (focusBtn) {
-        await api("/api/focus", {
-          method: "POST",
-          body: JSON.stringify({
-            project_id: Number(focusBtn.dataset.focusProject),
-            task_id: null,
-          }),
+        await setFocus(selectedProjectId, focusBtn.dataset.focusTask);
+        await refreshProjects();
+        return;
+      }
+      const doneBtn = ev.target.closest("[data-toggle-done]");
+      if (doneBtn) {
+        const id = doneBtn.dataset.toggleDone;
+        const task = taskCache.find((t) => String(t.id) === String(id));
+        await api(`/api/tasks/${id}`, {
+          method: "PUT",
+          body: JSON.stringify({ done: !(task && task.done) }),
         });
         await refreshProjects();
         return;
       }
-      const delBtn = ev.target.closest("[data-del-project]");
+      const delBtn = ev.target.closest("[data-del-task]");
       if (delBtn) {
-        if (!confirm("Удалить проект?")) return;
-        await api(`/api/projects/${delBtn.dataset.delProject}`, { method: "DELETE" });
+        if (!confirm("Удалить задачу?")) return;
+        await api(`/api/tasks/${delBtn.dataset.delTask}`, { method: "DELETE" });
         await refreshProjects();
       }
     });

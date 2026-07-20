@@ -76,6 +76,8 @@ def test_projects_focus_and_summary_filter(tmp_path: Path, monkeypatch):
 
     db = Database(data / "deskline.db")
     proj = db.create_project("Клиент A", "#1f6b56")
+    defaults = db.list_tasks(proj["id"])
+    assert any(t["name"] == "Основная" for t in defaults)
     task = db.create_task(proj["id"], "Отчёт")
     assert proj["id"]
     assert task["project_id"] == proj["id"]
