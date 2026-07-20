@@ -14,6 +14,7 @@ from deskline.classify import (
     is_system_noise,
     normalize_category,
     resolve_activity,
+    site_for_activity_label,
 )
 from deskline.config import DB_PATH, SCREENSHOTS_DIR, ensure_data_dirs
 from deskline.icons import (
@@ -402,7 +403,7 @@ class Database:
             return max(secs.items(), key=lambda kv: kv[1])[0]
 
         def _icon_for_activity(label: str) -> str:
-            site = _top_site(label)
+            site = _top_site(label) or site_for_activity_label(label)
             if site:
                 return icon_url_for_site(site)
             return icon_url_for_app(_top_exe(label))
@@ -529,7 +530,7 @@ class Database:
             full_span = max(0.0, (e - s).total_seconds()) or dur
             idle_full = float(row["idle_sec"] or 0) if "idle_sec" in keys else 0.0
             idle_part = min(dur, idle_full * (dur / full_span) if full_span else 0.0)
-            site = meta.get("url_hint")
+            site = meta.get("url_hint") or site_for_activity_label(meta["activity_label"])
             if site:
                 icon = icon_url_for_site(site)
             else:

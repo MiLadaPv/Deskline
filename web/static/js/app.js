@@ -233,6 +233,8 @@ async function refreshStatus() {
   else if (st.idle) line = label ? `Idle · ${label}` : "Idle";
   else if (label) line = `Запись · ${label}`;
   document.getElementById("statusLine").textContent = line;
+  const ver = document.getElementById("appVersion");
+  if (ver && st.version) ver.textContent = `Deskline v${st.version}`;
 }
 
 async function refreshShots() {

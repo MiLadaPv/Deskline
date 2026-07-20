@@ -96,12 +96,56 @@ def test_yandex_messenger_groups_unread_titles():
     assert a["url_hint"] == "messenger.yandex.ru"
 
 
+def test_yandex_messenger_real_nbsp_edge_title():
+    """Exact pattern observed in production DB (NBSP + multi-tab + ZWSP in Edge)."""
+    title = (
+        "Яндекс\xa0Мессенджер\xa0— 18 новых сообщений и еще 32 страницы "
+        "— Личный: Microsoft\u200b Edge"
+    )
+    meta = resolve_activity("msedge.exe", title)
+    assert meta["activity_label"] == "Яндекс Мессенджер"
+    assert meta["url_hint"] == "messenger.yandex.ru"
+
+    other = resolve_activity(
+        "msedge.exe",
+        "Яндекс\xa0Мессенджер\xa0— 3 новых сообщения и еще 10 страниц "
+        "— Личный: Microsoft\u200b Edge",
+    )
+    assert other["activity_label"] == meta["activity_label"]
+
+
+def test_yandex_mail_groups_inbox_counter():
+    meta = resolve_activity(
+        "msedge.exe",
+        "36 · Входящие — Яндекс Почта и еще 2 страницы — Личный: Microsoft Edge",
+    )
+    assert meta["activity_label"] == "Почта"
+    assert meta["url_hint"] == "mail.yandex.ru"
+    assert meta["activity_kind"] == "email"
+
+
 def test_normalize_dynamic_title_strips_counters():
     from deskline.classify import normalize_dynamic_title
 
     assert normalize_dynamic_title("Яндекс Мессенджер — 16 новых сообщений") == "Яндекс Мессенджер"
     assert normalize_dynamic_title("Inbox (3)") == "Inbox"
     assert normalize_dynamic_title("(106) Workout - YouTube") == "Workout - YouTube"
+    assert normalize_dynamic_title("36 · Входящие — Яндекс Почта") == "Входящие — Яндекс Почта"
+
+
+def test_site_for_activity_label():
+    from deskline.classify import site_for_activity_label
+
+    assert site_for_activity_label("Habr") == "habr.com"
+    assert site_for_activity_label("Яндекс Мессенджер") == "messenger.yandex.ru"
+    assert site_for_activity_label("Почта") in {
+        "gmail.com",
+        "mail.google.com",
+        "mail.yandex.ru",
+        "mail.ru",
+        "outlook.live.com",
+        "outlook.office.com",
+    }
 
 
 def test_resolve_desktop_apps():
@@ -200,6 +244,37 @@ def test_db_summary_uses_friendly_labels(tmp_path: Path):
     app_names = [x["name"] for x in summary["by_app"]]
     assert "Microsoft Edge" in app_names
     assert "Cursor" in app_names
+
+
+def test_db_summary_groups_yandex_messenger_and_site_icon(tmp_path: Path):
+    db = Database(tmp_path / "msg.db")
+    start = datetime.now().astimezone() - timedelta(minutes=30)
+    titles = [
+        "Яндекс\xa0Мессенджер\xa0— 16 новых сообщений и еще 2 страницы — Личный: Microsoft\u200b Edge",
+        "Яндекс\xa0Мессенджер\xa0— 3 новых сообщения и еще 2 страницы — Личный: Microsoft\u200b Edge",
+    ]
+    t0 = start
+    for i, title in enumerate(titles):
+        sid = db.start_session(
+            "msedge.exe",
+            title,
+            None,
+            "distracting",
+            started_at=t0,
+            display_name="Microsoft Edge",
+            activity_kind="other",
+            activity_label=f"Яндекс Мессенджер — {16 if i == 0 else 3} новых сообщений",
+        )
+        db.end_session(sid, ended_at=t0 + timedelta(minutes=10))
+        t0 = t0 + timedelta(minutes=10)
+
+    summary = db.summary_for_day()
+    messenger = [x for x in summary["by_activity"] if "ессенджер" in x["name"]]
+    assert len(messenger) == 1
+    assert messenger[0]["name"] == "Яндекс Мессенджер"
+    assert messenger[0]["sec"] >= 60
+    assert messenger[0]["icon_url"].startswith("/media/icons/site_")
+    assert "новых сообщен" not in messenger[0]["name"]
 
 
 def test_db_summary_hides_sub_minute_entries(tmp_path: Path):

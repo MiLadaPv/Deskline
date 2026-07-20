@@ -198,7 +198,10 @@ def create_app(tracker: Tracker, db: Database | None = None) -> FastAPI:
 
     @app.get("/api/status")
     def status() -> dict[str, Any]:
-        return tracker.status()
+        st = tracker.status()
+        st["version"] = __version__
+        st["app"] = APP_NAME
+        return st
 
     @app.get("/api/summary/today")
     def summary_today() -> dict[str, Any]:

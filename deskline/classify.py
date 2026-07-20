@@ -235,6 +235,7 @@ TITLE_BRAND_HINTS: list[tuple[str, str]] = [
     ("яндекс мессенджер", "messenger.yandex.ru"),
     ("yandex messenger", "messenger.yandex.ru"),
     ("яндекс.почта", "mail.yandex.ru"),
+    ("яндекс почта", "mail.yandex.ru"),
     ("yandex mail", "mail.yandex.ru"),
     ("mail.ru", "mail.ru"),
     ("outlook", "outlook.live.com"),
@@ -273,6 +274,7 @@ _DYNAMIC_UNREAD_SUFFIX = re.compile(
 )
 _DYNAMIC_PAREN_COUNT = re.compile(r"\s*\(\d+\)\s*$")
 _DYNAMIC_LEADING_COUNT = re.compile(r"^\(\d+\)\s+")
+_DYNAMIC_LEADING_DOT_COUNT = re.compile(r"^\d+\s*[·•.]\s+")
 
 
 def normalize_dynamic_title(title: str) -> str:
@@ -283,7 +285,8 @@ def normalize_dynamic_title(title: str) -> str:
     out = _DYNAMIC_UNREAD_SUFFIX.sub("", out)
     out = _DYNAMIC_PAREN_COUNT.sub("", out)
     out = _DYNAMIC_LEADING_COUNT.sub("", out)
-    return out.strip(" -—|·")
+    out = _DYNAMIC_LEADING_DOT_COUNT.sub("", out)
+    return out.strip(" -—|·•")
 
 
 def clean_browser_title(window_title: str | None) -> str:
@@ -434,6 +437,17 @@ def _match_site_activity(site: str | None) -> tuple[ActivityKind, str, Category]
         return ("search", "Поиск", "neutral")
     if site.startswith("google.") or site.endswith(".google.com"):
         return ("search", "Поиск", "neutral")
+    return None
+
+
+def site_for_activity_label(label: str | None) -> str | None:
+    """Best domain for a known activity label (favicon when url_hint is missing)."""
+    if not label:
+        return None
+    target = label.strip().lower()
+    for site, (_kind, site_label, _cat) in SITE_ACTIVITIES.items():
+        if site_label.lower() == target:
+            return site
     return None
 
 

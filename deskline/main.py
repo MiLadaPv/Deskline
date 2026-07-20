@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import argparse
+import ctypes
 import signal
+import socket
 import sys
 import threading
 from pathlib import Path
@@ -14,6 +16,9 @@ from deskline.db import Database
 from deskline.icons import purge_placeholder_icons
 from deskline.tracker import Tracker
 from deskline.tray import start_tray
+
+_MUTEX_NAME = "Local\\DesklineSingleInstance"
+_ERROR_ALREADY_EXISTS = 183
 
 
 def _ensure_stdio() -> Path | None:
@@ -63,6 +68,44 @@ def _uvicorn_log_config() -> dict:
     }
 
 
+def _port_open(host: str, port: int) -> bool:
+    try:
+        with socket.create_connection((host, port), timeout=0.4):
+            return True
+    except OSError:
+        return False
+
+
+def _try_acquire_instance_lock() -> int | None:
+    """Return a mutex handle if we are the primary instance, else None."""
+    try:
+        handle = ctypes.windll.kernel32.CreateMutexW(None, False, _MUTEX_NAME)
+    except Exception:
+        return -1  # lock unavailable — allow start
+    if not handle:
+        return -1
+    if ctypes.windll.kernel32.GetLastError() == _ERROR_ALREADY_EXISTS:
+        ctypes.windll.kernel32.CloseHandle(handle)
+        return None
+    return int(handle)
+
+
+def _release_instance_lock(handle: int | None) -> None:
+    if handle is None or handle == -1:
+        return
+    try:
+        ctypes.windll.kernel32.CloseHandle(handle)
+    except Exception:
+        pass
+
+
+def _handoff_to_running_instance(*, open_browser: bool, reason: str) -> int:
+    if open_browser:
+        open_dashboard()
+    print(f"Deskline already running ({reason}) — opened dashboard.", file=sys.stderr)
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     _ensure_stdio()
 
@@ -71,7 +114,22 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--no-tray", action="store_true", help="Run without system tray icon")
     parser.add_argument("--host", default=HOST)
     parser.add_argument("--port", type=int, default=PORT)
+    parser.add_argument(
+        "--allow-duplicate",
+        action="store_true",
+        help="Skip single-instance lock (tests / diagnostics only)",
+    )
     args = parser.parse_args(argv)
+    open_browser = not args.no_browser
+
+    mutex_handle: int | None = -1
+    if not args.allow_duplicate:
+        mutex_handle = _try_acquire_instance_lock()
+        if mutex_handle is None:
+            return _handoff_to_running_instance(open_browser=open_browser, reason="mutex")
+        if _port_open(args.host, args.port):
+            _release_instance_lock(mutex_handle)
+            return _handoff_to_running_instance(open_browser=open_browser, reason="port")
 
     ensure_data_dirs()
     purge_placeholder_icons()
@@ -119,13 +177,14 @@ def main(argv: list[str] | None = None) -> int:
             print(f"Tray unavailable, continuing without it: {exc}", file=sys.stderr)
 
     cfg = load_config()
-    if cfg.get("open_dashboard_on_start") and not args.no_browser:
+    if cfg.get("open_dashboard_on_start") and open_browser:
         threading.Timer(1.0, open_dashboard).start()
 
     try:
         server.run()
     finally:
         tracker.stop()
+        _release_instance_lock(mutex_handle)
     return 0
 
 
