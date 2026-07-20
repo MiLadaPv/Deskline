@@ -18,10 +18,17 @@
       <p class="tagline">Куда уходят часы — без отправки данных в облако.</p>
     </div>
     <div class="hero-actions">
-      <div class="focus-metric" id="focusMetric">
-        <span class="focus-label">Фокус сегодня</span>
-        <strong class="focus-value" id="focusValue">—</strong>
-        <span class="focus-sub" id="focusSub">загрузка…</span>
+      <div class="metrics-pair">
+        <div class="focus-metric" id="focusMetric">
+          <span class="focus-label">Фокус</span>
+          <strong class="focus-value" id="focusValue">—</strong>
+          <span class="focus-sub" id="focusSub">загрузка…</span>
+        </div>
+        <div class="focus-metric" id="activityMetric">
+          <span class="focus-label">Активность</span>
+          <strong class="focus-value" id="activityValue">—</strong>
+          <span class="focus-sub" id="activitySub">ввод клавиатуры/мыши</span>
+        </div>
       </div>
       <button type="button" class="btn primary" id="toggleBtn">Пауза</button>
     </div>
@@ -71,6 +78,11 @@
     <section id="panel-settings" class="panel">
       <h2>Настройки</h2>
       <form id="settingsForm" class="settings-form">
+        <label>
+          Считать idle после (сек без ввода)
+          <input type="number" name="idle_after_sec" min="30" max="3600" step="30" />
+        </label>
+        <p class="hint">Как в Time Doctor: idle не уменьшает фокус, но снижает «Активность». Для созвонов порог мягче (15 мин).</p>
         <label>
           Интервал скриншотов (сек)
           <input type="number" name="screenshot_interval_sec" min="60" step="30" />

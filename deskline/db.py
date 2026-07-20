@@ -43,6 +43,7 @@ class SessionRow:
     activity_kind: str | None = None
     activity_label: str | None = None
     app_path: str | None = None
+    idle_sec: float = 0.0
 
 
 class Database:
@@ -113,6 +114,7 @@ class Database:
                 ("activity_kind", "TEXT"),
                 ("activity_label", "TEXT"),
                 ("app_path", "TEXT"),
+                ("idle_sec", "REAL NOT NULL DEFAULT 0"),
             ):
                 if col not in cols:
                     conn.execute(f"ALTER TABLE sessions ADD COLUMN {col} {decl}")
@@ -234,7 +236,17 @@ class Database:
             activity_kind=row["activity_kind"] if "activity_kind" in keys else None,
             activity_label=row["activity_label"] if "activity_label" in keys else None,
             app_path=row["app_path"] if "app_path" in keys else None,
+            idle_sec=float(row["idle_sec"] or 0) if "idle_sec" in keys else 0.0,
         )
+
+    def add_idle_seconds(self, session_id: int, seconds: float) -> None:
+        if seconds <= 0:
+            return
+        with self.connect() as conn:
+            conn.execute(
+                "UPDATE sessions SET idle_sec = COALESCE(idle_sec, 0) + ? WHERE id=?",
+                (float(seconds), session_id),
+            )
 
     def _enrich(self, row: sqlite3.Row) -> dict[str, Any]:
         keys = set(row.keys())
@@ -304,9 +316,11 @@ class Database:
         by_kind: dict[str, float] = {}
         total = 0.0
         tracked = 0.0
+        idle_tracked = 0.0
         now = _utcnow()
 
         for row in rows:
+            keys = set(row.keys())
             s = _parse(row["started_at"]) or start
             e = _parse(row["ended_at"]) or now
             seg_start = max(s, start)
@@ -319,6 +333,12 @@ class Database:
             if meta["hidden"]:
                 continue
             tracked += dur
+            # Scale idle to the overlapping segment (TD: idle is orthogonal to category)
+            full_span = max(0.0, (e - s).total_seconds()) or dur
+            idle_full = float(row["idle_sec"] or 0) if "idle_sec" in keys else 0.0
+            idle_full = min(max(0.0, idle_full), full_span)
+            idle_part = idle_full * (dur / full_span) if full_span > 0 else 0.0
+            idle_tracked += min(idle_part, dur)
             cat = meta["category"] if meta["category"] in by_cat else "neutral"
             by_cat[cat] += dur
             app_label = meta["display_name"]
@@ -363,11 +383,17 @@ class Database:
 
         focus = by_cat["productive"]
         focus_pct = (focus / tracked * 100.0) if tracked else 0.0
+        idle_tracked = min(idle_tracked, tracked)
+        active_sec = max(0.0, tracked - idle_tracked)
+        activity_pct = (active_sec / tracked * 100.0) if tracked else 0.0
         return {
             "total_sec": tracked,
             "raw_total_sec": total,
             "focus_sec": focus,
             "focus_pct": round(focus_pct, 1),
+            "idle_sec": round(idle_tracked, 1),
+            "active_sec": round(active_sec, 1),
+            "activity_pct": round(activity_pct, 1),
             "by_category": by_cat,
             "by_kind": by_kind,
             "by_activity": sorted(

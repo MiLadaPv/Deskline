@@ -1,3 +1,3 @@
 """Deskline — local-first Windows productivity tracker."""
 
-__version__ = "0.1.6"
+__version__ = "0.1.7"

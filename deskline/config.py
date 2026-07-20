@@ -33,6 +33,8 @@ CONFIG_PATH = DATA_ROOT / "config.json"
 DEFAULT_CONFIG: dict[str, Any] = {
     "poll_interval_sec": 2.0,
     "min_session_sec": 3.0,
+    # No keyboard/mouse for this long → idle (TD-style; does not cut productive time)
+    "idle_after_sec": 180.0,
     "screenshot_interval_sec": 300,
     "screenshot_on_app_switch": True,
     "screenshots_enabled": True,

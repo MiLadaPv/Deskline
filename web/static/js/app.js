@@ -173,7 +173,10 @@ function closeLightbox() {
 function summaryKey(summary) {
   return JSON.stringify({
     focus_pct: summary.focus_pct,
+    activity_pct: summary.activity_pct,
     focus_min: Math.floor((summary.focus_sec || 0) / 60),
+    active_min: Math.floor((summary.active_sec || 0) / 60),
+    idle_min: Math.floor((summary.idle_sec || 0) / 60),
     total_min: Math.floor((summary.total_sec || 0) / 60),
     by_category: {
       productive: Math.floor((summary.by_category?.productive || 0) / 60),
@@ -194,6 +197,14 @@ async function refreshSummary() {
 
   document.getElementById("focusValue").textContent = `${summary.focus_pct}%`;
   document.getElementById("focusSub").textContent = `${fmtDur(summary.focus_sec)} из ${fmtDur(summary.total_sec)}`;
+  const activityValue = document.getElementById("activityValue");
+  const activitySub = document.getElementById("activitySub");
+  if (activityValue) {
+    activityValue.textContent = `${summary.activity_pct ?? 0}%`;
+  }
+  if (activitySub) {
+    activitySub.textContent = `${fmtDur(summary.active_sec)} активно · ${fmtDur(summary.idle_sec)} idle`;
+  }
   renderBars(summary.by_category, summary.total_sec, { animate: false });
   const activities = summary.by_activity || [];
   renderList(document.getElementById("topAppsToday"), activities, "Занятий пока нет");
@@ -206,6 +217,7 @@ async function refreshStatus() {
   const st = await api("/api/status");
   const key = JSON.stringify({
     paused: !!st.paused,
+    idle: !!st.idle,
     current_label: st.current_label || "",
     current_app: st.current_app || "",
   });
@@ -216,11 +228,11 @@ async function refreshStatus() {
   btn.textContent = st.paused ? "Продолжить" : "Пауза";
   btn.dataset.paused = st.paused ? "1" : "0";
   const label = st.current_label || st.current_app || "";
-  document.getElementById("statusLine").textContent = st.paused
-    ? "Пауза"
-    : label
-      ? `Запись · ${label}`
-      : "Запись";
+  let line = "Запись";
+  if (st.paused) line = "Пауза";
+  else if (st.idle) line = label ? `Idle · ${label}` : "Idle";
+  else if (label) line = `Запись · ${label}`;
+  document.getElementById("statusLine").textContent = line;
 }
 
 async function refreshShots() {
@@ -246,6 +258,7 @@ async function refreshShots() {
 async function loadSettings() {
   const cfg = await api("/api/settings");
   const form = document.getElementById("settingsForm");
+  form.idle_after_sec.value = cfg.idle_after_sec ?? 180;
   form.screenshot_interval_sec.value = cfg.screenshot_interval_sec;
   form.screenshots_enabled.checked = !!cfg.screenshots_enabled;
   form.screenshot_on_app_switch.checked = !!cfg.screenshot_on_app_switch;
@@ -297,6 +310,7 @@ function wireUi() {
     ev.preventDefault();
     const form = ev.currentTarget;
     const body = {
+      idle_after_sec: Number(form.idle_after_sec.value),
       screenshot_interval_sec: Number(form.screenshot_interval_sec.value),
       screenshots_enabled: form.screenshots_enabled.checked,
       screenshot_on_app_switch: form.screenshot_on_app_switch.checked,

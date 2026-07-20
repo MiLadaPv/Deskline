@@ -20,6 +20,7 @@ def test_smoke_init(tmp_path: Path, monkeypatch):
     cfg = load_config()
     assert cfg["screenshots_enabled"] is True
     assert cfg["screenshot_retention_days"] == 7
+    assert cfg["idle_after_sec"] == 180.0
     cfg["paused"] = True
     saved = save_config(cfg)
     assert saved["paused"] is True

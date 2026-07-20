@@ -42,6 +42,7 @@ from deskline.tracker import Tracker
 class SettingsUpdate(BaseModel):
     poll_interval_sec: float | None = None
     min_session_sec: float | None = None
+    idle_after_sec: float | None = Field(default=None, ge=30, le=3600)
     screenshot_interval_sec: int | None = None
     screenshot_on_app_switch: bool | None = None
     screenshots_enabled: bool | None = None

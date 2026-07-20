@@ -8,6 +8,7 @@ from deskline.capture import capture_screenshot
 from deskline.classify import extract_site_from_title, resolve_activity
 from deskline.config import load_config, save_config
 from deskline.db import Database
+from deskline.idle import is_idle, seconds_since_last_input
 from deskline.windows import get_active_window
 
 
@@ -21,6 +22,8 @@ class Tracker:
         self._current_session_id: int | None = None
         self._last_screenshot_at = 0.0
         self._last_purge_at = 0.0
+        self._last_tick_at = time.time()
+        self._idle = False
         self._status_listeners: list[Callable[[dict], None]] = []
         self.cfg = load_config()
 
@@ -51,6 +54,8 @@ class Tracker:
             "current_app": current_app,
             "current_title": current_title,
             "current_label": label,
+            "idle": self._idle,
+            "idle_for_sec": round(seconds_since_last_input(), 1),
         }
 
     def _emit(self) -> None:
@@ -65,6 +70,7 @@ class Tracker:
         if self._thread and self._thread.is_alive():
             return
         self._stop.clear()
+        self._last_tick_at = time.time()
         self._thread = threading.Thread(target=self._loop, name="deskline-tracker", daemon=True)
         self._thread.start()
         self._emit()
@@ -80,13 +86,15 @@ class Tracker:
         with self._lock:
             self.cfg["paused"] = True
             save_config(self.cfg)
-            self._close_current()
+            self._close_current_unlocked()
+            self._idle = False
         self._emit()
 
     def resume(self) -> None:
         with self._lock:
             self.cfg["paused"] = False
             save_config(self.cfg)
+            self._last_tick_at = time.time()
         self._emit()
 
     def reload_config(self) -> None:
@@ -115,16 +123,31 @@ class Tracker:
     def _tick(self) -> None:
         with self._lock:
             cfg = dict(self.cfg)
+            now = time.time()
+            dt = max(0.0, now - self._last_tick_at)
+            self._last_tick_at = now
+
             if cfg.get("paused"):
+                self._idle = False
                 return
 
             win = get_active_window()
             if not win:
                 return
 
+            idle_after = float(cfg.get("idle_after_sec", 180.0))
+            self._idle = is_idle(idle_after, win.app_name)
+
             key = (win.app_name, win.window_title)
-            now = time.time()
             switched = self._current_key != key
+
+            if (
+                not switched
+                and self._current_session_id is not None
+                and self._idle
+                and dt > 0
+            ):
+                self.db.add_idle_seconds(self._current_session_id, dt)
 
             if switched:
                 self._close_current_unlocked()
@@ -159,6 +182,7 @@ class Tracker:
             elif (
                 cfg.get("screenshots_enabled")
                 and self._current_session_id
+                and not self._idle
                 and (now - self._last_screenshot_at) >= float(cfg.get("screenshot_interval_sec", 300))
             ):
                 self._shot_unlocked("interval")
