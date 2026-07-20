@@ -23,8 +23,17 @@ from deskline.icons import (
 
 
 def test_icon_cache_name_and_url():
-    assert icon_cache_name("MSEdge.EXE") == "msedge.exe.png"
-    assert icon_url_for_app("msedge.exe") == "/media/icons/msedge.exe.png"
+    assert icon_cache_name("MSEdge.EXE") == "msedge.exe.v2.png"
+    url = icon_url_for_app("msedge.exe")
+    assert url.startswith("/media/icons/msedge.exe.v2.png?v=")
+
+
+def test_app_name_from_icon_filename():
+    from deskline.icons import app_name_from_icon_filename
+
+    assert app_name_from_icon_filename("msedge.exe.v2.png") == "msedge.exe"
+    assert app_name_from_icon_filename("site_habr.com.png") is None
+    assert app_name_from_icon_filename("placeholder.png") is None
 
 
 def test_ensure_app_icon_uses_shared_placeholder(tmp_path: Path, monkeypatch):
@@ -47,7 +56,7 @@ def test_weak_placeholder_does_not_block_real_extract(tmp_path: Path, monkeypatc
     monkeypatch.setattr("deskline.config.ICONS_DIR", icons)
 
     # Legacy placeholder size band (~200 bytes)
-    weak = icons / "msedge.exe.png"
+    weak = icons / "msedge.exe.v2.png"
     Image.new("RGBA", (32, 32), (215, 235, 227, 255)).save(weak, format="PNG")
     assert is_weak_icon_cache(weak)
 
@@ -75,11 +84,15 @@ def test_purge_placeholder_icons(tmp_path: Path, monkeypatch):
     monkeypatch.setattr("deskline.icons.ICONS_DIR", icons)
     monkeypatch.setattr("deskline.config.ICONS_DIR", icons)
 
-    weak = icons / "cursor.exe.png"
+    weak = icons / "cursor.exe.v2.png"
     Image.new("RGBA", (32, 32), (215, 235, 227, 255)).save(weak, format="PNG")
+    # Also leave a legacy pre-v2 name that purge should remove
+    legacy = icons / "cursor.exe.png"
+    Image.new("RGBA", (32, 32), (10, 10, 10, 255)).save(legacy, format="PNG")
     shared_placeholder_path()
     assert purge_placeholder_icons() >= 1
     assert not weak.exists()
+    assert not legacy.exists()
     assert (icons / "placeholder.png").exists()
 
 
@@ -110,14 +123,14 @@ def test_icon_path_for_app(tmp_path: Path, monkeypatch):
     monkeypatch.setattr("deskline.icons.ICONS_DIR", icons)
     monkeypatch.setattr("deskline.config.ICONS_DIR", icons)
     path = icon_path_for_app("chrome.exe")
-    assert path == icons / "chrome.exe.png"
+    assert path == icons / "chrome.exe.v2.png"
 
 
 def test_site_icon_names_and_urls():
     assert icon_cache_name_for_site("Habr.com") == "site_habr.com.png"
-    assert icon_url_for_site("habr.com") == "/media/icons/site_habr.com.png"
+    assert icon_url_for_site("habr.com").startswith("/media/icons/site_habr.com.png?v=")
     assert is_site_icon_name("site_habr.com.png")
-    assert not is_site_icon_name("msedge.exe.png")
+    assert not is_site_icon_name("msedge.exe.v2.png")
     assert site_from_icon_name("site_habr.com.png") == "habr.com"
     assert site_from_icon_name("site_messenger.yandex.ru.png") == "messenger.yandex.ru"
 
@@ -190,7 +203,20 @@ def test_resolve_icon_url_falls_back_to_app(tmp_path: Path, monkeypatch):
 
     with patch("deskline.icons._fetch_site_favicon", return_value=False):
         url = resolve_icon_url(site="messenger.yandex.ru", app_name="msedge.exe")
-    assert url == "/media/icons/msedge.exe.png"
+    assert url.startswith("/media/icons/msedge.exe.v2.png?v=")
+
+
+def test_restore_alpha_if_needed():
+    from deskline.icons import _restore_alpha_if_needed
+
+    # BGRA-like content with alpha=0 everywhere (GDI quirk)
+    img = Image.new("RGBA", (8, 8), (0, 0, 0, 0))
+    for x in range(2, 6):
+        for y in range(2, 6):
+            img.putpixel((x, y), (0, 120, 215, 0))
+    fixed = _restore_alpha_if_needed(img)
+    assert fixed.getpixel((3, 3))[3] == 255
+    assert fixed.getpixel((0, 0))[3] == 0
 
 
 def test_ensure_site_icon_caches_favicon(tmp_path: Path, monkeypatch):

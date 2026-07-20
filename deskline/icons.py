@@ -21,6 +21,8 @@ _FAVICON_TIMEOUT_SEC = 3.0
 _APP_ICON_PADDING = 5
 _SITE_ICON_PADDING = 2
 _APP_ICON_MAX_FILL = 0.88
+# Bump when extractor changes so old HTTP/disk caches are abandoned.
+_APP_ICON_REV = "v2"
 
 # Extra favicon URLs for hosts where /favicon.ico and Google s2 fail.
 _SITE_FAVICON_OVERRIDES: dict[str, list[str]] = {
@@ -38,9 +40,13 @@ _SITE_FAVICON_OVERRIDES: dict[str, list[str]] = {
 def icon_cache_name(app_name: str) -> str:
     base = (app_name or "unknown.exe").strip().lower()
     safe = _SAFE_NAME.sub("_", base)
-    if not safe.endswith(".png"):
-        safe = f"{safe}.png"
-    return safe
+    if safe.endswith(".png"):
+        safe = safe[:-4]
+    # Drop a trailing rev if present so we don't stack .v2.v2
+    rev_suffix = f".{_APP_ICON_REV}"
+    if safe.endswith(rev_suffix):
+        safe = safe[: -len(rev_suffix)]
+    return f"{safe}.{_APP_ICON_REV}.png"
 
 
 def icon_cache_name_for_site(site: str) -> str:
@@ -51,14 +57,39 @@ def icon_cache_name_for_site(site: str) -> str:
     return f"{_SITE_PREFIX}{safe}.png"
 
 
+def app_name_from_icon_filename(name: str) -> str | None:
+    """Recover exe name from msedge.exe.v2.png (not site_/placeholder)."""
+    safe = Path(name).name
+    if safe == _PLACEHOLDER_NAME or safe.startswith(_SITE_PREFIX):
+        return None
+    if not safe.endswith(".png"):
+        return None
+    stem = safe[:-4]
+    rev_suffix = f".{_APP_ICON_REV}"
+    if stem.endswith(rev_suffix):
+        stem = stem[: -len(rev_suffix)]
+    return stem or None
+
+
+def _cache_bust_qs(path: Path) -> str:
+    if path.exists():
+        try:
+            return str(int(path.stat().st_mtime))
+        except OSError:
+            pass
+    return _APP_ICON_REV
+
+
 def icon_url_for_app(app_name: str | None) -> str:
     name = icon_cache_name(app_name or "unknown.exe")
-    return f"/media/icons/{name}"
+    path = ICONS_DIR / name
+    return f"/media/icons/{name}?v={_cache_bust_qs(path)}"
 
 
 def icon_url_for_site(site: str | None) -> str:
     name = icon_cache_name_for_site(site or "unknown")
-    return f"/media/icons/{name}"
+    path = ICONS_DIR / name
+    return f"/media/icons/{name}?v={_cache_bust_qs(path)}"
 
 
 def icon_path_for_app(app_name: str | None) -> Path:
@@ -137,11 +168,23 @@ def is_weak_icon_cache(path: Path) -> bool:
 
 
 def purge_placeholder_icons() -> int:
-    """Remove per-app placeholder PNGs so real icons can be re-extracted."""
+    """Remove weak/legacy icon PNGs so real icons can be re-extracted."""
     ensure_data_dirs()
     removed = 0
+    rev_tail = f".{_APP_ICON_REV}.png"
     for path in ICONS_DIR.glob("*.png"):
         if path.name == _PLACEHOLDER_NAME:
+            continue
+        # Drop pre-v2 app icons (msedge.exe.png) so DIB extractor rebuilds them.
+        if (
+            not path.name.startswith(_SITE_PREFIX)
+            and not path.name.endswith(rev_tail)
+        ):
+            try:
+                path.unlink()
+                removed += 1
+            except OSError:
+                pass
             continue
         if is_weak_icon_cache(path):
             try:
@@ -483,8 +526,29 @@ def _bytes_to_icon_png(data: bytes, out: Path, size: int = 32) -> bool:
         return False
 
 
+def _restore_alpha_if_needed(img: Image.Image) -> Image.Image:
+    """GDI often draws RGB with alpha left at 0 — treat non-black RGB as opaque."""
+    rgba = img.convert("RGBA")
+    pixels = list(rgba.getdata())
+    if not pixels:
+        return rgba
+    max_a = max(p[3] for p in pixels)
+    if max_a > 10:
+        return rgba
+    fixed = [
+        (r, g, b, 255) if (r or g or b) else (0, 0, 0, 0)
+        for r, g, b, a in pixels
+    ]
+    rgba.putdata(fixed)
+    return rgba
+
+
 def _extract_exe_icon(exe_path: Path, out: Path) -> bool:
-    for extractor in (_extract_via_shgetfileinfo, _extract_via_extracticonex):
+    for extractor in (
+        _extract_via_private_extract,
+        _extract_via_shgetfileinfo,
+        _extract_via_extracticonex,
+    ):
         try:
             if extractor(exe_path, out) and out.exists() and out.stat().st_size > 0:
                 if not is_weak_icon_cache(out):
@@ -498,49 +562,139 @@ def _extract_exe_icon(exe_path: Path, out: Path) -> bool:
     return False
 
 
-def _hicon_to_png(hicon: int, out: Path, size: int = 32) -> bool:
-    import win32con
-    import win32gui
-    import win32ui
+def _hicon_to_png(hicon: int, out: Path, size: int = 32, draw_size: int | None = None) -> bool:
+    """Rasterize HICON via a 32bpp top-down DIB (reliable alpha vs CreateCompatibleBitmap)."""
+    import ctypes
+    from ctypes import wintypes
 
-    # Draw larger then trim so content fills the final cell
-    draw_size = max(size * 2, 64)
-    hdc = win32ui.CreateDCFromHandle(win32gui.GetDC(0))
-    hbmp = win32ui.CreateBitmap()
-    hbmp.CreateCompatibleBitmap(hdc, draw_size, draw_size)
-    hdc_mem = hdc.CreateCompatibleDC()
-    hdc_mem.SelectObject(hbmp)
+    import win32con
+
+    draw = int(draw_size or max(size * 8, 256))
+
+    class BITMAPINFOHEADER(ctypes.Structure):
+        _fields_ = [
+            ("biSize", wintypes.DWORD),
+            ("biWidth", wintypes.LONG),
+            ("biHeight", wintypes.LONG),
+            ("biPlanes", wintypes.WORD),
+            ("biBitCount", wintypes.WORD),
+            ("biCompression", wintypes.DWORD),
+            ("biSizeImage", wintypes.DWORD),
+            ("biXPelsPerMeter", wintypes.LONG),
+            ("biYPelsPerMeter", wintypes.LONG),
+            ("biClrUsed", wintypes.DWORD),
+            ("biClrImportant", wintypes.DWORD),
+        ]
+
+    class BITMAPINFO(ctypes.Structure):
+        _fields_ = [
+            ("bmiHeader", BITMAPINFOHEADER),
+            ("bmiColors", wintypes.DWORD * 3),
+        ]
+
+    user32 = ctypes.windll.user32
+    gdi32 = ctypes.windll.gdi32
+
+    hdc_screen = user32.GetDC(0)
+    if not hdc_screen:
+        return False
+    hdc = gdi32.CreateCompatibleDC(hdc_screen)
+    if not hdc:
+        user32.ReleaseDC(0, hdc_screen)
+        return False
+
+    bmi = BITMAPINFO()
+    ctypes.memset(ctypes.byref(bmi), 0, ctypes.sizeof(bmi))
+    bmi.bmiHeader.biSize = ctypes.sizeof(BITMAPINFOHEADER)
+    bmi.bmiHeader.biWidth = draw
+    bmi.bmiHeader.biHeight = -draw  # top-down
+    bmi.bmiHeader.biPlanes = 1
+    bmi.bmiHeader.biBitCount = 32
+    bmi.bmiHeader.biCompression = 0  # BI_RGB
+
+    bits_ptr = ctypes.c_void_p()
+    hbmp = gdi32.CreateDIBSection(
+        hdc,
+        ctypes.byref(bmi),
+        0,  # DIB_RGB_COLORS
+        ctypes.byref(bits_ptr),
+        None,
+        0,
+    )
+    if not hbmp or not bits_ptr.value:
+        gdi32.DeleteDC(hdc)
+        user32.ReleaseDC(0, hdc_screen)
+        return False
+
+    old = gdi32.SelectObject(hdc, hbmp)
     try:
-        hdc_mem.DrawIconEx(
-            (0, 0),
+        byte_count = draw * draw * 4
+        ctypes.memset(bits_ptr, 0, byte_count)
+        ok = user32.DrawIconEx(
+            hdc,
+            0,
+            0,
             hicon,
-            draw_size,
-            draw_size,
+            draw,
+            draw,
             0,
             None,
             win32con.DI_NORMAL,
         )
-    except Exception:
-        hdc_mem.DrawIcon((0, 0), hicon)
-    bmp_info = hbmp.GetInfo()
-    bmp_str = hbmp.GetBitmapBits(True)
-    img = Image.frombuffer(
-        "RGBA",
-        (bmp_info["bmWidth"], bmp_info["bmHeight"]),
-        bmp_str,
-        "raw",
-        "BGRA",
-        0,
-        1,
-    )
-    img = _trim_and_fit(
-        img,
-        size=size,
-        padding=_APP_ICON_PADDING,
-        max_fill=_APP_ICON_MAX_FILL,
-    )
-    img.save(out, format="PNG")
-    return out.exists() and out.stat().st_size > 0
+        if not ok:
+            return False
+        raw = ctypes.string_at(bits_ptr, byte_count)
+        img = Image.frombuffer("RGBA", (draw, draw), raw, "raw", "BGRA", 0, 1).copy()
+        img = _restore_alpha_if_needed(img)
+        if not _icon_has_usable_content(img, min_side=4):
+            return False
+        img = _trim_and_fit(
+            img,
+            size=size,
+            padding=_APP_ICON_PADDING,
+            max_fill=_APP_ICON_MAX_FILL,
+        )
+        img.save(out, format="PNG")
+        return out.exists() and out.stat().st_size > 0 and not is_weak_icon_cache(out)
+    finally:
+        gdi32.SelectObject(hdc, old)
+        gdi32.DeleteObject(hbmp)
+        gdi32.DeleteDC(hdc)
+        user32.ReleaseDC(0, hdc_screen)
+
+
+def _extract_via_private_extract(exe_path: Path, out: Path) -> bool:
+    """Prefer native high-res icons (avoids stretch from tiny 16px shells)."""
+    import ctypes
+    from ctypes import wintypes
+
+    user32 = ctypes.windll.user32
+    large = (wintypes.HANDLE * 1)()
+    icon_ids = (wintypes.UINT * 1)()
+    for dim in (256, 128, 48, 32):
+        large[0] = 0
+        n = user32.PrivateExtractIconsW(
+            str(exe_path),
+            0,
+            dim,
+            dim,
+            large,
+            icon_ids,
+            1,
+            0,
+        )
+        hicon = int(large[0] or 0)
+        if not n or not hicon:
+            continue
+        try:
+            if _hicon_to_png(hicon, out, size=32, draw_size=max(dim, 64)):
+                return True
+        finally:
+            try:
+                user32.DestroyIcon(hicon)
+            except Exception:
+                pass
+    return False
 
 
 def _extract_via_shgetfileinfo(exe_path: Path, out: Path) -> bool:

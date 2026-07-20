@@ -354,6 +354,7 @@ def create_app(tracker: Tracker, db: Database | None = None) -> FastAPI:
     @app.get("/media/icons/{name}")
     def media_icon(name: str) -> FileResponse:
         from deskline.icons import (
+            app_name_from_icon_filename,
             ensure_app_icon,
             ensure_site_icon,
             is_site_icon_name,
@@ -370,8 +371,8 @@ def create_app(tracker: Tracker, db: Database | None = None) -> FastAPI:
                 if host:
                     path = ensure_site_icon(host)
             else:
-                stem = safe[:-4] if safe.endswith(".png") else safe
-                if stem != "placeholder":
+                stem = app_name_from_icon_filename(safe)
+                if stem and stem != "placeholder":
                     path = ensure_app_icon(stem, None)
         if is_weak_icon_cache(path) or not path.exists():
             path = shared_placeholder_path()
