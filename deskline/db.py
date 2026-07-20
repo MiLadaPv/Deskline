@@ -16,7 +16,12 @@ from deskline.classify import (
     resolve_activity,
 )
 from deskline.config import DB_PATH, SCREENSHOTS_DIR, ensure_data_dirs
-from deskline.icons import ensure_app_icon, icon_url_for_app
+from deskline.icons import (
+    ensure_app_icon,
+    ensure_site_icon,
+    icon_url_for_app,
+    icon_url_for_site,
+)
 
 MIN_DISPLAY_SEC = 60.0
 
@@ -329,6 +334,7 @@ class Database:
         app_exe_by_label: dict[str, str] = {}
         app_path_by_exe: dict[str, str] = {}
         activity_app_secs: dict[str, dict[str, float]] = {}
+        activity_site_secs: dict[str, dict[str, float]] = {}
         by_kind: dict[str, float] = {}
         total = 0.0
         tracked = 0.0
@@ -380,12 +386,26 @@ class Database:
             site = meta["url_hint"]
             if site:
                 by_site[site] = by_site.get(site, 0.0) + dur
+                site_bucket = activity_site_secs.setdefault(act, {})
+                site_bucket[site] = site_bucket.get(site, 0.0) + dur
 
         def _top_exe(label: str) -> str:
             secs = activity_app_secs.get(label) or {}
             if not secs:
                 return "unknown.exe"
             return max(secs.items(), key=lambda kv: kv[1])[0]
+
+        def _top_site(label: str) -> str | None:
+            secs = activity_site_secs.get(label) or {}
+            if not secs:
+                return None
+            return max(secs.items(), key=lambda kv: kv[1])[0]
+
+        def _icon_for_activity(label: str) -> str:
+            site = _top_site(label)
+            if site:
+                return icon_url_for_site(site)
+            return icon_url_for_app(_top_exe(label))
 
         for exe, path in app_path_by_exe.items():
             try:
@@ -399,6 +419,12 @@ class Database:
                     ensure_app_icon(exe, None)
                 except Exception:
                     pass
+        # Prefetch favicons for top sites (best-effort; UI also lazy-loads)
+        for site in list(by_site.keys())[:40]:
+            try:
+                ensure_site_icon(site)
+            except Exception:
+                pass
 
         focus = by_cat["productive"]
         focus_pct = (focus / tracked * 100.0) if tracked else 0.0
@@ -422,7 +448,8 @@ class Database:
                         "sec": v,
                         "kind": activity_kinds.get(k, "other"),
                         "app_name": _top_exe(k),
-                        "icon_url": icon_url_for_app(_top_exe(k)),
+                        "site": _top_site(k),
+                        "icon_url": _icon_for_activity(k),
                     }
                     for k, v in by_activity.items()
                     if v >= MIN_DISPLAY_SEC
@@ -451,7 +478,7 @@ class Database:
                         "name": k,
                         "sec": v,
                         "kind": "search",
-                        "icon_url": icon_url_for_app("msedge.exe"),
+                        "icon_url": icon_url_for_site(k),
                     }
                     for k, v in by_site.items()
                     if v >= MIN_DISPLAY_SEC
@@ -502,6 +529,11 @@ class Database:
             full_span = max(0.0, (e - s).total_seconds()) or dur
             idle_full = float(row["idle_sec"] or 0) if "idle_sec" in keys else 0.0
             idle_part = min(dur, idle_full * (dur / full_span) if full_span else 0.0)
+            site = meta.get("url_hint")
+            if site:
+                icon = icon_url_for_site(site)
+            else:
+                icon = icon_url_for_app(meta["app_name"])
             items.append(
                 {
                     "started_at": _iso(seg_start),
@@ -512,7 +544,8 @@ class Database:
                     "app_name": meta["app_name"],
                     "display_name": meta["display_name"],
                     "category": normalize_category(meta["category"]),
-                    "icon_url": icon_url_for_app(meta["app_name"]),
+                    "site": site,
+                    "icon_url": icon,
                 }
             )
         return items

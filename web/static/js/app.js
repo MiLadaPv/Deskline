@@ -121,7 +121,7 @@ function renderList(el, rows, emptyText) {
   el.innerHTML = sliced
     .map((r) => {
       const icon = r.icon_url
-        ? `<img class="rank-icon-img" src="${escapeHtml(r.icon_url)}" alt="" width="28" height="28" decoding="async" onerror="this.replaceWith(Object.assign(document.createElement('span'),{className:'rank-icon',textContent:'•'}))" />`
+        ? `<img class="rank-icon-img" src="${escapeHtml(r.icon_url)}" alt="" width="32" height="32" decoding="async" onerror="this.replaceWith(Object.assign(document.createElement('span'),{className:'rank-icon',textContent:'•'}))" />`
         : `<span class="rank-icon" aria-hidden="true">•</span>`;
       return `<li>
         ${icon}
@@ -293,7 +293,7 @@ async function refreshTimeline() {
   el.innerHTML = rows
     .map((r) => {
       const icon = r.icon_url
-        ? `<img class="rank-icon-img" src="${escapeHtml(r.icon_url)}" alt="" width="28" height="28" decoding="async" />`
+        ? `<img class="rank-icon-img" src="${escapeHtml(r.icon_url)}" alt="" width="32" height="32" decoding="async" />`
         : `<span class="rank-icon">•</span>`;
       const idle =
         r.idle_sec >= 60
@@ -322,7 +322,7 @@ async function refreshRatings() {
   el.innerHTML = rows
     .map((r) => {
       const icon = r.icon_url
-        ? `<img class="rank-icon-img" src="${escapeHtml(r.icon_url)}" alt="" width="28" height="28" decoding="async" />`
+        ? `<img class="rank-icon-img" src="${escapeHtml(r.icon_url)}" alt="" width="32" height="32" decoding="async" />`
         : `<span class="rank-icon">•</span>`;
       const kindLabel = r.kind === "site" ? "сайт" : "приложение";
       const btns = ["productive", "neutral", "distracting", "unrated"]

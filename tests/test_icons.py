@@ -6,13 +6,19 @@ from unittest.mock import patch
 from PIL import Image
 
 from deskline.icons import (
+    _trim_and_fit,
     ensure_app_icon,
+    ensure_site_icon,
     icon_cache_name,
+    icon_cache_name_for_site,
     icon_path_for_app,
     icon_url_for_app,
+    icon_url_for_site,
+    is_site_icon_name,
     is_weak_icon_cache,
     purge_placeholder_icons,
     shared_placeholder_path,
+    site_from_icon_name,
 )
 
 
@@ -105,3 +111,59 @@ def test_icon_path_for_app(tmp_path: Path, monkeypatch):
     monkeypatch.setattr("deskline.config.ICONS_DIR", icons)
     path = icon_path_for_app("chrome.exe")
     assert path == icons / "chrome.exe.png"
+
+
+def test_site_icon_names_and_urls():
+    assert icon_cache_name_for_site("Habr.com") == "site_habr.com.png"
+    assert icon_url_for_site("habr.com") == "/media/icons/site_habr.com.png"
+    assert is_site_icon_name("site_habr.com.png")
+    assert not is_site_icon_name("msedge.exe.png")
+    assert site_from_icon_name("site_habr.com.png") == "habr.com"
+    assert site_from_icon_name("site_messenger.yandex.ru.png") == "messenger.yandex.ru"
+
+
+def test_trim_and_fit_fills_canvas():
+    img = Image.new("RGBA", (64, 64), (0, 0, 0, 0))
+    # Small opaque square in the center with lots of transparent padding
+    for x in range(24, 40):
+        for y in range(24, 40):
+            img.putpixel((x, y), (255, 0, 0, 255))
+    out = _trim_and_fit(img, size=32, padding=2)
+    assert out.size == (32, 32)
+    # Content should occupy most of the inner area (not stay tiny in the center)
+    bbox = out.getbbox()
+    assert bbox is not None
+    bw = bbox[2] - bbox[0]
+    bh = bbox[3] - bbox[1]
+    assert bw >= 24
+    assert bh >= 24
+
+
+def test_ensure_site_icon_caches_favicon(tmp_path: Path, monkeypatch):
+    icons = tmp_path / "icons"
+    monkeypatch.setattr("deskline.icons.ICONS_DIR", icons)
+    monkeypatch.setattr("deskline.config.ICONS_DIR", icons)
+
+    fav = Image.new("RGBA", (16, 16), (10, 120, 200, 255))
+    buf = __import__("io").BytesIO()
+    fav.save(buf, format="PNG")
+    payload = buf.getvalue()
+
+    class _Resp:
+        def read(self):
+            return payload
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            return False
+
+    with patch("deskline.icons.urllib.request.urlopen", return_value=_Resp()):
+        out = ensure_site_icon("habr.com")
+
+    assert out.name == "site_habr.com.png"
+    assert out.exists()
+    assert not is_weak_icon_cache(out)
+    img = Image.open(out)
+    assert img.size == (32, 32)

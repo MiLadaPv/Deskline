@@ -76,6 +76,34 @@ def test_resolve_browser_email_and_messenger():
     assert resolve_activity("chrome.exe", "Chat", "web.telegram.org")["activity_kind"] == "messaging"
 
 
+def test_yandex_messenger_groups_unread_titles():
+    a = resolve_activity(
+        "msedge.exe",
+        "Яндекс Мессенджер — 16 новых сообщений — Личный: Microsoft Edge",
+    )
+    b = resolve_activity(
+        "msedge.exe",
+        "Яндекс Мессенджер — 3 новых сообщения — Личный: Microsoft Edge",
+    )
+    c = resolve_activity(
+        "msedge.exe",
+        "Яндекс Мессенджер — 1 новое сообщение — Личный: Microsoft Edge",
+    )
+    assert a["activity_label"] == "Яндекс Мессенджер"
+    assert b["activity_label"] == "Яндекс Мессенджер"
+    assert c["activity_label"] == "Яндекс Мессенджер"
+    assert a["activity_kind"] == "messaging"
+    assert a["url_hint"] == "messenger.yandex.ru"
+
+
+def test_normalize_dynamic_title_strips_counters():
+    from deskline.classify import normalize_dynamic_title
+
+    assert normalize_dynamic_title("Яндекс Мессенджер — 16 новых сообщений") == "Яндекс Мессенджер"
+    assert normalize_dynamic_title("Inbox (3)") == "Inbox"
+    assert normalize_dynamic_title("(106) Workout - YouTube") == "Workout - YouTube"
+
+
 def test_resolve_desktop_apps():
     meta = resolve_activity("telegram.exe", "Chat with Ann")
     assert meta["activity_label"] == "Мессенджер"

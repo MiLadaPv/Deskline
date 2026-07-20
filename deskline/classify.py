@@ -163,6 +163,7 @@ SITE_ACTIVITIES: dict[str, tuple[ActivityKind, str, Category]] = {
     "web.telegram.org": ("messaging", "Мессенджер", "distracting"),
     "web.whatsapp.com": ("messaging", "Мессенджер", "distracting"),
     "web.skype.com": ("messaging", "Мессенджер", "neutral"),
+    "messenger.yandex.ru": ("messaging", "Яндекс Мессенджер", "distracting"),
     "discord.com": ("messaging", "Discord", "distracting"),
     "vk.com": ("social", "Соцсети", "distracting"),
     "instagram.com": ("social", "Соцсети", "distracting"),
@@ -231,6 +232,8 @@ TITLE_BRAND_HINTS: list[tuple[str, str]] = [
     ("tiktok", "tiktok.com"),
     ("vk.com", "vk.com"),
     ("вконтакте", "vk.com"),
+    ("яндекс мессенджер", "messenger.yandex.ru"),
+    ("yandex messenger", "messenger.yandex.ru"),
     ("яндекс.почта", "mail.yandex.ru"),
     ("yandex mail", "mail.yandex.ru"),
     ("mail.ru", "mail.ru"),
@@ -258,6 +261,29 @@ _BROWSER_APP_TAIL = re.compile(
     r"(?:microsoft\s*edge|google\s*chrome|mozilla\s*firefox|firefox|opera|brave|vivaldi|yandex(?:\s*browser)?)\s*$",
     re.IGNORECASE,
 )
+# Dynamic notification / unread counts that fragment the same site into many rows
+_DYNAMIC_UNREAD_SUFFIX = re.compile(
+    r"\s*[—\-–|]\s*\d+\s+"
+    r"(?:"
+    r"нов\w*\s+сообщени\w*"
+    r"|unread(?:\s+messages?)?"
+    r"|непрочитанн\w*"
+    r")\s*$",
+    re.IGNORECASE,
+)
+_DYNAMIC_PAREN_COUNT = re.compile(r"\s*\(\d+\)\s*$")
+_DYNAMIC_LEADING_COUNT = re.compile(r"^\(\d+\)\s+")
+
+
+def normalize_dynamic_title(title: str) -> str:
+    """Strip unread/notification counters so the same site keeps one activity label."""
+    if not title:
+        return ""
+    out = title
+    out = _DYNAMIC_UNREAD_SUFFIX.sub("", out)
+    out = _DYNAMIC_PAREN_COUNT.sub("", out)
+    out = _DYNAMIC_LEADING_COUNT.sub("", out)
+    return out.strip(" -—|·")
 
 
 def clean_browser_title(window_title: str | None) -> str:
@@ -270,6 +296,7 @@ def clean_browser_title(window_title: str | None) -> str:
     title = _BROWSER_EXTRA_PAGES.sub("", title)
     title = _BROWSER_APP_TAIL.sub("", title)
     title = re.sub(r"\s+[—\-–|]\s*$", "", title)
+    title = normalize_dynamic_title(title)
     return title.strip(" -—|·")
 
 

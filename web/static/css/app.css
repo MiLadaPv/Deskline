@@ -252,7 +252,7 @@ main {
 
 .rank-list li {
   display: grid;
-  grid-template-columns: 28px minmax(0, 1fr) auto;
+  grid-template-columns: 32px minmax(0, 1fr) auto;
   align-items: center;
   column-gap: 12px;
   padding: 14px 0;
@@ -261,8 +261,8 @@ main {
 }
 
 .rank-icon {
-  width: 28px;
-  height: 28px;
+  width: 32px;
+  height: 32px;
   display: grid;
   place-items: center;
   border-radius: 8px;
@@ -275,11 +275,11 @@ main {
 }
 
 .rank-icon-img {
-  width: 28px;
-  height: 28px;
+  width: 32px;
+  height: 32px;
   object-fit: contain;
   object-position: center;
-  border-radius: 6px;
+  border-radius: 4px;
   background: transparent;
   display: block;
   justify-self: center;
@@ -317,7 +317,7 @@ main {
 
 .timeline li {
   display: grid;
-  grid-template-columns: 4.5rem 28px minmax(0, 1fr) auto;
+  grid-template-columns: 4.5rem 32px minmax(0, 1fr) auto;
   align-items: center;
   column-gap: 12px;
   padding: 12px 0;
@@ -342,7 +342,7 @@ main {
 
 .rating-row {
   display: grid;
-  grid-template-columns: 28px minmax(0, 1fr) auto;
+  grid-template-columns: 32px minmax(0, 1fr) auto;
   gap: 12px;
   align-items: center;
   padding: 12px 0;

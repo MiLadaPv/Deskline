@@ -1,8 +1,11 @@
 from __future__ import annotations
 
+import io
 import os
 import re
 import shutil
+import urllib.error
+import urllib.request
 from pathlib import Path
 
 from PIL import Image, ImageDraw
@@ -13,6 +16,8 @@ _SAFE_NAME = re.compile(r"[^a-zA-Z0-9._-]+")
 # Placeholder PNGs from the old buggy cache are ~200 bytes; real icons are larger.
 _WEAK_CACHE_MAX_BYTES = 400
 _PLACEHOLDER_NAME = "placeholder.png"
+_SITE_PREFIX = "site_"
+_FAVICON_TIMEOUT_SEC = 3.0
 
 
 def icon_cache_name(app_name: str) -> str:
@@ -23,14 +28,47 @@ def icon_cache_name(app_name: str) -> str:
     return safe
 
 
+def icon_cache_name_for_site(site: str) -> str:
+    host = (site or "unknown").strip().lower()
+    if host.startswith("www."):
+        host = host[4:]
+    safe = _SAFE_NAME.sub("_", host)
+    return f"{_SITE_PREFIX}{safe}.png"
+
+
 def icon_url_for_app(app_name: str | None) -> str:
     name = icon_cache_name(app_name or "unknown.exe")
+    return f"/media/icons/{name}"
+
+
+def icon_url_for_site(site: str | None) -> str:
+    name = icon_cache_name_for_site(site or "unknown")
     return f"/media/icons/{name}"
 
 
 def icon_path_for_app(app_name: str | None) -> Path:
     ensure_data_dirs()
     return ICONS_DIR / icon_cache_name(app_name or "unknown.exe")
+
+
+def icon_path_for_site(site: str | None) -> Path:
+    ensure_data_dirs()
+    return ICONS_DIR / icon_cache_name_for_site(site or "unknown")
+
+
+def is_site_icon_name(name: str) -> bool:
+    return (name or "").startswith(_SITE_PREFIX)
+
+
+def site_from_icon_name(name: str) -> str | None:
+    """Recover domain from a site_*.png cache filename."""
+    safe = Path(name).name
+    if not safe.startswith(_SITE_PREFIX):
+        return None
+    stem = safe[len(_SITE_PREFIX) :]
+    if stem.endswith(".png"):
+        stem = stem[:-4]
+    return stem.replace("_", ".") or None
 
 
 def shared_placeholder_path() -> Path:
@@ -57,6 +95,9 @@ def is_weak_icon_cache(path: Path) -> bool:
                 return True
         except OSError:
             pass
+    # Site favicons are often tiny solid PNGs; do not treat them as weak by size.
+    if path.name.startswith(_SITE_PREFIX):
+        return False
     # Legacy per-app placeholders were a solid teal circle (~110–220 bytes).
     if size <= 220:
         return True
@@ -133,6 +174,25 @@ def resolve_exe_path(app_name: str | None, app_path: str | None = None) -> Path 
     return None
 
 
+def _trim_and_fit(img: Image.Image, size: int = 32, padding: int = 2) -> Image.Image:
+    """Crop transparent padding and fit content into a size×size canvas."""
+    rgba = img.convert("RGBA")
+    bbox = rgba.getbbox()
+    if bbox:
+        rgba = rgba.crop(bbox)
+    inner = max(1, size - 2 * padding)
+    w, h = rgba.size
+    scale = min(inner / max(w, 1), inner / max(h, 1))
+    new_w = max(1, int(round(w * scale)))
+    new_h = max(1, int(round(h * scale)))
+    rgba = rgba.resize((new_w, new_h), Image.Resampling.LANCZOS)
+    canvas = Image.new("RGBA", (size, size), (0, 0, 0, 0))
+    ox = (size - new_w) // 2
+    oy = (size - new_h) // 2
+    canvas.paste(rgba, (ox, oy), rgba)
+    return canvas
+
+
 def ensure_app_icon(app_name: str | None, app_path: str | None = None) -> Path:
     """Extract and cache a 32x32 PNG icon. Returns cache path or shared placeholder."""
     ensure_data_dirs()
@@ -151,6 +211,65 @@ def ensure_app_icon(app_name: str | None, app_path: str | None = None) -> Path:
         return out
 
     return shared_placeholder_path()
+
+
+def ensure_site_icon(site: str | None) -> Path:
+    """Fetch and cache a site favicon as 32x32 PNG. Returns cache path or placeholder."""
+    ensure_data_dirs()
+    host = (site or "").strip().lower()
+    if host.startswith("www."):
+        host = host[4:]
+    if not host or " " in host or "." not in host:
+        return shared_placeholder_path()
+
+    out = icon_path_for_site(host)
+    if out.exists() and not is_weak_icon_cache(out):
+        return out
+
+    if out.exists() and is_weak_icon_cache(out):
+        try:
+            out.unlink()
+        except OSError:
+            pass
+
+    if _fetch_site_favicon(host, out):
+        return out
+    return shared_placeholder_path()
+
+
+def _fetch_site_favicon(host: str, out: Path) -> bool:
+    urls = [
+        f"https://{host}/favicon.ico",
+        f"https://www.google.com/s2/favicons?domain={host}&sz=64",
+    ]
+    for url in urls:
+        try:
+            req = urllib.request.Request(
+                url,
+                headers={"User-Agent": "Deskline/0.2"},
+                method="GET",
+            )
+            with urllib.request.urlopen(req, timeout=_FAVICON_TIMEOUT_SEC) as resp:
+                data = resp.read()
+            if not data or len(data) < 16:
+                continue
+            if _bytes_to_icon_png(data, out):
+                return True
+        except (urllib.error.URLError, urllib.error.HTTPError, TimeoutError, OSError, ValueError):
+            continue
+        except Exception:
+            continue
+    return False
+
+
+def _bytes_to_icon_png(data: bytes, out: Path, size: int = 32) -> bool:
+    try:
+        img = Image.open(io.BytesIO(data))
+        img = _trim_and_fit(img, size=size, padding=2)
+        img.save(out, format="PNG")
+        return out.exists() and out.stat().st_size > 0
+    except Exception:
+        return False
 
 
 def _extract_exe_icon(exe_path: Path, out: Path) -> bool:
@@ -173,17 +292,19 @@ def _hicon_to_png(hicon: int, out: Path, size: int = 32) -> bool:
     import win32gui
     import win32ui
 
+    # Draw larger then trim so content fills the final cell
+    draw_size = max(size * 2, 64)
     hdc = win32ui.CreateDCFromHandle(win32gui.GetDC(0))
     hbmp = win32ui.CreateBitmap()
-    hbmp.CreateCompatibleBitmap(hdc, size, size)
+    hbmp.CreateCompatibleBitmap(hdc, draw_size, draw_size)
     hdc_mem = hdc.CreateCompatibleDC()
     hdc_mem.SelectObject(hbmp)
     try:
         hdc_mem.DrawIconEx(
             (0, 0),
             hicon,
-            size,
-            size,
+            draw_size,
+            draw_size,
             0,
             None,
             win32con.DI_NORMAL,
@@ -201,7 +322,7 @@ def _hicon_to_png(hicon: int, out: Path, size: int = 32) -> bool:
         0,
         1,
     )
-    img = img.resize((size, size), Image.Resampling.LANCZOS)
+    img = _trim_and_fit(img, size=size, padding=2)
     img.save(out, format="PNG")
     return out.exists() and out.stat().st_size > 0
 
