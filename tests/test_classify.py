@@ -22,6 +22,10 @@ def test_extract_site_from_title_common_patterns():
 def test_display_names():
     assert display_name_for_app("msedge.exe") == "Microsoft Edge"
     assert display_name_for_app("mstsc.exe") == "Remote Desktop"
+    assert display_name_for_app("windowsterminal.exe") == "Терминал"
+    assert display_name_for_app("snippingtool.exe") == "Ножницы"
+    assert display_name_for_app("notepad.exe") == "Блокнот"
+    assert display_name_for_app("keepass.exe") == "KeePass"
 
 
 def test_resolve_browser_youtube():
@@ -54,6 +58,12 @@ def test_rdp_client_hidden_from_rankings():
         meta = resolve_activity(exe, "Remote Desktop Connection")
         assert meta["hidden"] is True
         assert meta["activity_kind"] == "system"
+
+
+def test_credential_and_script_noise_hidden():
+    assert resolve_activity("CredentialUIBroker.exe", "Windows Security")["hidden"] is True
+    assert resolve_activity("url.py", "url.py")["hidden"] is True
+    assert resolve_activity("script.pyw", "script")["hidden"] is True
 
 
 def test_db_summary_excludes_rdp_client(tmp_path: Path):
@@ -127,3 +137,37 @@ def test_db_summary_uses_friendly_labels(tmp_path: Path):
     app_names = [x["name"] for x in summary["by_app"]]
     assert "Microsoft Edge" in app_names
     assert "Cursor" in app_names
+
+
+def test_db_summary_hides_sub_minute_entries(tmp_path: Path):
+    db = Database(tmp_path / "short.db")
+    start = datetime.now().astimezone() - timedelta(minutes=5)
+    sid = db.start_session(
+        "snippingtool.exe",
+        "Snipping Tool",
+        None,
+        "neutral",
+        started_at=start,
+        display_name="Ножницы",
+        activity_kind="other",
+        activity_label="Ножницы",
+    )
+    db.end_session(sid, ended_at=start + timedelta(seconds=20))
+    sid2 = db.start_session(
+        "cursor.exe",
+        "main.py",
+        None,
+        "productive",
+        started_at=start + timedelta(seconds=20),
+        display_name="Cursor",
+        activity_kind="work",
+        activity_label="Разработка",
+    )
+    db.end_session(sid2, ended_at=start + timedelta(minutes=5))
+
+    summary = db.summary_for_day()
+    names = [x["name"] for x in summary["by_activity"]]
+    assert "Ножницы" not in names
+    assert "Разработка" in names
+    assert all(x["sec"] >= 60 for x in summary["by_activity"])
+    assert all(x["sec"] >= 60 for x in summary["by_app"])

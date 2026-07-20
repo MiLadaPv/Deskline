@@ -11,6 +11,7 @@ import uvicorn
 from deskline.api import create_app, open_dashboard
 from deskline.config import DATA_ROOT, HOST, PORT, ensure_data_dirs, load_config
 from deskline.db import Database
+from deskline.icons import purge_placeholder_icons
 from deskline.tracker import Tracker
 from deskline.tray import start_tray
 
@@ -73,6 +74,7 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     ensure_data_dirs()
+    purge_placeholder_icons()
     db = Database()
     tracker = Tracker(db)
     tracker.start()

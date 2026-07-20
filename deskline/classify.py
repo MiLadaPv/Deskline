@@ -49,6 +49,13 @@ APP_DISPLAY_NAMES: dict[str, str] = {
     "qemu-system-x86_64.exe": "QEMU",
     "lockapp.exe": "Экран блокировки",
     "shellhost.exe": "Windows Shell",
+    "windowsterminal.exe": "Терминал",
+    "wt.exe": "Терминал",
+    "snippingtool.exe": "Ножницы",
+    "screenclippinghost.exe": "Ножницы",
+    "notepad.exe": "Блокнот",
+    "keepass.exe": "KeePass",
+    "keepassxc.exe": "KeePassXC",
 }
 
 # Noise / installer processes — hide from main rankings
@@ -64,6 +71,27 @@ SYSTEM_APPS = {
     "mstsc.exe",
     "msrdc.exe",
     "rdpclip.exe",
+    # Credential / UAC / picker chrome
+    "credentialuibroker.exe",
+    "consent.exe",
+    "useraccountcontrolsettings.exe",
+    "pickerhost.exe",
+    "openwith.exe",
+    "dllhost.exe",
+    "runtimebroker.exe",
+    "sihost.exe",
+    "startmenuexperiencehost.exe",
+    "searchapp.exe",
+    "searchui.exe",
+    "widgetservice.exe",
+    "widgets.exe",
+    "shellexperiencehost.exe",
+    "taskhostw.exe",
+    "backgroundtaskhost.exe",
+    "conhost.exe",
+    "fontdrvhost.exe",
+    "dwm.exe",
+    "ctfmon.exe",
 }
 
 DEFAULT_APP_RULES: dict[str, Category] = {
@@ -185,7 +213,10 @@ def is_system_noise(app_name: str | None) -> bool:
     app = normalize_app(app_name)
     if app in SYSTEM_APPS:
         return True
-    if app.endswith(".tmp"):
+    if app.endswith(".tmp") or app.endswith(".py") or app.endswith(".pyw"):
+        return True
+    # Scripts / non-exe foreground noise (e.g. url.py)
+    if "." in app and not app.endswith(".exe"):
         return True
     if "setup" in app and (app.endswith(".exe") or app.endswith(".tmp")):
         return True

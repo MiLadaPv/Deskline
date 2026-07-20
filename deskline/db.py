@@ -12,6 +12,8 @@ from deskline.classify import display_name_for_app, is_system_noise, resolve_act
 from deskline.config import DB_PATH, SCREENSHOTS_DIR, ensure_data_dirs
 from deskline.icons import ensure_app_icon, icon_url_for_app
 
+MIN_DISPLAY_SEC = 60.0
+
 
 def _utcnow() -> datetime:
     return datetime.now().astimezone()
@@ -343,6 +345,7 @@ class Database:
         for exe in {_top_exe(a) for a in by_activity} | set(app_exe_by_label.values()):
             if exe not in app_path_by_exe:
                 try:
+                    # May resolve path via PATH/System32; never locks a per-app placeholder.
                     ensure_app_icon(exe, None)
                 except Exception:
                     pass
@@ -366,6 +369,7 @@ class Database:
                         "icon_url": icon_url_for_app(_top_exe(k)),
                     }
                     for k, v in by_activity.items()
+                    if v >= MIN_DISPLAY_SEC
                 ],
                 key=lambda x: x["sec"],
                 reverse=True,
@@ -380,6 +384,7 @@ class Database:
                         "icon_url": icon_url_for_app(app_exe_by_label.get(k)),
                     }
                     for k, v in by_app.items()
+                    if v >= MIN_DISPLAY_SEC
                 ],
                 key=lambda x: x["sec"],
                 reverse=True,
@@ -393,6 +398,7 @@ class Database:
                         "icon_url": icon_url_for_app("msedge.exe"),
                     }
                     for k, v in by_site.items()
+                    if v >= MIN_DISPLAY_SEC
                 ],
                 key=lambda x: x["sec"],
                 reverse=True,

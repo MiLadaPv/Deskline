@@ -14,6 +14,10 @@ const fmtBytes = (n) => {
   return `${(n / (1024 * 1024 * 1024)).toFixed(2)} ГБ`;
 };
 
+let lastSummaryKey = "";
+let lastStatusKey = "";
+let lastBarsKey = "";
+
 async function api(path, opts = {}) {
   const res = await fetch(path, {
     headers: { "Content-Type": "application/json", ...(opts.headers || {}) },
@@ -37,17 +41,32 @@ function setActiveTab(name) {
   });
 }
 
-function renderBars(byCategory, total) {
+function listSignature(rows) {
+  return (rows || [])
+    .slice(0, 15)
+    .map((r) => `${r.name}|${Math.round(r.sec || 0)}|${r.icon_url || ""}`)
+    .join(";");
+}
+
+function renderBars(byCategory, total, { animate = true } = {}) {
   const order = [
     ["productive", "Фокус"],
     ["neutral", "Нейтрально"],
     ["distracting", "Отвлечения"],
   ];
+  const pcts = order.map(([key]) => {
+    const sec = byCategory[key] || 0;
+    return total ? Math.round((sec / total) * 100) : 0;
+  });
+  const barsKey = pcts.join(",");
+  if (barsKey === lastBarsKey) return;
+  const shouldAnimate = animate && lastBarsKey !== "";
+  lastBarsKey = barsKey;
+
   const el = document.getElementById("catBars");
   el.innerHTML = order
-    .map(([key, label]) => {
-      const sec = byCategory[key] || 0;
-      const pct = total ? Math.round((sec / total) * 100) : 0;
+    .map(([key, label], i) => {
+      const pct = pcts[i];
       return `<div class="cat-row">
         <span>${label}</span>
         <div class="bar ${key}"><span style="width:${pct}%"></span></div>
@@ -55,6 +74,8 @@ function renderBars(byCategory, total) {
       </div>`;
     })
     .join("");
+
+  if (!shouldAnimate) return;
   requestAnimationFrame(() => {
     el.querySelectorAll(".bar > span").forEach((s) => {
       const w = s.style.width;
@@ -67,6 +88,12 @@ function renderBars(byCategory, total) {
 }
 
 function renderList(el, rows, emptyText) {
+  const signature = rows.length
+    ? listSignature(rows)
+    : `empty:${emptyText || "Пока нет данных"}`;
+  if (el.dataset.sig === signature) return;
+  el.dataset.sig = signature;
+
   if (!rows.length) {
     el.innerHTML = `<li><span class="rank-icon" aria-hidden="true">•</span><span class="rank-name">${emptyText || "Пока нет данных"}</span><span class="rank-meta">Оставьте Deskline включённым</span></li>`;
     return;
@@ -124,8 +151,24 @@ function closeLightbox() {
   document.body.style.overflow = "";
 }
 
+function summaryKey(summary) {
+  return JSON.stringify({
+    focus_pct: summary.focus_pct,
+    focus_sec: Math.round(summary.focus_sec || 0),
+    total_sec: Math.round(summary.total_sec || 0),
+    by_category: summary.by_category,
+    by_activity: listSignature(summary.by_activity),
+    by_app: listSignature(summary.by_app),
+    by_site: listSignature(summary.by_site),
+  });
+}
+
 async function refreshSummary() {
   const summary = await api("/api/summary/today");
+  const key = summaryKey(summary);
+  if (key === lastSummaryKey) return;
+  lastSummaryKey = key;
+
   document.getElementById("focusValue").textContent = `${summary.focus_pct}%`;
   document.getElementById("focusSub").textContent = `${fmtDur(summary.focus_sec)} из ${fmtDur(summary.total_sec)}`;
   renderBars(summary.by_category, summary.total_sec);
@@ -138,6 +181,14 @@ async function refreshSummary() {
 
 async function refreshStatus() {
   const st = await api("/api/status");
+  const key = JSON.stringify({
+    paused: !!st.paused,
+    current_label: st.current_label || "",
+    current_app: st.current_app || "",
+  });
+  if (key === lastStatusKey) return;
+  lastStatusKey = key;
+
   const btn = document.getElementById("toggleBtn");
   btn.textContent = st.paused ? "Продолжить" : "Пауза";
   btn.dataset.paused = st.paused ? "1" : "0";
@@ -192,6 +243,7 @@ function wireUi() {
 
   document.getElementById("toggleBtn").addEventListener("click", async (e) => {
     const paused = e.currentTarget.dataset.paused === "1";
+    lastStatusKey = "";
     await api(paused ? "/api/control/resume" : "/api/control/pause", { method: "POST" });
     await refreshStatus();
   });
@@ -265,6 +317,8 @@ function wireUi() {
 
   document.getElementById("clearBtn").addEventListener("click", async () => {
     if (!confirm("Удалить все локальные сессии и записи скриншотов?")) return;
+    lastSummaryKey = "";
+    lastBarsKey = "";
     await api("/api/data/clear", { method: "POST" });
     await refreshSummary();
     await refreshShots();
