@@ -69,14 +69,45 @@
           </select>
         </label>
       </div>
-      <div class="cats" id="catBars"></div>
+
+      <div class="kpi-strip" id="kpiStrip" aria-label="Activity Summary"></div>
+
+      <div class="charts-grid">
+        <div class="chart-card">
+          <h3 class="subhead">Продуктивность</h3>
+          <p class="hint">Как в Time Doctor: productive / neutral / unproductive</p>
+          <div class="stack-bar" id="prodStack"></div>
+          <div class="cats" id="catBars"></div>
+        </div>
+        <div class="chart-card">
+          <h3 class="subhead">Типы занятий</h3>
+          <p class="hint">Messaging, work, video и др.</p>
+          <div class="kind-bars" id="kindBars"></div>
+        </div>
+      </div>
+
+      <div class="charts-grid trends-grid">
+        <div class="chart-card">
+          <h3 class="subhead">Часы за неделю</h3>
+          <p class="hint">Hours Tracked — активное время по дням</p>
+          <div class="hours-chart" id="hoursChart"></div>
+        </div>
+        <div class="chart-card">
+          <h3 class="subhead">Продуктивность по дням</h3>
+          <p class="hint">Productivity % — stacked по категориям</p>
+          <div class="prod-days-chart" id="prodDaysChart"></div>
+        </div>
+      </div>
+
       <h3 class="subhead">Топ занятий</h3>
       <ol class="rank-list" id="topAppsToday"></ol>
     </section>
 
     <section id="panel-day" class="panel">
       <h2>День</h2>
-      <p class="hint">Хронология сессий. Idle — время без клавиатуры и мыши. Сон ПК не засчитывается.</p>
+      <p class="hint">Timeline как в Time Doctor: блоки активности по часам. Idle — без ввода. Сон ПК не засчитывается.</p>
+      <div class="gantt-wrap" id="dayGantt"></div>
+      <h3 class="subhead">Сессии</h3>
       <ol class="timeline" id="timelineList"></ol>
     </section>
 

@@ -71,6 +71,7 @@ function renderBars(byCategory, total, { animate = true } = {}) {
   lastBarsKey = barsKey;
 
   const el = document.getElementById("catBars");
+  if (!el) return;
   el.innerHTML = order
     .map(([key, label], i) => {
       const pct = pcts[i];
@@ -92,6 +93,223 @@ function renderBars(byCategory, total, { animate = true } = {}) {
       });
     });
   });
+}
+
+function renderKpis(summary) {
+  const el = document.getElementById("kpiStrip");
+  if (!el) return;
+  const total = summary.total_sec || 0;
+  const idlePct = total ? Math.round(((summary.idle_sec || 0) / total) * 100) : 0;
+  const unprodPct = total
+    ? Math.round(((summary.by_category?.distracting || 0) / total) * 100)
+    : 0;
+  const items = [
+    { label: "Всего", value: fmtDur(total), sub: "tracked" },
+    { label: "Активно", value: fmtDur(summary.active_sec), sub: `${summary.activity_pct ?? 0}%` },
+    { label: "Idle", value: `${idlePct}%`, sub: fmtDur(summary.idle_sec) },
+    { label: "Фокус", value: `${summary.focus_pct ?? 0}%`, sub: fmtDur(summary.focus_sec) },
+    { label: "Отвлечения", value: `${unprodPct}%`, sub: fmtDur(summary.by_category?.distracting || 0) },
+  ];
+  el.innerHTML = items
+    .map(
+      (it) => `<div class="kpi-card">
+        <span class="kpi-label">${it.label}</span>
+        <strong class="kpi-value">${it.value}</strong>
+        <span class="kpi-sub">${it.sub}</span>
+      </div>`
+    )
+    .join("");
+}
+
+function renderProdStack(byCategory, total) {
+  const el = document.getElementById("prodStack");
+  if (!el) return;
+  if (!total) {
+    el.innerHTML = `<div class="stack-empty">Нет данных за сегодня</div>`;
+    return;
+  }
+  const segs = [
+    ["productive", "Фокус", byCategory.productive || 0],
+    ["neutral", "Нейтрально", byCategory.neutral || 0],
+    ["distracting", "Отвлечения", byCategory.distracting || 0],
+  ].filter(([, , sec]) => sec > 0);
+  el.innerHTML =
+    `<div class="stack-track">` +
+    segs
+      .map(([key, label, sec]) => {
+        const pct = Math.max(1, Math.round((sec / total) * 100));
+        return `<span class="stack-seg ${key}" style="width:${pct}%" title="${label}: ${fmtDur(sec)} (${pct}%)"></span>`;
+      })
+      .join("") +
+    `</div>` +
+    `<div class="stack-legend">` +
+    segs
+      .map(
+        ([key, label, sec]) =>
+          `<span class="stack-leg"><i class="${key}"></i>${label} ${fmtDur(sec)}</span>`
+      )
+      .join("") +
+    `</div>`;
+}
+
+function renderKindBars(byKind, total) {
+  const el = document.getElementById("kindBars");
+  if (!el) return;
+  const KIND_LABELS = {
+    work: "Работа",
+    messaging: "Мессенджеры",
+    email: "Почта",
+    video: "Видео",
+    social: "Соцсети",
+    search: "Поиск",
+    shopping: "Покупки",
+    remote: "Удалёнка",
+    system: "Система",
+    other: "Прочее",
+  };
+  const rows = Object.entries(byKind || {})
+    .map(([k, sec]) => ({ key: k, label: KIND_LABELS[k] || k, sec }))
+    .filter((r) => r.sec >= 60)
+    .sort((a, b) => b.sec - a.sec)
+    .slice(0, 8);
+  if (!rows.length) {
+    el.innerHTML = `<p class="hint">Пока нет данных по типам занятий.</p>`;
+    return;
+  }
+  const max = Math.max(...rows.map((r) => r.sec), 1);
+  el.innerHTML = rows
+    .map((r) => {
+      const pct = Math.round((r.sec / max) * 100);
+      const share = total ? Math.round((r.sec / total) * 100) : 0;
+      return `<div class="kind-row">
+        <span class="kind-name">${escapeHtml(r.label)}</span>
+        <div class="kind-bar"><span style="width:${pct}%"></span></div>
+        <span class="kind-meta">${fmtDur(r.sec)} · ${share}%</span>
+      </div>`;
+    })
+    .join("");
+}
+
+function weekdayShort(isoDay) {
+  const d = new Date(`${isoDay}T12:00:00`);
+  return d.toLocaleDateString("ru-RU", { weekday: "short", day: "numeric" });
+}
+
+function renderHoursChart(trends) {
+  const el = document.getElementById("hoursChart");
+  if (!el) return;
+  const rows = trends || [];
+  const max = Math.max(...rows.map((r) => r.active_sec || r.total_sec || 0), 1);
+  el.innerHTML = rows
+    .map((r) => {
+      const sec = r.active_sec || 0;
+      const h = Math.max(2, Math.round((sec / max) * 100));
+      return `<div class="hours-col" title="${r.day}: ${fmtDur(sec)} активно">
+        <div class="hours-bar-wrap"><div class="hours-bar" style="height:${h}%"></div></div>
+        <span class="hours-label">${weekdayShort(r.day)}</span>
+        <span class="hours-val">${fmtDur(sec)}</span>
+      </div>`;
+    })
+    .join("");
+}
+
+function renderProdDaysChart(trends) {
+  const el = document.getElementById("prodDaysChart");
+  if (!el) return;
+  const rows = trends || [];
+  el.innerHTML = rows
+    .map((r) => {
+      const total = r.total_sec || 0;
+      const cats = r.by_category || {};
+      const segs = ["productive", "neutral", "distracting"]
+        .map((k) => {
+          const sec = cats[k] || 0;
+          const pct = total ? Math.round((sec / total) * 100) : 0;
+          return pct > 0
+            ? `<span class="stack-seg ${k}" style="height:${pct}%" title="${k}: ${pct}%"></span>`
+            : "";
+        })
+        .join("");
+      return `<div class="prod-day-col" title="${r.day}: фокус ${r.focus_pct}%">
+        <div class="prod-day-stack">${total ? segs : `<span class="stack-seg empty" style="height:4%"></span>`}</div>
+        <span class="hours-label">${weekdayShort(r.day)}</span>
+        <span class="hours-val">${Math.round(r.focus_pct || 0)}%</span>
+      </div>`;
+    })
+    .join("");
+}
+
+async function refreshTrends() {
+  const q = filterProjectId ? `&project_id=${encodeURIComponent(filterProjectId)}` : "";
+  const trends = await api(`/api/trends?days=7${q}`);
+  renderHoursChart(trends);
+  renderProdDaysChart(trends);
+}
+
+function categoryClass(cat) {
+  const c = (cat || "neutral").toLowerCase();
+  if (c === "productive" || c === "distracting" || c === "neutral") return c;
+  return "neutral";
+}
+
+function renderDayGantt(rows) {
+  const el = document.getElementById("dayGantt");
+  if (!el) return;
+  if (!rows.length) {
+    el.innerHTML = `<p class="hint">Пока нет сессий для timeline.</p>`;
+    return;
+  }
+
+  const parsed = rows.map((r) => ({
+    ...r,
+    startMs: new Date(r.started_at).getTime(),
+    endMs: new Date(r.ended_at || Date.now()).getTime(),
+  }));
+  let minMs = Math.min(...parsed.map((r) => r.startMs));
+  let maxMs = Math.max(...parsed.map((r) => r.endMs));
+  const dayStart = new Date(minMs);
+  dayStart.setHours(0, 0, 0, 0);
+  const dayEnd = new Date(dayStart);
+  dayEnd.setDate(dayEnd.getDate() + 1);
+  // Prefer full workday window if sessions fit; else pad 30m
+  minMs = Math.min(minMs, dayStart.getTime() + 8 * 3600 * 1000);
+  maxMs = Math.max(maxMs, dayStart.getTime() + 19 * 3600 * 1000);
+  minMs = Math.max(dayStart.getTime(), minMs - 30 * 60 * 1000);
+  maxMs = Math.min(dayEnd.getTime(), maxMs + 30 * 60 * 1000);
+  const span = Math.max(maxMs - minMs, 60 * 60 * 1000);
+
+  const hours = [];
+  const startH = new Date(minMs);
+  startH.setMinutes(0, 0, 0);
+  for (let t = startH.getTime(); t <= maxMs; t += 3600 * 1000) {
+    const left = ((t - minMs) / span) * 100;
+    const label = new Date(t).toLocaleTimeString("ru-RU", {
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+    hours.push(`<span class="gantt-hour" style="left:${left}%">${label}</span>`);
+  }
+
+  const blocks = parsed
+    .map((r) => {
+      const left = ((r.startMs - minMs) / span) * 100;
+      const width = Math.max(0.4, ((r.endMs - r.startMs) / span) * 100);
+      const cat = categoryClass(r.category);
+      const title = `${r.name || ""} · ${fmtClock(r.started_at)}–${fmtClock(r.ended_at)} · ${fmtDur(r.sec)}`;
+      return `<div class="gantt-block ${cat}" style="left:${left}%;width:${width}%" title="${escapeHtml(title)}">
+        <span>${escapeHtml(r.name || "")}</span>
+      </div>`;
+    })
+    .join("");
+
+  el.innerHTML = `
+    <div class="gantt-scale">${hours.join("")}</div>
+    <div class="gantt-track">${blocks}</div>
+    <div class="gantt-legend">
+      <span class="stack-leg"><i class="productive"></i>Фокус</span>
+      <span class="stack-leg"><i class="neutral"></i>Нейтрально</span>
+      <span class="stack-leg"><i class="distracting"></i>Отвлечение</span>
+    </div>`;
 }
 
 function renderList(el, rows, emptyText) {
@@ -281,7 +499,11 @@ async function refreshSummary() {
   if (activitySub) {
     activitySub.textContent = `${fmtDur(summary.active_sec)} активно · ${fmtDur(summary.idle_sec)} idle`;
   }
+  renderKpis(summary);
+  renderProdStack(summary.by_category || {}, summary.total_sec || 0);
   renderBars(summary.by_category, summary.total_sec, { animate: false });
+  renderKindBars(summary.by_kind || {}, summary.total_sec || 0);
+  refreshTrends().catch(() => {});
   const activities = summary.by_activity || [];
   renderList(document.getElementById("topAppsToday"), activities, "Занятий пока нет");
   renderList(document.getElementById("activitiesList"), activities, "Занятий пока нет");
@@ -398,6 +620,7 @@ function fmtClock(iso) {
 
 async function refreshTimeline() {
   const rows = await api("/api/timeline/today");
+  renderDayGantt(rows);
   const el = document.getElementById("timelineList");
   if (!rows.length) {
     el.innerHTML = `<li><span class="timeline-time">—</span><span class="rank-icon">•</span><span class="rank-name">Пока нет сессий</span><span class="rank-meta"></span></li>`;
@@ -412,7 +635,8 @@ async function refreshTimeline() {
         r.idle_sec >= 60
           ? `<span class="timeline-idle">idle ${fmtDur(r.idle_sec)}</span>`
           : "";
-      return `<li>
+      const cat = categoryClass(r.category);
+      return `<li class="timeline-cat-${cat}">
         <span class="timeline-time">${fmtClock(r.started_at)}</span>
         ${icon}
         <span>

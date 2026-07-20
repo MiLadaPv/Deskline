@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 from pathlib import Path
 
 from deskline.classify import resolve_activity
@@ -123,7 +123,37 @@ def test_projects_focus_and_summary_filter(tmp_path: Path, monkeypatch):
     assert filtered["total_sec"] < full["total_sec"]
 
 
-def test_screenshot_flag_distracting_only_in_work_mode(tmp_path: Path, monkeypatch):
+def test_daily_trends_shape(tmp_path: Path, monkeypatch):
+    data = tmp_path / "Deskline"
+    monkeypatch.setattr("deskline.config.DATA_ROOT", data)
+    monkeypatch.setattr("deskline.config.DB_PATH", data / "deskline.db")
+    monkeypatch.setattr("deskline.config.SCREENSHOTS_DIR", data / "screenshots")
+    monkeypatch.setattr("deskline.config.ICONS_DIR", data / "icons")
+    monkeypatch.setattr("deskline.config.CONFIG_PATH", data / "config.json")
+    data.mkdir(parents=True)
+    (data / "screenshots").mkdir()
+    (data / "icons").mkdir()
+
+    db = Database(data / "deskline.db")
+    start = datetime.now().astimezone() - timedelta(hours=2)
+    end = start + timedelta(hours=1)
+    sid = db.start_session(
+        app_name="code.exe",
+        window_title="x",
+        url_hint=None,
+        category="productive",
+        display_name="VS Code",
+        activity_kind="work",
+        activity_label="VS Code",
+        started_at=start,
+    )
+    db.end_session(sid, ended_at=end)
+
+    trends = db.daily_trends(days=7)
+    assert len(trends) == 7
+    assert trends[-1]["day"] == date.today().isoformat()
+    assert "by_category" in trends[-1]
+    assert trends[-1]["total_sec"] >= 3500
     shots = tmp_path / "shots"
     shots.mkdir()
     monkeypatch.setattr("deskline.config.SCREENSHOTS_DIR", shots)

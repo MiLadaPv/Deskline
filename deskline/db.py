@@ -357,6 +357,39 @@ class Database:
         end = start + timedelta(days=1)
         return self.summary_range(start, end, project_id=project_id)
 
+    def daily_trends(self, days: int = 7, project_id: int | None = None) -> list[dict[str, Any]]:
+        """Time Doctor–style Hours Tracked + productivity mix per day."""
+        days = max(1, min(int(days), 31))
+        today = date.today()
+        out: list[dict[str, Any]] = []
+        for i in range(days - 1, -1, -1):
+            day = today - timedelta(days=i)
+            s = self.summary_for_day(day, project_id=project_id)
+            by_cat = s.get("by_category") or {}
+            total = float(s.get("total_sec") or 0)
+            productive = float(by_cat.get("productive") or 0)
+            neutral = float(by_cat.get("neutral") or 0)
+            distracting = float(by_cat.get("distracting") or 0)
+            out.append(
+                {
+                    "day": day.isoformat(),
+                    "total_sec": total,
+                    "active_sec": float(s.get("active_sec") or 0),
+                    "idle_sec": float(s.get("idle_sec") or 0),
+                    "focus_sec": float(s.get("focus_sec") or 0),
+                    "focus_pct": float(s.get("focus_pct") or 0),
+                    "activity_pct": float(s.get("activity_pct") or 0),
+                    "unproductive_pct": round((distracting / total * 100.0) if total else 0.0, 1),
+                    "idle_pct": round((float(s.get("idle_sec") or 0) / total * 100.0) if total else 0.0, 1),
+                    "by_category": {
+                        "productive": productive,
+                        "neutral": neutral,
+                        "distracting": distracting,
+                    },
+                }
+            )
+        return out
+
     def summary_range(
         self,
         start: datetime,

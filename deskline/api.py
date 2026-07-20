@@ -238,6 +238,11 @@ def create_app(tracker: Tracker, db: Database | None = None) -> FastAPI:
     def summary_today(project_id: int | None = None) -> dict[str, Any]:
         return db.summary_for_day(date.today(), project_id=project_id)
 
+    @app.get("/api/trends")
+    def trends(days: int = 7, project_id: int | None = None) -> list[dict[str, Any]]:
+        days = max(1, min(int(days), 31))
+        return db.daily_trends(days=days, project_id=project_id)
+
     @app.get("/api/timeline/today")
     def timeline_today() -> list[dict[str, Any]]:
         return db.timeline_for_day(date.today())
