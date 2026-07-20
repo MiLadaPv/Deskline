@@ -10,14 +10,12 @@ Local-first Windows productivity tracker. Your activity stays on your PC — no 
 - Daily focus report on a local dashboard
 - System tray: **Recording** / **Paused**
 
-## Desktop app (Tauri)
+## Desktop app (default)
 
-Native window around the same local tracker:
+Deskline’s UI is a local dashboard. The **normal launch** opens it in a **native Windows window** (Tauri), not in Chrome/Edge.
 
 ```bat
-cd /d D:\Projects\Deskline\deskline-desktop
-npm install
-npm run dev
+Deskline.bat
 ```
 
 Or:
@@ -25,6 +23,10 @@ Or:
 ```bat
 powershell -ExecutionPolicy Bypass -File scripts\run_desktop.ps1
 ```
+
+First run may compile the desktop shell (`npm` + Rust). After `npm run build` in `deskline-desktop`, double-click uses the built `.exe` (faster).
+
+Tracker still runs in Python on `127.0.0.1:8787`. Tray “Open dashboard” can open the browser if you need it.
 
 Release build (NSIS/MSI):
 

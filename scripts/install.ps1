@@ -61,34 +61,42 @@ Write-Host 'Installing dependencies...'
 & $VenvPython -m pip install -r (Join-Path $InstallRoot 'requirements.txt') -q
 & $VenvPython -m pip install -e $InstallRoot -q
 
-# Console launcher
+# Console launcher — prefer native desktop window, else tray without browser
 @"
 @echo off
 cd /d "%~dp0"
-REM Prefer this install's package (.\deskline) over any other Deskline on the machine.
 set "PYTHONPATH=%~dp0"
 set "PYTHONNOUSERSITE=1"
+if exist "%~dp0deskline-desktop.exe" (
+  start "" "%~dp0deskline-desktop.exe"
+  exit /b 0
+)
 if exist "%~dp0venv\Scripts\pythonw.exe" (
-  start "" "%~dp0venv\Scripts\pythonw.exe" -m deskline
+  start "" "%~dp0venv\Scripts\pythonw.exe" -m deskline --no-browser
 ) else (
-  start "" "%~dp0venv\Scripts\python.exe" -m deskline
+  start "" "%~dp0venv\Scripts\python.exe" -m deskline --no-browser
 )
 "@ | Set-Content -Path $LauncherBat -Encoding ASCII
 
-# Silent VBS launcher (no console flash)
+# Silent VBS launcher (no console flash) — desktop exe first
 @"
 Set sh = CreateObject("WScript.Shell")
-Dim fso, root
+Dim fso, root, exe, desktopExe
 Set fso = CreateObject("Scripting.FileSystemObject")
 root = fso.GetParentFolderName(WScript.ScriptFullName)
 sh.CurrentDirectory = root
+desktopExe = root & "\deskline-desktop.exe"
+If fso.FileExists(desktopExe) Then
+  sh.Run """" & desktopExe & """", 1, False
+  WScript.Quit 0
+End If
 sh.Environment("PROCESS")("PYTHONPATH") = root
 sh.Environment("PROCESS")("PYTHONNOUSERSITE") = "1"
 exe = root & "\venv\Scripts\pythonw.exe"
 If fso.FileExists(exe) = False Then
   exe = root & "\venv\Scripts\python.exe"
 End If
-sh.Run """" & exe & """ -m deskline", 0, False
+sh.Run """" & exe & """ -m deskline --no-browser", 0, False
 "@ | Set-Content -Path $LauncherVbs -Encoding ASCII
 
 # Bundled uninstaller

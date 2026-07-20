@@ -65,4 +65,4 @@ foreach ($desktop in $desktopCandidates) {
 $startMenu = Join-Path $env:APPDATA 'Microsoft\Windows\Start Menu\Programs'
 New-DesklineShortcut -Path (Join-Path $startMenu 'Deskline.lnk') -Icon $icon
 
-Write-Host 'Done. Double-click Deskline on the desktop to open.'
+Write-Host 'Done. Double-click Deskline — it opens a native window (not the browser).'
