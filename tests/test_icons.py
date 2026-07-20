@@ -167,3 +167,28 @@ def test_ensure_site_icon_caches_favicon(tmp_path: Path, monkeypatch):
     assert not is_weak_icon_cache(out)
     img = Image.open(out)
     assert img.size == (32, 32)
+
+
+def test_resolve_exe_path_via_registry_uninstall(tmp_path: Path, monkeypatch):
+    from deskline.icons import resolve_exe_path
+
+    fake_exe = tmp_path / "KeePass.exe"
+    fake_exe.write_bytes(b"MZ")
+
+    def fake_registry(name: str):
+        assert name.lower() == "keepass.exe"
+        return fake_exe
+
+    monkeypatch.setattr("deskline.icons._resolve_via_registry", fake_registry)
+    monkeypatch.setattr("deskline.icons.shutil.which", lambda n: None)
+    found = resolve_exe_path("keepass.exe", None)
+    assert found == fake_exe
+
+
+def test_resolve_exe_path_accepts_displayicon_suffix(tmp_path: Path):
+    from deskline.icons import resolve_exe_path
+
+    fake_exe = tmp_path / "app.exe"
+    fake_exe.write_bytes(b"MZ")
+    found = resolve_exe_path("app.exe", f"{fake_exe},0")
+    assert found == fake_exe

@@ -125,6 +125,11 @@ def resolve_exe_path(app_name: str | None, app_path: str | None = None) -> Path 
         candidate = Path(app_path)
         if candidate.is_file():
             return candidate
+        # DisplayIcon-style "C:\\app.exe,0"
+        if "," in app_path:
+            stripped = Path(app_path.split(",", 1)[0].strip().strip('"'))
+            if stripped.is_file():
+                return stripped
 
     name = (app_name or "").strip()
     if not name:
@@ -142,11 +147,19 @@ def resolve_exe_path(app_name: str | None, app_path: str | None = None) -> Path 
         if cand.is_file():
             return cand
 
+    via_reg = _resolve_via_registry(name)
+    if via_reg:
+        return via_reg
+
     search_roots = [
         Path(os.environ.get("ProgramFiles", r"C:\Program Files")),
         Path(os.environ.get("ProgramFiles(x86)", r"C:\Program Files (x86)")),
         Path.home() / "AppData" / "Local" / "Programs",
         Path.home() / "AppData" / "Local" / "Microsoft" / "WindowsApps",
+        Path(r"C:\OneDriveTemp"),
+        Path.home() / "OneDrive",
+        Path.home() / "Desktop",
+        Path.home() / "Downloads",
     ]
     for root in search_roots:
         if not root.is_dir():
@@ -171,6 +184,97 @@ def resolve_exe_path(app_name: str | None, app_path: str | None = None) -> Path 
                     pass
         except OSError:
             continue
+    return None
+
+
+def _resolve_via_registry(name: str) -> Path | None:
+    """Find exe via App Paths and Uninstall DisplayIcon/InstallLocation."""
+    try:
+        import winreg
+    except ImportError:
+        return None
+
+    name_l = name.lower()
+    for hive in (winreg.HKEY_LOCAL_MACHINE, winreg.HKEY_CURRENT_USER):
+        try:
+            with winreg.OpenKey(
+                hive, rf"SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\{name}"
+            ) as key:
+                val, _ = winreg.QueryValueEx(key, None)
+                path = _path_from_reg_value(str(val))
+                if path:
+                    return path
+        except OSError:
+            pass
+
+    uninstall_keys = [
+        (winreg.HKEY_LOCAL_MACHINE, r"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall"),
+        (winreg.HKEY_LOCAL_MACHINE, r"SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall"),
+        (winreg.HKEY_CURRENT_USER, r"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall"),
+    ]
+    for hive, sub in uninstall_keys:
+        try:
+            with winreg.OpenKey(hive, sub) as parent:
+                idx = 0
+                while True:
+                    try:
+                        child_name = winreg.EnumKey(parent, idx)
+                    except OSError:
+                        break
+                    idx += 1
+                    try:
+                        with winreg.OpenKey(parent, child_name) as key:
+                            path = _path_from_uninstall_key(key, name_l)
+                            if path:
+                                return path
+                    except OSError:
+                        continue
+        except OSError:
+            continue
+    return None
+
+
+def _path_from_reg_value(value: str) -> Path | None:
+    raw = (value or "").strip().strip('"')
+    if not raw:
+        return None
+    if "," in raw and not Path(raw).is_file():
+        raw = raw.split(",", 1)[0].strip().strip('"')
+    path = Path(raw)
+    return path if path.is_file() else None
+
+
+def _path_from_uninstall_key(key, name_l: str) -> Path | None:
+    import winreg
+
+    icon = None
+    location = None
+    try:
+        icon, _ = winreg.QueryValueEx(key, "DisplayIcon")
+    except OSError:
+        pass
+    try:
+        location, _ = winreg.QueryValueEx(key, "InstallLocation")
+    except OSError:
+        pass
+
+    if icon:
+        path = _path_from_reg_value(str(icon))
+        if path and path.name.lower() == name_l:
+            return path
+
+    if location:
+        cand = Path(str(location).strip().strip('"')) / name_l
+        if cand.is_file():
+            return cand
+        # Case-preserving search in install folder
+        if cand.parent.is_dir():
+            try:
+                for child in cand.parent.iterdir():
+                    if child.is_file() and child.name.lower() == name_l:
+                        return child
+            except OSError:
+                pass
     return None
 
 

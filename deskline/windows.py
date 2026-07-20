@@ -40,9 +40,10 @@ def get_active_window() -> ActiveWindow | None:
             pid = int(pid.value)
 
         path = _process_path(pid)
-        app_name = (path.rsplit("\\", 1)[-1] if path else None) or "unknown.exe"
+        name = (path.rsplit("\\", 1)[-1] if path else None) or _process_name_toolhelp(pid)
+        app_name = (name or "unknown.exe").lower()
         return ActiveWindow(
-            app_name=app_name.lower(),
+            app_name=app_name,
             window_title=title,
             pid=pid,
             app_path=path,
@@ -52,23 +53,91 @@ def get_active_window() -> ActiveWindow | None:
 
 
 def _process_path(pid: int) -> str | None:
-    PROCESS_QUERY_LIMITED_INFORMATION = 0x1000
+    """Best-effort full image path for a process."""
+    # PROCESS_QUERY_LIMITED_INFORMATION, PROCESS_QUERY_INFORMATION
+    for access in (0x1000, 0x0400):
+        path = _query_full_image_name(pid, access)
+        if path:
+            return path
+    path = _module_file_name(pid)
+    if path:
+        return path
+    return None
+
+
+def _query_full_image_name(pid: int, access: int) -> str | None:
     kernel32 = ctypes.windll.kernel32
-    handle = kernel32.OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, False, pid)
+    handle = kernel32.OpenProcess(access, False, pid)
     if not handle:
         return None
     try:
         buf = ctypes.create_unicode_buffer(1024)
         size = wintypes.DWORD(len(buf))
         if kernel32.QueryFullProcessImageNameW(handle, 0, buf, ctypes.byref(size)):
-            return buf.value
+            return buf.value or None
     finally:
         kernel32.CloseHandle(handle)
     return None
 
 
+def _module_file_name(pid: int) -> str | None:
+    """Fallback via GetModuleFileNameEx (needs QUERY + VM_READ)."""
+    if not win32process:
+        return None
+    try:
+        import win32api
+        import win32con
+
+        access = win32con.PROCESS_QUERY_INFORMATION | win32con.PROCESS_VM_READ
+        handle = win32api.OpenProcess(access, False, pid)
+        try:
+            return win32process.GetModuleFileNameEx(handle, 0) or None
+        finally:
+            win32api.CloseHandle(handle)
+    except Exception:
+        return None
+
+
+class _PROCESSENTRY32W(ctypes.Structure):
+    _fields_ = [
+        ("dwSize", wintypes.DWORD),
+        ("cntUsage", wintypes.DWORD),
+        ("th32ProcessID", wintypes.DWORD),
+        ("th32DefaultHeapID", ctypes.POINTER(ctypes.c_ulong)),
+        ("th32ModuleID", wintypes.DWORD),
+        ("cntThreads", wintypes.DWORD),
+        ("th32ParentProcessID", wintypes.DWORD),
+        ("pcPriClassBase", ctypes.c_long),
+        ("dwFlags", wintypes.DWORD),
+        ("szExeFile", wintypes.WCHAR * 260),
+    ]
+
+
+def _process_name_toolhelp(pid: int) -> str | None:
+    """Process exe name without needing OpenProcess (works when path query is denied)."""
+    TH32CS_SNAPPROCESS = 0x00000002
+    kernel32 = ctypes.windll.kernel32
+    snap = kernel32.CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0)
+    if snap == ctypes.c_void_p(-1).value or snap == -1:
+        return None
+    try:
+        entry = _PROCESSENTRY32W()
+        entry.dwSize = ctypes.sizeof(_PROCESSENTRY32W)
+        if not kernel32.Process32FirstW(snap, ctypes.byref(entry)):
+            return None
+        while True:
+            if int(entry.th32ProcessID) == int(pid):
+                name = entry.szExeFile
+                return name or None
+            if not kernel32.Process32NextW(snap, ctypes.byref(entry)):
+                break
+    finally:
+        kernel32.CloseHandle(snap)
+    return None
+
+
 def _process_name(pid: int) -> str | None:
     path = _process_path(pid)
-    if not path:
-        return None
-    return path.rsplit("\\", 1)[-1]
+    if path:
+        return path.rsplit("\\", 1)[-1]
+    return _process_name_toolhelp(pid)
