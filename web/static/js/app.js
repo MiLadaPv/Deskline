@@ -66,19 +66,38 @@ function renderBars(byCategory, total) {
   });
 }
 
+function kindIcon(kind) {
+  const map = {
+    video: "▶",
+    messaging: "💬",
+    email: "✉",
+    search: "⌕",
+    social: "◎",
+    work: "✎",
+    remote: "⧉",
+    browser: "◉",
+    shopping: "▣",
+    system: "⚙",
+    other: "•",
+  };
+  return map[kind] || map.other;
+}
+
 function renderList(el, rows, emptyText) {
   if (!rows.length) {
-    el.innerHTML = `<li><span class="rank-name">${emptyText || "Пока нет данных"}</span><span class="rank-meta">Оставьте Deskline включённым</span></li>`;
+    el.innerHTML = `<li><span class="rank-icon" aria-hidden="true">•</span><span class="rank-name">${emptyText || "Пока нет данных"}</span><span class="rank-meta">Оставьте Deskline включённым</span></li>`;
     return;
   }
   el.innerHTML = rows
     .slice(0, 15)
-    .map(
-      (r) => `<li>
+    .map((r) => {
+      const kind = r.kind || "other";
+      return `<li>
+        <span class="rank-icon" title="${escapeHtml(kind)}" aria-hidden="true">${kindIcon(kind)}</span>
         <span class="rank-name">${escapeHtml(r.name)}</span>
         <span class="rank-meta">${fmtDur(r.sec)}</span>
-      </li>`
-    )
+      </li>`;
+    })
     .join("");
 }
 
@@ -94,7 +113,7 @@ function updateStorageHint(cfg) {
   const el = document.getElementById("shotsStorageHint");
   if (!el) return;
   const storage = cfg.screenshots_storage || {};
-  const path = cfg.screenshots_path || storage.path || "%LOCALAPPDATA%\\Deskline\\screenshots";
+  const path = cfg.screenshots_path || storage.path || "локальная папка Deskline";
   const count = storage.count ?? 0;
   const bytes = storage.bytes ?? 0;
   el.textContent = `Папка: ${path} · ${count} файл(ов), ${fmtBytes(bytes)}`;

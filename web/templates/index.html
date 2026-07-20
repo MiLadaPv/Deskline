@@ -6,7 +6,7 @@
   <title>Deskline</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Sora:wght@400;500;600&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="/static/css/app.css?v={{ version }}" />
 </head>
 <body>
@@ -111,10 +111,11 @@
         </label>
         <button type="submit" class="btn">Сменить пароль</button>
       </form>
-      <button type="button" class="btn" id="logoutBtn">Выйти из дашборда</button>
-      <button type="button" class="btn" id="purgeShotsBtn">Удалить старые скриншоты сейчас</button>
-      <button type="button" class="btn danger" id="clearBtn">Очистить все локальные данные</button>
-      <p class="hint">Данные в %LOCALAPPDATA%\Deskline — никуда не загружаются.</p>
+      <div class="settings-actions">
+        <button type="button" class="btn" id="logoutBtn">Выйти из дашборда</button>
+        <button type="button" class="btn" id="purgeShotsBtn">Удалить старые скриншоты сейчас</button>
+        <button type="button" class="btn danger" id="clearBtn">Очистить все локальные данные</button>
+      </div>
     </section>
   </main>
 

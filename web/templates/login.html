@@ -6,7 +6,7 @@
   <title>Вход · Deskline</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Sora:wght@400;500;600&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="/static/css/app.css?v={{ version }}" />
 </head>
 <body class="login-body">
@@ -20,10 +20,6 @@
         Пароль
         <input type="password" name="password" id="password" autocomplete="current-password" required minlength="4" />
       </label>
-      <label id="pass2Wrap" hidden>
-        Повторите пароль
-        <input type="password" name="password2" id="password2" autocomplete="new-password" minlength="4" />
-      </label>
       <p class="login-error" id="loginError" hidden></p>
       <button type="submit" class="btn primary" id="loginSubmit">Войти</button>
     </form>
@@ -34,7 +30,6 @@
       const form = document.getElementById("loginForm");
       const title = document.getElementById("loginTitle");
       const hint = document.getElementById("loginHint");
-      const wrap2 = document.getElementById("pass2Wrap");
       const submit = document.getElementById("loginSubmit");
       const err = document.getElementById("loginError");
       const setup = !st.password_set;
@@ -46,10 +41,8 @@
 
       if (setup) {
         title.textContent = "Создайте пароль";
-        hint.textContent = "При первом запуске задайте пароль для входа в Deskline.";
-        wrap2.hidden = false;
+        hint.textContent = "Задайте пароль для входа. Запомните его — восстановить нельзя.";
         document.getElementById("password").autocomplete = "new-password";
-        document.getElementById("password2").required = true;
         submit.textContent = "Сохранить и войти";
       }
 
@@ -57,12 +50,6 @@
         ev.preventDefault();
         err.hidden = true;
         const password = document.getElementById("password").value;
-        const password2 = document.getElementById("password2").value;
-        if (setup && password !== password2) {
-          err.textContent = "Пароли не совпадают";
-          err.hidden = false;
-          return;
-        }
         const url = setup ? "/api/auth/setup" : "/api/auth/login";
         const res = await fetch(url, {
           method: "POST",

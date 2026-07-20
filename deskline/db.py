@@ -275,6 +275,8 @@ class Database:
         by_app: dict[str, float] = {}
         by_site: dict[str, float] = {}
         by_activity: dict[str, float] = {}
+        activity_kinds: dict[str, str] = {}
+        app_kinds: dict[str, str] = {}
         by_kind: dict[str, float] = {}
         total = 0.0
         tracked = 0.0
@@ -297,9 +299,13 @@ class Database:
             by_cat[cat] += dur
             app_label = meta["display_name"]
             by_app[app_label] = by_app.get(app_label, 0.0) + dur
+            if app_label not in app_kinds:
+                app_kinds[app_label] = meta["activity_kind"] or "other"
             act = meta["activity_label"]
             by_activity[act] = by_activity.get(act, 0.0) + dur
-            kind = meta["activity_kind"]
+            kind = meta["activity_kind"] or "other"
+            if act not in activity_kinds:
+                activity_kinds[act] = kind
             by_kind[kind] = by_kind.get(kind, 0.0) + dur
             site = meta["url_hint"]
             if site:
@@ -315,17 +321,23 @@ class Database:
             "by_category": by_cat,
             "by_kind": by_kind,
             "by_activity": sorted(
-                [{"name": k, "sec": v} for k, v in by_activity.items()],
+                [
+                    {"name": k, "sec": v, "kind": activity_kinds.get(k, "other")}
+                    for k, v in by_activity.items()
+                ],
                 key=lambda x: x["sec"],
                 reverse=True,
             ),
             "by_app": sorted(
-                [{"name": k, "sec": v} for k, v in by_app.items()],
+                [
+                    {"name": k, "sec": v, "kind": app_kinds.get(k, "other")}
+                    for k, v in by_app.items()
+                ],
                 key=lambda x: x["sec"],
                 reverse=True,
             ),
             "by_site": sorted(
-                [{"name": k, "sec": v} for k, v in by_site.items()],
+                [{"name": k, "sec": v, "kind": "search"} for k, v in by_site.items()],
                 key=lambda x: x["sec"],
                 reverse=True,
             ),

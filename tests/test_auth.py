@@ -33,21 +33,26 @@ def test_auth_setup_login_and_gate(tmp_path, monkeypatch):
     login_page = client.get("/login")
     assert login_page.status_code == 200
     assert "пароль" in login_page.text.lower() or "Пароль" in login_page.text
+    assert "password2" not in login_page.text
+    assert "Повторите" not in login_page.text
 
     setup = client.post("/api/auth/setup", json={"password": "secret1"})
     assert setup.status_code == 200
     assert "deskline_session" in setup.cookies
+    # Session cookie must not set a long-lived Max-Age
+    set_cookie = setup.headers.get("set-cookie", "")
+    assert "Max-Age" not in set_cookie and "max-age" not in set_cookie
 
     ok = client.get("/api/settings")
     assert ok.status_code == 200
 
-    client.post("/api/auth/logout")
-    denied2 = client.get("/")
-    assert denied2.status_code in (303, 307, 401, 200)
-    # After logout, unauthenticated HTML should redirect to login
+    logout = client.post("/api/auth/logout")
+    assert logout.status_code == 200
+    client.cookies.clear()
     follow = client.get("/", follow_redirects=False)
     assert follow.status_code in (303, 307)
     assert "/login" in follow.headers.get("location", "")
+    assert client.get("/api/settings").status_code == 401
 
     bad = client.post("/api/auth/login", json={"password": "wrong"})
     assert bad.status_code == 401
@@ -57,6 +62,7 @@ def test_auth_setup_login_and_gate(tmp_path, monkeypatch):
     home = client.get("/")
     assert home.status_code == 200
     assert "Deskline" in home.text
+    assert "Manrope" in home.text
 
 
 def test_dashboard_requires_login_after_password(tmp_path, monkeypatch):

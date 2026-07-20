@@ -15,7 +15,6 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from deskline import __version__
 from deskline.auth import (
     COOKIE_NAME,
-    SESSION_TTL_SEC,
     change_password,
     create_session_token,
     is_password_set,
@@ -64,18 +63,23 @@ class ChangePasswordBody(BaseModel):
 
 
 def _set_session_cookie(response: Response, token: str) -> None:
+    # Session cookie (no max_age): cleared when the browser is closed.
     response.set_cookie(
         key=COOKIE_NAME,
         value=token,
         httponly=True,
         samesite="strict",
-        max_age=SESSION_TTL_SEC,
         path="/",
     )
 
 
 def _clear_session_cookie(response: Response) -> None:
-    response.delete_cookie(COOKIE_NAME, path="/")
+    response.delete_cookie(
+        COOKIE_NAME,
+        path="/",
+        httponly=True,
+        samesite="strict",
+    )
 
 
 class AuthMiddleware(BaseHTTPMiddleware):
