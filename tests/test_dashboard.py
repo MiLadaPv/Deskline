@@ -28,7 +28,12 @@ def test_dashboard_index_ok(tmp_path, monkeypatch):
     res = client.get("/")
     assert res.status_code == 200
     assert "Deskline" in res.text
+    assert 'class="app-shell"' in res.text
+    assert 'class="sidebar"' in res.text
+    assert 'role="tabpanel"' in res.text
+    assert 'id="toastRegion"' in res.text
     assert 'id="shotLightbox"' in res.text
+    assert 'aria-modal="true"' in res.text
 
     settings = client.get("/api/settings")
     assert settings.status_code == 200

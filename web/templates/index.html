@@ -4,72 +4,91 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Deskline</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="/static/css/app.css?v={{ version }}" />
 </head>
 <body>
-  <div class="atmosphere" aria-hidden="true"></div>
-  <header class="top">
-    <div class="brand-block">
-      <p class="eyebrow">Локально · приватно · Windows</p>
-      <h1 class="brand">Deskline</h1>
-      <p class="tagline">Куда уходят часы — без отправки данных в облако.</p>
-    </div>
-    <div class="hero-actions">
-      <div class="metrics-pair">
-        <div class="focus-metric" id="focusMetric">
-          <span class="focus-label">Фокус</span>
-          <strong class="focus-value" id="focusValue">—</strong>
-          <span class="focus-sub" id="focusSub">загрузка…</span>
-        </div>
-        <div class="focus-metric" id="activityMetric">
-          <span class="focus-label">Активность</span>
-          <strong class="focus-value" id="activityValue">—</strong>
-          <span class="focus-sub" id="activitySub">ввод клавиатуры/мыши</span>
-        </div>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <a class="sidebar-brand" href="#" data-nav-home aria-label="Deskline — обзор">
+        <span class="brand-mark" aria-hidden="true">D</span>
+        <span>Deskline</span>
+      </a>
+      <nav class="tabs" role="tablist" aria-label="Разделы">
+        <button class="tab active" id="tab-today" data-tab="today" type="button" role="tab" aria-selected="true" aria-controls="panel-today">
+          <span class="nav-icon" aria-hidden="true">⌂</span><span>Обзор</span>
+        </button>
+        <button class="tab" id="tab-day" data-tab="day" type="button" role="tab" aria-selected="false" aria-controls="panel-day">
+          <span class="nav-icon" aria-hidden="true">◷</span><span>День</span>
+        </button>
+        <button class="tab" id="tab-usage" data-tab="usage" type="button" role="tab" aria-selected="false" aria-controls="panel-usage">
+          <span class="nav-icon" aria-hidden="true">≡</span><span>Активность</span>
+        </button>
+        <button class="tab" id="tab-projects" data-tab="projects" type="button" role="tab" aria-selected="false" aria-controls="panel-projects">
+          <span class="nav-icon" aria-hidden="true">□</span><span>Проекты</span>
+        </button>
+        <button class="tab" id="tab-ratings" data-tab="ratings" type="button" role="tab" aria-selected="false" aria-controls="panel-ratings">
+          <span class="nav-icon" aria-hidden="true">◇</span><span>Классификация</span>
+        </button>
+        <button class="tab" id="tab-shots" data-tab="shots" type="button" role="tab" aria-selected="false" aria-controls="panel-shots">
+          <span class="nav-icon" aria-hidden="true">▣</span><span>Скриншоты</span>
+        </button>
+        <button class="tab tab-settings" id="tab-settings" data-tab="settings" type="button" role="tab" aria-selected="false" aria-controls="panel-settings">
+          <span class="nav-icon" aria-hidden="true">⚙</span><span>Настройки</span>
+        </button>
+      </nav>
+      <div class="sidebar-foot">
+        <span id="appVersion">Deskline v{{ version }}</span>
+        <span id="statusLine" aria-live="polite">Подключение…</span>
       </div>
-      <div class="control-strip">
+    </aside>
+
+    <div class="app-column">
+      <header class="topbar">
+        <div class="topbar-context">
+          <label class="focus-select">
+            <span>Проект</span>
+            <select id="currentProjectSelect" aria-label="Текущий проект">
+              <option value="">Без проекта</option>
+            </select>
+          </label>
+          <label class="focus-select">
+            <span>Задача</span>
+            <select id="currentTaskSelect" aria-label="Текущая задача" disabled>
+              <option value="">Без задачи</option>
+            </select>
+          </label>
+        </div>
+        <div class="control-strip">
         <label class="work-toggle" title="Мессенджеры считаются фокусом">
           <input type="checkbox" id="workModeToggle" />
           <span>На работе</span>
         </label>
-        <label class="focus-select">
-          <span class="sr-only">Проект</span>
-          <select id="currentProjectSelect" aria-label="Текущий проект">
-            <option value="">Проект…</option>
-          </select>
-        </label>
-        <label class="focus-select">
-          <span class="sr-only">Задача</span>
-          <select id="currentTaskSelect" aria-label="Текущая задача" disabled>
-            <option value="">Задача…</option>
-          </select>
-        </label>
-        <button type="button" class="btn primary" id="toggleBtn">Пауза</button>
-      </div>
-    </div>
-  </header>
+          <button type="button" class="btn primary tracking-btn" id="toggleBtn">Пауза</button>
+        </div>
+      </header>
 
-  <nav class="tabs" role="tablist" aria-label="Разделы">
-    <div class="tab-group">
-      <button class="tab active" data-tab="today" type="button">Сегодня</button>
-      <button class="tab" data-tab="day" type="button">День</button>
-      <button class="tab" data-tab="usage" type="button">Где время</button>
-    </div>
-    <div class="tab-group">
-      <button class="tab" data-tab="projects" type="button">Проекты</button>
-      <button class="tab" data-tab="ratings" type="button">Рейтинги</button>
-      <button class="tab" data-tab="shots" type="button">Скриншоты</button>
-    </div>
-    <div class="tab-group tab-group-end">
-      <button class="tab" data-tab="settings" type="button">Настройки</button>
-    </div>
-  </nav>
+      <main class="workspace">
+        <div class="workspace-head">
+          <div>
+            <p class="page-kicker" id="pageKicker">Рабочая сводка</p>
+            <h1 id="pageTitle">Обзор</h1>
+          </div>
+          <time class="today-date" id="todayDate"></time>
+        </div>
 
-  <main>
-    <section id="panel-today" class="panel active">
+        <div class="overview-metrics" id="overviewMetrics" aria-label="Краткая сводка">
+          <div class="focus-metric" id="focusMetric">
+            <span class="focus-label">Фокус</span>
+            <strong class="focus-value" id="focusValue">—</strong>
+            <span class="focus-sub" id="focusSub">Загрузка…</span>
+          </div>
+          <div class="focus-metric" id="activityMetric">
+            <span class="focus-label">Активность</span>
+            <strong class="focus-value" id="activityValue">—</strong>
+            <span class="focus-sub" id="activitySub">Клавиатура и мышь</span>
+          </div>
+        </div>
+    <section id="panel-today" class="panel active" role="tabpanel" aria-labelledby="tab-today">
       <div class="panel-head">
         <h2>Сегодня</h2>
         <label class="filter-inline">
@@ -109,14 +128,14 @@
       <ol class="rank-list" id="topAppsToday"></ol>
     </section>
 
-    <section id="panel-day" class="panel">
+    <section id="panel-day" class="panel" role="tabpanel" aria-labelledby="tab-day" hidden>
       <h2>День</h2>
       <div class="gantt-wrap" id="dayGantt"></div>
       <h3 class="subhead">Сессии</h3>
       <ol class="timeline" id="timelineList"></ol>
     </section>
 
-    <section id="panel-usage" class="panel">
+    <section id="panel-usage" class="panel" role="tabpanel" aria-labelledby="tab-usage" hidden>
       <div class="panel-head">
         <h2>Где время</h2>
       </div>
@@ -136,7 +155,7 @@
       </div>
     </section>
 
-    <section id="panel-projects" class="panel">
+    <section id="panel-projects" class="panel" role="tabpanel" aria-labelledby="tab-projects" hidden>
       <div class="panel-head">
         <h2>Проекты и задачи</h2>
       </div>
@@ -167,88 +186,107 @@
       <ol class="rank-list" id="projectTimeList"></ol>
     </section>
 
-    <section id="panel-ratings" class="panel">
+    <section id="panel-ratings" class="panel" role="tabpanel" aria-labelledby="tab-ratings" hidden>
       <h2>Рейтинги</h2>
       <div class="ratings-list" id="ratingsList"></div>
     </section>
 
-    <section id="panel-shots" class="panel">
+    <section id="panel-shots" class="panel" role="tabpanel" aria-labelledby="tab-shots" hidden>
       <h2>Скриншоты</h2>
       <div class="shots-grid" id="shotsGrid"></div>
     </section>
 
-    <section id="panel-settings" class="panel">
+    <section id="panel-settings" class="panel" role="tabpanel" aria-labelledby="tab-settings" hidden>
       <h2>Настройки</h2>
-      <form id="settingsForm" class="settings-form">
-        <label class="check">
-          <input type="checkbox" name="work_mode" />
-          Режим «На работе»
-        </label>
-        <label>
-          Рабочие чаты (слова в заголовке, через запятую)
-          <input type="text" name="work_chat_keywords" placeholder="клиент, standup, RG-Soft" />
-        </label>
-        <label>
-          Без ввода после (сек)
-          <input type="number" name="idle_after_sec" min="30" max="3600" step="30" />
-        </label>
-        <label class="check">
-          <input type="checkbox" name="poor_time_popup" />
-          Напоминать об отвлечениях в режиме «На работе»
-        </label>
-        <label class="check">
-          <input type="checkbox" name="blur_screenshots" />
-          Размывать скриншоты
-        </label>
-        <label>
-          Интервал скриншотов (сек)
-          <input type="number" name="screenshot_interval_sec" min="60" step="30" />
-        </label>
-        <label class="check">
-          <input type="checkbox" name="screenshots_enabled" />
-          Включить скриншоты
-        </label>
-        <label class="check">
-          <input type="checkbox" name="screenshot_on_app_switch" />
-          Скриншот при смене приложения
-        </label>
-        <label>
-          Хранить скриншоты (дней)
-          <input type="number" name="screenshot_retention_days" min="0" max="3650" step="1" />
-        </label>
-        <p class="hint">0 — не удалять. По умолчанию 7.</p>
-        <p class="hint" id="shotsStorageHint">Папка скриншотов…</p>
-        <label class="check">
-          <input type="checkbox" name="open_dashboard_on_start" />
-          Открывать дашборд при запуске
-        </label>
-        <label class="check">
-          <input type="checkbox" name="autostart" />
-          Запускать с Windows
-        </label>
-        <button type="submit" class="btn">Сохранить</button>
-      </form>
-      <form id="passwordForm" class="settings-form">
-        <h3 class="subhead">Пароль входа</h3>
-        <label>
-          Текущий пароль
-          <input type="password" name="current_password" autocomplete="current-password" required />
-        </label>
-        <label>
-          Новый пароль
-          <input type="password" name="new_password" autocomplete="new-password" required minlength="4" />
-        </label>
-        <button type="submit" class="btn">Сменить пароль</button>
-      </form>
-      <div class="settings-actions">
-        <button type="button" class="btn" id="logoutBtn">Выйти из дашборда</button>
-        <button type="button" class="btn" id="purgeShotsBtn">Удалить старые скриншоты сейчас</button>
-        <button type="button" class="btn danger" id="clearBtn">Очистить все локальные данные</button>
+      <div class="settings-layout">
+        <form id="settingsForm" class="settings-form settings-grid">
+          <fieldset class="settings-card">
+            <legend>Работа</legend>
+            <label class="check">
+              <input type="checkbox" name="work_mode" />
+              Режим «На работе»
+            </label>
+            <label>
+              Рабочие чаты
+              <input type="text" name="work_chat_keywords" placeholder="клиент, планёрка, проект" />
+            </label>
+            <label>
+              Без ввода после (сек)
+              <input type="number" name="idle_after_sec" min="30" max="3600" step="30" />
+            </label>
+            <label class="check">
+              <input type="checkbox" name="poor_time_popup" />
+              Напоминать об отвлечениях
+            </label>
+          </fieldset>
+          <fieldset class="settings-card">
+            <legend>Скриншоты</legend>
+            <label class="check">
+              <input type="checkbox" name="screenshots_enabled" />
+              Включить скриншоты
+            </label>
+            <div class="dependent-settings" data-screenshot-settings>
+              <label class="check">
+                <input type="checkbox" name="blur_screenshots" />
+                Размывать изображения
+              </label>
+              <label class="check">
+                <input type="checkbox" name="screenshot_on_app_switch" />
+                Снимать при смене приложения
+              </label>
+              <label>
+                Интервал (сек)
+                <input type="number" name="screenshot_interval_sec" min="60" step="30" />
+              </label>
+              <label>
+                Срок хранения (дней)
+                <input type="number" name="screenshot_retention_days" min="0" max="3650" step="1" />
+              </label>
+            </div>
+            <p class="storage-hint" id="shotsStorageHint">Локальное хранилище…</p>
+            <button type="button" class="btn secondary" id="purgeShotsBtn">Очистить просроченные</button>
+          </fieldset>
+          <fieldset class="settings-card">
+            <legend>Система</legend>
+            <label class="check">
+              <input type="checkbox" name="open_dashboard_on_start" />
+              Открывать окно при запуске
+            </label>
+            <label class="check">
+              <input type="checkbox" name="autostart" />
+              Запускать с Windows
+            </label>
+          </fieldset>
+          <div class="settings-save">
+            <button type="submit" class="btn primary">Сохранить настройки</button>
+          </div>
+        </form>
+        <aside class="security-column">
+          <form id="passwordForm" class="settings-card settings-form">
+            <h3>Безопасность</h3>
+            <label>
+              Текущий пароль
+              <input type="password" name="current_password" autocomplete="current-password" required />
+            </label>
+            <label>
+              Новый пароль
+              <input type="password" name="new_password" autocomplete="new-password" required minlength="4" />
+            </label>
+            <button type="submit" class="btn secondary">Сменить пароль</button>
+          </form>
+          <div class="settings-card settings-actions">
+            <h3>Данные</h3>
+            <button type="button" class="btn secondary" id="logoutBtn">Выйти</button>
+            <button type="button" class="btn danger" id="clearBtn">Удалить все локальные данные</button>
+          </div>
+        </aside>
       </div>
     </section>
-  </main>
+      </main>
+    </div>
+  </div>
 
-  <div id="shotLightbox" class="lightbox" hidden>
+  <div id="shotLightbox" class="lightbox" role="dialog" aria-modal="true" aria-label="Просмотр скриншота" hidden>
     <button type="button" class="lightbox-nav lightbox-prev" id="lightboxPrev" aria-label="Предыдущий">‹</button>
     <button type="button" class="lightbox-close" id="lightboxClose" aria-label="Закрыть">×</button>
     <button type="button" class="lightbox-nav lightbox-next" id="lightboxNext" aria-label="Следующий">›</button>
@@ -256,10 +294,7 @@
     <p class="lightbox-caption" id="lightboxCaption"></p>
   </div>
 
-  <footer class="foot">
-    <span id="appVersion">Deskline v{{ version }}</span>
-    <span id="statusLine">…</span>
-  </footer>
+  <div class="toast-region" id="toastRegion" aria-live="polite" aria-atomic="true"></div>
   <script src="/static/js/app.js?v={{ version }}"></script>
 </body>
 </html>

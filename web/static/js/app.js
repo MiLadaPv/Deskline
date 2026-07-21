@@ -17,6 +17,43 @@ const fmtBytes = (n) => {
 let lastSummaryKey = "";
 let lastStatusKey = "";
 let lastBarsKey = "";
+let lightboxReturnFocus = null;
+
+const PAGE_META = {
+  today: ["Обзор", "Рабочая сводка"],
+  day: ["День", "Хронология активности"],
+  usage: ["Активность", "Распределение времени"],
+  projects: ["Проекты", "Проекты и задачи"],
+  ratings: ["Классификация", "Приложения и сайты"],
+  shots: ["Скриншоты", "Локальная галерея"],
+  settings: ["Настройки", "Параметры Deskline"],
+};
+
+function showToast(message, type = "success") {
+  const region = document.getElementById("toastRegion");
+  if (!region) return;
+  const toast = document.createElement("div");
+  toast.className = `toast ${type}`;
+  toast.textContent = message;
+  region.appendChild(toast);
+  window.setTimeout(() => toast.remove(), 3200);
+}
+
+async function runAction(control, action, successMessage = "") {
+  const oldDisabled = control?.disabled;
+  if (control) control.disabled = true;
+  try {
+    const result = await action();
+    if (successMessage) showToast(successMessage);
+    return result;
+  } catch (err) {
+    console.error(err);
+    showToast("Не удалось выполнить действие", "error");
+    return null;
+  } finally {
+    if (control) control.disabled = !!oldDisabled;
+  }
+}
 
 async function api(path, opts = {}) {
   const res = await fetch(path, {
@@ -27,7 +64,15 @@ async function api(path, opts = {}) {
     location.href = "/login";
     throw new Error("auth required");
   }
-  if (!res.ok) throw new Error(await res.text());
+  if (!res.ok) {
+    const text = await res.text();
+    let message = text || `Ошибка ${res.status}`;
+    try {
+      const parsed = JSON.parse(text);
+      if (typeof parsed.detail === "string") message = parsed.detail;
+    } catch (_) {}
+    throw new Error(message);
+  }
   if (res.status === 204) return null;
   return res.json();
 }
@@ -36,11 +81,24 @@ function setActiveTab(name) {
   const aliases = { activities: "usage", apps: "usage", sites: "usage" };
   const tab = aliases[name] || name;
   document.querySelectorAll(".tab").forEach((t) => {
-    t.classList.toggle("active", t.dataset.tab === tab);
+    const active = t.dataset.tab === tab;
+    t.classList.toggle("active", active);
+    t.setAttribute("aria-selected", active ? "true" : "false");
+    t.tabIndex = active ? 0 : -1;
   });
   document.querySelectorAll(".panel").forEach((p) => {
-    p.classList.toggle("active", p.id === `panel-${tab}`);
+    const active = p.id === `panel-${tab}`;
+    p.classList.toggle("active", active);
+    p.hidden = !active;
   });
+  const [title, kicker] = PAGE_META[tab] || PAGE_META.today;
+  const titleEl = document.getElementById("pageTitle");
+  const kickerEl = document.getElementById("pageKicker");
+  const overviewMetrics = document.getElementById("overviewMetrics");
+  if (titleEl) titleEl.textContent = title;
+  if (kickerEl) kickerEl.textContent = kicker;
+  if (overviewMetrics) overviewMetrics.hidden = tab !== "today";
+  sessionStorage.setItem("deskline-tab", tab);
   if (aliases[name]) setUsageSlice(name);
 }
 
@@ -48,7 +106,10 @@ function setUsageSlice(slice) {
   const allowed = ["activities", "apps", "sites"];
   const key = allowed.includes(slice) ? slice : "activities";
   document.querySelectorAll(".seg-btn").forEach((b) => {
-    b.classList.toggle("active", b.dataset.usage === key);
+    const active = b.dataset.usage === key;
+    b.classList.toggle("active", active);
+    b.setAttribute("aria-selected", active ? "true" : "false");
+    b.tabIndex = active ? 0 : -1;
   });
   document.querySelectorAll("[data-usage-pane]").forEach((pane) => {
     const on = pane.dataset.usagePane === key;
@@ -349,7 +410,7 @@ function renderList(el, rows, emptyText) {
   el.dataset.sig = signature;
 
   if (!sliced.length) {
-    el.innerHTML = `<li><span class="rank-icon" aria-hidden="true">•</span><span class="rank-name">${emptyText || "Пока нет данных"}</span><span class="rank-meta">Оставьте Deskline включённым</span></li>`;
+    el.innerHTML = `<li class="empty-state"><span class="rank-icon" aria-hidden="true">•</span><span class="rank-name">${emptyText || "Пока нет данных"}</span><span class="rank-meta">—</span></li>`;
     return;
   }
   el.innerHTML = sliced
@@ -408,6 +469,7 @@ function openLightboxAt(index) {
   box.classList.toggle("flag-distracting", !!item.flag);
   box.hidden = false;
   document.body.style.overflow = "hidden";
+  document.getElementById("lightboxClose")?.focus();
 }
 
 function openLightbox(url, caption, flag) {
@@ -431,6 +493,8 @@ function closeLightbox() {
   box.classList.remove("flag-distracting");
   document.getElementById("lightboxImg").removeAttribute("src");
   document.body.style.overflow = "";
+  lightboxReturnFocus?.focus();
+  lightboxReturnFocus = null;
 }
 
 let projectCache = [];
@@ -455,13 +519,13 @@ function fillTaskSelect(tasks, currentTaskId) {
   if (!sel) return;
   const open = taskCache.filter((t) => !t.done);
   if (!selectedProjectId) {
-    sel.innerHTML = `<option value="">Задача…</option>`;
+    sel.innerHTML = `<option value="">Без задачи</option>`;
     sel.disabled = true;
     return;
   }
   sel.disabled = false;
   sel.innerHTML =
-    `<option value="">Задача…</option>` +
+    `<option value="">Без задачи</option>` +
     open
       .map(
         (t) =>
@@ -476,7 +540,7 @@ function fillTaskSelect(tasks, currentTaskId) {
 function fillProjectSelects(projects, currentId) {
   projectCache = projects || [];
   const opts =
-    `<option value="">Проект…</option>` +
+    `<option value="">Без проекта</option>` +
     projectCache
       .map(
         (p) =>
@@ -577,14 +641,16 @@ async function refreshProjects() {
         .map((p) => {
           const selected = selectedProjectId === String(p.id);
           const tracking = String(settings.current_project_id) === String(p.id);
-          return `<button type="button" class="pt-item pt-project ${selected ? "is-selected" : ""} ${tracking ? "is-active" : ""}" data-select-project="${p.id}" style="--pc:${escapeHtml(p.color || "#2f6f5e")}">
-            <span class="pt-swatch" aria-hidden="true"></span>
-            <span class="pt-item-main">
-              <span class="pt-item-name">${escapeHtml(p.name)}</span>
-              ${tracking ? `<span class="pt-item-meta">в учёте</span>` : ""}
-            </span>
-            <span class="btn danger pt-del" data-del-project="${p.id}" role="button">×</span>
-          </button>`;
+          return `<div class="pt-item pt-project ${selected ? "is-selected" : ""} ${tracking ? "is-active" : ""}" style="--pc:${escapeHtml(p.color || "#2f6f5e")}">
+            <button type="button" class="pt-project-main" data-select-project="${p.id}" aria-pressed="${selected ? "true" : "false"}">
+              <span class="pt-swatch" aria-hidden="true"></span>
+              <span class="pt-item-main">
+                <span class="pt-item-name">${escapeHtml(p.name)}</span>
+                ${tracking ? `<span class="pt-item-meta">Текущий проект</span>` : ""}
+              </span>
+            </button>
+            <button type="button" class="btn danger pt-del" data-del-project="${p.id}" aria-label="Удалить проект ${escapeHtml(p.name)}">×</button>
+          </div>`;
         })
         .join("");
     }
@@ -652,7 +718,7 @@ async function refreshStatus() {
   const label = st.current_label || st.current_app || "";
   let line = "Запись";
   if (st.paused) line = "Пауза";
-  else if (st.idle) line = label ? `Idle · ${label}` : "Idle";
+  else if (st.idle) line = label ? `Без ввода · ${label}` : "Без ввода";
   else if (label) line = `Запись · ${label}`;
   if (st.work_mode) line = `На работе · ${line}`;
   document.getElementById("statusLine").textContent = line;
@@ -736,6 +802,18 @@ async function loadSettings() {
   updateStorageHint(cfg);
   const workToggle = document.getElementById("workModeToggle");
   if (workToggle) workToggle.checked = !!cfg.work_mode;
+  syncScreenshotSettings(form);
+}
+
+function syncScreenshotSettings(form = document.getElementById("settingsForm")) {
+  if (!form) return;
+  const enabled = !!form.screenshots_enabled?.checked;
+  const group = form.querySelector("[data-screenshot-settings]");
+  if (!group) return;
+  group.classList.toggle("is-disabled", !enabled);
+  group.querySelectorAll("input").forEach((input) => {
+    input.disabled = !enabled;
+  });
 }
 
 function summaryKey(summary) {
@@ -785,7 +863,7 @@ async function refreshTimeline() {
         : `<span class="rank-icon">•</span>`;
       const idle =
         r.idle_sec >= 60
-          ? `<span class="timeline-idle">idle ${fmtDur(r.idle_sec)}</span>`
+          ? `<span class="timeline-idle">без ввода ${fmtDur(r.idle_sec)}</span>`
           : "";
       const cat = categoryClass(r.category);
       return `<li class="timeline-cat-${cat}">
@@ -833,7 +911,8 @@ async function refreshRatings() {
 }
 
 function wireUi() {
-  document.querySelectorAll(".tab").forEach((tab) => {
+  const tabs = [...document.querySelectorAll(".tab")];
+  tabs.forEach((tab, index) => {
     tab.addEventListener("click", () => {
       setActiveTab(tab.dataset.tab);
       if (tab.dataset.tab === "shots") refreshShots();
@@ -841,6 +920,12 @@ function wireUi() {
       if (tab.dataset.tab === "day") refreshTimeline();
       if (tab.dataset.tab === "ratings") refreshRatings();
       if (tab.dataset.tab === "projects") refreshProjects();
+    });
+    tab.addEventListener("keydown", (ev) => {
+      if (ev.key !== "ArrowDown" && ev.key !== "ArrowUp") return;
+      ev.preventDefault();
+      const delta = ev.key === "ArrowDown" ? 1 : -1;
+      tabs[(index + delta + tabs.length) % tabs.length].focus();
     });
   });
 
@@ -1000,6 +1085,7 @@ function wireUi() {
   shotsGrid.addEventListener("click", (ev) => {
     const shot = ev.target.closest(".shot");
     if (!shot) return;
+    lightboxReturnFocus = shot;
     const idx = Number(shot.dataset.index || 0);
     openLightboxAt(idx);
   });
@@ -1008,6 +1094,7 @@ function wireUi() {
     const shot = ev.target.closest(".shot");
     if (!shot) return;
     ev.preventDefault();
+    lightboxReturnFocus = shot;
     openLightboxAt(Number(shot.dataset.index || 0));
   });
 
@@ -1060,11 +1147,26 @@ function wireUi() {
       ev.preventDefault();
       stepLightbox(1);
     }
+    if (ev.key === "Tab") {
+      const controls = [...box.querySelectorAll("button:not([disabled])")];
+      if (!controls.length) return;
+      const current = controls.indexOf(document.activeElement);
+      const next = ev.shiftKey
+        ? (current - 1 + controls.length) % controls.length
+        : (current + 1) % controls.length;
+      ev.preventDefault();
+      controls[next].focus();
+    }
   });
+
+  const screenshotsToggle = document.querySelector('#settingsForm [name="screenshots_enabled"]');
+  screenshotsToggle?.addEventListener("change", () => syncScreenshotSettings());
 
   document.getElementById("settingsForm").addEventListener("submit", async (ev) => {
     ev.preventDefault();
     const form = ev.currentTarget;
+    const submit = ev.submitter;
+    if (submit) submit.disabled = true;
     const kwRaw = form.work_chat_keywords ? form.work_chat_keywords.value : "";
     const keywords = String(kwRaw || "")
       .split(",")
@@ -1083,21 +1185,30 @@ function wireUi() {
       work_mode: form.work_mode ? form.work_mode.checked : false,
       work_chat_keywords: keywords,
     };
-    const saved = await api("/api/settings", { method: "PUT", body: JSON.stringify(body) });
-    updateStorageHint(saved);
-    lastSummaryKey = "";
-    lastStatusKey = "";
-    await refreshSummary();
-    await refreshStatus();
-    alert("Сохранено");
+    try {
+      const saved = await api("/api/settings", { method: "PUT", body: JSON.stringify(body) });
+      updateStorageHint(saved);
+      lastSummaryKey = "";
+      lastStatusKey = "";
+      await refreshSummary();
+      await refreshStatus();
+      showToast("Настройки сохранены");
+    } catch (err) {
+      console.error(err);
+      showToast("Не удалось сохранить настройки", "error");
+    } finally {
+      if (submit) submit.disabled = false;
+    }
   });
 
-  document.getElementById("purgeShotsBtn").addEventListener("click", async () => {
+  document.getElementById("purgeShotsBtn").addEventListener("click", async (ev) => {
     if (!confirm("Удалить скриншоты старше срока хранения из настроек?")) return;
-    const result = await api("/api/screenshots/purge", { method: "POST" });
-    updateStorageHint({ screenshots_storage: result.screenshots_storage });
-    await refreshShots();
-    alert(`Удалено файлов: ${result.deleted_files || 0}`);
+    await runAction(ev.currentTarget, async () => {
+      const result = await api("/api/screenshots/purge", { method: "POST" });
+      updateStorageHint({ screenshots_storage: result.screenshots_storage });
+      await refreshShots();
+      showToast(`Удалено файлов: ${result.deleted_files || 0}`);
+    });
   });
 
   document.getElementById("passwordForm").addEventListener("submit", async (ev) => {
@@ -1110,9 +1221,9 @@ function wireUi() {
     try {
       await api("/api/auth/change-password", { method: "POST", body: JSON.stringify(body) });
       form.reset();
-      alert("Пароль изменён");
+      showToast("Пароль изменён");
     } catch (e) {
-      alert("Не удалось сменить пароль. Проверьте текущий пароль.");
+      showToast("Проверьте текущий пароль", "error");
     }
   });
 
@@ -1133,8 +1244,24 @@ function wireUi() {
 }
 
 async function boot() {
+  const date = document.getElementById("todayDate");
+  if (date) {
+    const now = new Date();
+    date.dateTime = now.toISOString().slice(0, 10);
+    date.textContent = now.toLocaleDateString("ru-RU", {
+      weekday: "long",
+      day: "numeric",
+      month: "long",
+    });
+  }
   wireUi();
+  const initialTab = sessionStorage.getItem("deskline-tab") || "today";
+  setActiveTab(PAGE_META[initialTab] ? initialTab : "today");
   await Promise.all([refreshSummary(), refreshStatus(), refreshProjects()]);
+  if (initialTab === "day") await refreshTimeline();
+  if (initialTab === "ratings") await refreshRatings();
+  if (initialTab === "shots") await refreshShots();
+  if (initialTab === "settings") await loadSettings();
   setInterval(() => {
     refreshSummary().catch(() => {});
     refreshStatus().catch(() => {});
