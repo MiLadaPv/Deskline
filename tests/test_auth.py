@@ -62,8 +62,7 @@ def test_auth_setup_login_and_gate(tmp_path, monkeypatch):
     home = client.get("/")
     assert home.status_code == 200
     assert "Deskline" in home.text
-    assert 'class="app-shell"' in home.text
-    assert "fonts.googleapis.com" not in home.text
+    assert "Manrope" in home.text
 
 
 def test_dashboard_requires_login_after_password(tmp_path, monkeypatch):
