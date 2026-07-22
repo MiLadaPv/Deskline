@@ -14,6 +14,7 @@ from deskline.api import create_app, open_dashboard
 from deskline.config import DATA_ROOT, HOST, PORT, ensure_data_dirs, load_config
 from deskline.db import Database
 from deskline.icons import purge_placeholder_icons
+from deskline.mini_tracker import MiniTracker
 from deskline.tracker import Tracker
 from deskline.tray import start_tray
 
@@ -137,6 +138,17 @@ def main(argv: list[str] | None = None) -> int:
     tracker = Tracker(db)
     tracker.start()
 
+    mini = MiniTracker(
+        get_snapshot=tracker.status,
+        on_pause=tracker.pause,
+        on_resume=tracker.resume,
+        on_open=open_dashboard,
+    )
+    try:
+        mini.start()
+    except Exception as exc:  # noqa: BLE001
+        print(f"Mini tracker unavailable: {exc}", file=sys.stderr)
+
     app = create_app(tracker, db)
     config = uvicorn.Config(
         app,
@@ -154,6 +166,7 @@ def main(argv: list[str] | None = None) -> int:
         if stop_event.is_set():
             return
         stop_event.set()
+        mini.stop()
         tracker.stop()
         server.should_exit = True
 
@@ -172,6 +185,7 @@ def main(argv: list[str] | None = None) -> int:
                 on_resume=tracker.resume,
                 on_open=open_dashboard,
                 on_quit=shutdown,
+                on_show_mini=mini.show,
             )
         except Exception as exc:  # noqa: BLE001
             print(f"Tray unavailable, continuing without it: {exc}", file=sys.stderr)
@@ -183,6 +197,7 @@ def main(argv: list[str] | None = None) -> int:
     try:
         server.run()
     finally:
+        mini.stop()
         tracker.stop()
         _release_instance_lock(mutex_handle)
     return 0

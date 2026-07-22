@@ -1000,6 +1000,11 @@ button.pt-item {
 
 .pt-project {
   border-left: 3px solid var(--pc, var(--accent));
+  box-shadow: none;
+}
+
+.pt-list .pt-project + .pt-project {
+  margin-top: 0;
 }
 
 .pt-project-main {

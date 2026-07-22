@@ -34,7 +34,18 @@ async function api(path, opts = {}) {
     location.href = "/login";
     throw new Error("auth required");
   }
-  if (!res.ok) throw new Error(await res.text());
+  if (!res.ok) {
+    const raw = await res.text();
+    let message = raw || res.statusText || "Request failed";
+    try {
+      const parsed = JSON.parse(raw);
+      if (parsed && typeof parsed.detail === "string") message = parsed.detail;
+      else if (parsed && Array.isArray(parsed.detail)) {
+        message = parsed.detail.map((d) => d.msg || JSON.stringify(d)).join("; ");
+      }
+    } catch (_) {}
+    throw new Error(message);
+  }
   if (res.status === 204) return null;
   return res.json();
 }
@@ -957,6 +968,9 @@ async function loadSettings() {
   }
   form.open_dashboard_on_start.checked = !!cfg.open_dashboard_on_start;
   form.autostart.checked = !!cfg.autostart;
+  if (form.show_mini_tracker) {
+    form.show_mini_tracker.checked = cfg.show_mini_tracker !== false;
+  }
   if (form.work_mode) form.work_mode.checked = !!cfg.work_mode;
   if (form.work_chat_keywords) {
     const kw = cfg.work_chat_keywords || [];
@@ -1405,6 +1419,7 @@ function wireUi() {
       screenshots_dir: form.screenshots_dir ? form.screenshots_dir.value.trim() : "",
       open_dashboard_on_start: form.open_dashboard_on_start.checked,
       autostart: form.autostart.checked,
+      show_mini_tracker: form.show_mini_tracker ? form.show_mini_tracker.checked : true,
       work_mode: form.work_mode ? form.work_mode.checked : false,
       work_chat_keywords: keywords,
     };

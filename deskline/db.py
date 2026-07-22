@@ -25,6 +25,10 @@ from deskline.icons import (
 MIN_DISPLAY_SEC = 60.0
 
 
+class ProjectNameExists(ValueError):
+    """Raised when an active project with the same name already exists."""
+
+
 def _utcnow() -> datetime:
     return datetime.now().astimezone()
 
@@ -837,9 +841,44 @@ class Database:
                 ).fetchall()
         return [dict(r) for r in rows]
 
+    def find_project_by_name(
+        self, name: str, *, exclude_id: int | None = None
+    ) -> dict[str, Any] | None:
+        needle = (name or "").strip().casefold()
+        if not needle:
+            return None
+        with self.connect() as conn:
+            rows = conn.execute(
+                "SELECT * FROM projects WHERE archived=0"
+            ).fetchall()
+        for row in rows:
+            if exclude_id is not None and int(row["id"]) == int(exclude_id):
+                continue
+            if str(row["name"] or "").strip().casefold() == needle:
+                return dict(row)
+        return None
+
+    def get_project(self, project_id: int | None) -> dict[str, Any] | None:
+        if project_id is None:
+            return None
+        with self.connect() as conn:
+            row = conn.execute(
+                "SELECT * FROM projects WHERE id=?", (project_id,)
+            ).fetchone()
+        return dict(row) if row else None
+
+    def get_task(self, task_id: int | None) -> dict[str, Any] | None:
+        if task_id is None:
+            return None
+        with self.connect() as conn:
+            row = conn.execute("SELECT * FROM tasks WHERE id=?", (task_id,)).fetchone()
+        return dict(row) if row else None
+
     def create_project(self, name: str, color: str = "#2f6f5e") -> dict[str, Any]:
         name = (name or "").strip() or "Проект"
         color = (color or "#2f6f5e").strip()
+        if self.find_project_by_name(name):
+            raise ProjectNameExists(f"Проект «{name}» уже есть")
         with self.connect() as conn:
             cur = conn.execute(
                 "INSERT INTO projects(name, color, archived, created_at) VALUES(?, ?, 0, ?)",
@@ -869,6 +908,8 @@ class Database:
             new_name = name.strip() if name is not None else row["name"]
             new_color = color.strip() if color is not None else row["color"]
             new_arch = int(archived) if archived is not None else row["archived"]
+            if not new_arch and self.find_project_by_name(new_name, exclude_id=project_id):
+                raise ProjectNameExists(f"Проект «{new_name}» уже есть")
             conn.execute(
                 "UPDATE projects SET name=?, color=?, archived=? WHERE id=?",
                 (new_name, new_color, new_arch, project_id),

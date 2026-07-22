@@ -48,6 +48,7 @@ def start_tray(
     on_resume: Callable[[], None],
     on_open: Callable[[], None],
     on_quit: Callable[[], None],
+    on_show_mini: Callable[[], None] | None = None,
 ) -> threading.Thread:
     import pystray
     from pystray import MenuItem as Item
@@ -57,10 +58,15 @@ def start_tray(
     def title() -> str:
         st = get_status()
         if st.get("paused"):
-            return "Deskline · Paused"
+            return "Deskline · Пауза"
         if st.get("idle"):
-            return "Deskline · Idle"
-        return "Deskline · Recording"
+            return "Deskline · Без ввода"
+        project = (st.get("project_name") or "").strip()
+        task = (st.get("task_name") or "").strip()
+        if project or task:
+            focus = " · ".join(x for x in (project, task) if x)
+            return f"Deskline · {focus}"
+        return "Deskline · Запись"
 
     def refresh(icon: "pystray.Icon") -> None:
         st = get_status()
@@ -78,18 +84,24 @@ def start_tray(
     def open_dash(icon: "pystray.Icon", _item: object) -> None:
         on_open()
 
+    def show_mini(icon: "pystray.Icon", _item: object) -> None:
+        if on_show_mini:
+            on_show_mini()
+
     def quit_app(icon: "pystray.Icon", _item: object) -> None:
         set_tray_icon(None)
         icon.stop()
         on_quit()
 
-    menu = pystray.Menu(
+    menu_items = [
         Item(lambda item: title(), None, enabled=False),
-        Item("Open dashboard", open_dash),
-        Item("Pause", pause),
-        Item("Resume", resume),
-        Item("Quit", quit_app),
-    )
+        Item("Открыть Deskline", open_dash),
+        Item("Показать мини-трекер", show_mini, enabled=on_show_mini is not None),
+        Item("Пауза", pause),
+        Item("Продолжить", resume),
+        Item("Выход", quit_app),
+    ]
+    menu = pystray.Menu(*menu_items)
     icon = pystray.Icon("Deskline", icon_img, title(), menu)
     set_tray_icon(icon)
 

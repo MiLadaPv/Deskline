@@ -8,7 +8,7 @@ from typing import Callable
 from deskline.capture import capture_screenshot
 from deskline.classify import extract_site_from_title, normalize_category, resolve_activity
 from deskline.config import load_config, save_config
-from deskline.db import Database
+from deskline.db import Database, parse_iso_datetime
 from deskline.idle import is_idle, seconds_since_last_input
 from deskline.notify import ask_still_working, notify, still_working_body
 from deskline.power import DEFAULT_SLEEP_GAP_SEC, is_sleep_gap
@@ -36,6 +36,7 @@ class Tracker:
         self._last_tick_at = time.time()
         self._idle = False
         self._status_listeners: list[Callable[[dict], None]] = []
+        self._session_started_at: float | None = None
         self.cfg = load_config()
 
         open_sess = self.db.open_session()
@@ -45,6 +46,10 @@ class Tracker:
             self._current_category = normalize_category(open_sess.category)
             self._current_label = open_sess.activity_label or open_sess.display_name
             self._current_app_path = open_sess.app_path
+            try:
+                self._session_started_at = parse_iso_datetime(open_sess.started_at).timestamp()
+            except Exception:
+                self._session_started_at = time.time()
         self.purge_old_screenshots()
 
     @property
@@ -66,6 +71,21 @@ class Tracker:
                 work_chat_keywords=list(self.cfg.get("work_chat_keywords") or []),
             )
             label = meta.get("activity_label") or meta.get("display_name")
+        project_id = self.cfg.get("current_project_id")
+        task_id = self.cfg.get("current_task_id")
+        try:
+            project_id = int(project_id) if project_id is not None else None
+        except (TypeError, ValueError):
+            project_id = None
+        try:
+            task_id = int(task_id) if task_id is not None else None
+        except (TypeError, ValueError):
+            task_id = None
+        project = self.db.get_project(project_id)
+        task = self.db.get_task(task_id)
+        elapsed = 0.0
+        if self._session_started_at and not self.paused:
+            elapsed = max(0.0, time.time() - self._session_started_at)
         return {
             "paused": self.paused,
             "recording": not self.paused and self._thread is not None and self._thread.is_alive(),
@@ -77,8 +97,12 @@ class Tracker:
             "idle": self._idle,
             "idle_for_sec": round(seconds_since_last_input(), 1),
             "work_mode": bool(self.cfg.get("work_mode")),
-            "current_project_id": self.cfg.get("current_project_id"),
-            "current_task_id": self.cfg.get("current_task_id"),
+            "current_project_id": project_id,
+            "current_task_id": task_id,
+            "project_name": (project or {}).get("name") or "",
+            "task_name": (task or {}).get("name") or "",
+            "session_elapsed_sec": round(elapsed, 1),
+            "show_mini_tracker": bool(self.cfg.get("show_mini_tracker", True)),
         }
 
     def _emit(self) -> None:
@@ -240,6 +264,7 @@ class Tracker:
                     task_id=task_id,
                     started_at=datetime.fromtimestamp(now).astimezone(),
                 )
+                self._session_started_at = now
                 try:
                     from deskline.icons import ensure_app_icon
 
@@ -284,6 +309,7 @@ class Tracker:
             ended = datetime.fromtimestamp(prev_tick).astimezone()
             self.db.end_session(self._current_session_id, ended_at=ended)
             self._current_session_id = None
+        self._session_started_at = None
         # Force a new session on the next focus sample
         self._current_key = None
         self._idle = False
@@ -364,6 +390,7 @@ class Tracker:
         if self._current_session_id is not None:
             self.db.end_session(self._current_session_id)
         self._current_session_id = None
+        self._session_started_at = None
         self._current_key = None
         self._current_label = None
         self._current_app_path = None

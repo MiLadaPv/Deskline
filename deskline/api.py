@@ -36,7 +36,7 @@ from deskline.config import (
     load_config,
     save_config,
 )
-from deskline.db import Database, parse_iso_datetime
+from deskline.db import Database, ProjectNameExists, parse_iso_datetime
 from deskline.tracker import Tracker
 
 
@@ -60,6 +60,7 @@ class SettingsUpdate(BaseModel):
     work_chat_keywords: list[str] | None = None
     current_project_id: int | None = None
     current_task_id: int | None = None
+    show_mini_tracker: bool | None = None
 
 
 def _validate_screenshots_dir(raw: str) -> str:
@@ -312,13 +313,19 @@ def create_app(tracker: Tracker, db: Database | None = None) -> FastAPI:
 
     @app.post("/api/projects")
     def create_project(body: ProjectCreate) -> dict[str, Any]:
-        return db.create_project(body.name, body.color)
+        try:
+            return db.create_project(body.name, body.color)
+        except ProjectNameExists as exc:
+            raise HTTPException(409, str(exc)) from exc
 
     @app.put("/api/projects/{project_id}")
     def update_project(project_id: int, body: ProjectUpdate) -> dict[str, Any]:
-        row = db.update_project(
-            project_id, name=body.name, color=body.color, archived=body.archived
-        )
+        try:
+            row = db.update_project(
+                project_id, name=body.name, color=body.color, archived=body.archived
+            )
+        except ProjectNameExists as exc:
+            raise HTTPException(409, str(exc)) from exc
         if not row:
             raise HTTPException(404, "Project not found")
         return row
