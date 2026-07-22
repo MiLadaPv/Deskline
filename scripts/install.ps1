@@ -132,17 +132,28 @@ function New-Shortcut {
   )
   try {
     $dir = Split-Path -Parent $Path
-    if ($dir -and -not (Test-Path $dir)) {
+    if ($dir -and -not (Test-Path -LiteralPath $dir)) {
       New-Item -ItemType Directory -Path $dir -Force | Out-Null
+    }
+    if (Test-Path -LiteralPath $Path) {
+      Remove-Item -LiteralPath $Path -Force -ErrorAction SilentlyContinue
     }
     $w = New-Object -ComObject WScript.Shell
     $s = $w.CreateShortcut($Path)
-    $s.TargetPath = 'wscript.exe'
-    $s.Arguments = '"' + $Target + '"'
-    $s.WorkingDirectory = $WorkDir
-    $s.WindowStyle = 7
+    $desktopExe = Join-Path $WorkDir 'deskline-desktop.exe'
+    if (Test-Path -LiteralPath $desktopExe) {
+      $s.TargetPath = $desktopExe
+      $s.Arguments = ''
+      $s.WorkingDirectory = $WorkDir
+      $s.WindowStyle = 1
+    } else {
+      $s.TargetPath = 'wscript.exe'
+      $s.Arguments = '"' + $Target + '"'
+      $s.WorkingDirectory = $WorkDir
+      $s.WindowStyle = 7
+    }
     $s.Description = $Description
-    if ($IconPath -and (Test-Path $IconPath)) {
+    if ($IconPath -and (Test-Path -LiteralPath $IconPath)) {
       $s.IconLocation = "$IconPath,0"
     }
     $s.Save()
@@ -186,4 +197,9 @@ Write-Host 'Deskline installed successfully.'
 Write-Host "  Install dir : $InstallRoot"
 Write-Host '  Start Menu  : Deskline'
 Write-Host 'Launching Deskline...'
-Start-Process -FilePath 'wscript.exe' -ArgumentList $LauncherVbs
+$desktopExe = Join-Path $InstallRoot 'deskline-desktop.exe'
+if (Test-Path -LiteralPath $desktopExe) {
+  Start-Process -FilePath $desktopExe -WorkingDirectory $InstallRoot
+} else {
+  Start-Process -FilePath 'wscript.exe' -ArgumentList $LauncherVbs
+}
