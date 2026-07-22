@@ -1159,20 +1159,28 @@ function wireUi() {
   if (projectForm) {
     projectForm.addEventListener("submit", async (ev) => {
       ev.preventDefault();
-      const name = projectForm.name.value.trim();
-      const color = projectForm.color.value;
+      const nameInput = projectForm.elements.namedItem("name");
+      const colorInput = projectForm.elements.namedItem("color");
+      const name = String(nameInput && "value" in nameInput ? nameInput.value : "").trim();
+      const color = String(colorInput && "value" in colorInput ? colorInput.value : "#2f6f5e");
       if (!name) return;
-      const created = await api("/api/projects", {
-        method: "POST",
-        body: JSON.stringify({ name, color }),
-      });
-      projectForm.reset();
-      projectForm.color.value = "#2f6f5e";
-      selectedProjectId = String(created.id);
-      const tasks = await api(`/api/tasks?project_id=${created.id}`);
-      const first = (tasks || []).find((t) => !t.done);
-      await setFocus(created.id, first ? first.id : null);
-      await refreshProjects();
+      try {
+        const created = await api("/api/projects", {
+          method: "POST",
+          body: JSON.stringify({ name, color }),
+        });
+        projectForm.reset();
+        if (colorInput && "value" in colorInput) colorInput.value = "#2f6f5e";
+        selectedProjectId = String(created.id);
+        const tasks = await api(`/api/tasks?project_id=${created.id}`);
+        const first = (tasks || []).find((t) => !t.done);
+        await setFocus(created.id, first ? first.id : null);
+        await refreshProjects();
+        showToast(`Проект «${name}» создан`, "ok");
+      } catch (err) {
+        console.error(err);
+        showToast(err?.message || "Не удалось создать проект", "error");
+      }
     });
   }
 
@@ -1180,16 +1188,26 @@ function wireUi() {
   if (taskForm) {
     taskForm.addEventListener("submit", async (ev) => {
       ev.preventDefault();
-      if (!selectedProjectId) return;
-      const name = taskForm.name.value.trim();
+      if (!selectedProjectId) {
+        showToast("Сначала выберите проект", "error");
+        return;
+      }
+      const nameInput = taskForm.elements.namedItem("name");
+      const name = String(nameInput && "value" in nameInput ? nameInput.value : "").trim();
       if (!name) return;
-      const created = await api("/api/tasks", {
-        method: "POST",
-        body: JSON.stringify({ project_id: Number(selectedProjectId), name }),
-      });
-      taskForm.reset();
-      await setFocus(selectedProjectId, created.id);
-      await refreshProjects();
+      try {
+        const created = await api("/api/tasks", {
+          method: "POST",
+          body: JSON.stringify({ project_id: Number(selectedProjectId), name }),
+        });
+        taskForm.reset();
+        await setFocus(selectedProjectId, created.id);
+        await refreshProjects();
+        showToast(`Задача «${name}» создана`, "ok");
+      } catch (err) {
+        console.error(err);
+        showToast(err?.message || "Не удалось создать задачу", "error");
+      }
     });
   }
 
