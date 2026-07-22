@@ -19,12 +19,12 @@ function Stop-DesklineProcesses {
       $listenPids += [int]$Matches[1]
     }
   }
-  foreach ($pid in ($listenPids | Select-Object -Unique)) {
-    if ($pid -le 0) { continue }
-    $proc = Get-Process -Id $pid -ErrorAction SilentlyContinue
+  foreach ($listenPid in ($listenPids | Select-Object -Unique)) {
+    if ($listenPid -le 0) { continue }
+    $proc = Get-Process -Id $listenPid -ErrorAction SilentlyContinue
     $name = if ($proc) { $proc.ProcessName } else { "?" }
-    Write-Host "Stopping listener PID $pid ($name) on port $Port"
-    Stop-Process -Id $pid -Force -ErrorAction SilentlyContinue
+    Write-Host "Stopping listener PID $listenPid ($name) on port $Port"
+    Stop-Process -Id $listenPid -Force -ErrorAction SilentlyContinue
     $killed++
   }
 

@@ -36,7 +36,7 @@ from deskline.config import (
     load_config,
     save_config,
 )
-from deskline.db import Database
+from deskline.db import Database, parse_iso_datetime
 from deskline.tracker import Tracker
 
 
@@ -173,8 +173,21 @@ def create_app(tracker: Tracker, db: Database | None = None) -> FastAPI:
     app.add_middleware(AuthMiddleware)
 
     def _range(from_s: str | None, to_s: str | None) -> tuple[datetime, datetime]:
-        end = datetime.fromisoformat(to_s) if to_s else datetime.now().astimezone()
-        start = datetime.fromisoformat(from_s) if from_s else end - timedelta(days=1)
+        try:
+            end = (
+                parse_iso_datetime(to_s)
+                if to_s
+                else datetime.now().astimezone()
+            )
+            start = (
+                parse_iso_datetime(from_s)
+                if from_s
+                else end - timedelta(days=1)
+            )
+        except ValueError as exc:
+            raise HTTPException(400, f"Invalid date range: {exc}") from exc
+        if start > end:
+            start, end = end, start
         return start, end
 
     @app.get("/login", response_class=HTMLResponse)

@@ -18,10 +18,7 @@ from deskline.classify import (
 )
 from deskline.config import DB_PATH, ensure_data_dirs, get_screenshots_dir
 from deskline.icons import (
-    ensure_app_icon,
-    ensure_site_icon,
     icon_url_for_app,
-    icon_url_for_site,
     resolve_icon_url,
 )
 
@@ -36,10 +33,27 @@ def _iso(dt: datetime | None) -> str | None:
     return dt.isoformat(timespec="seconds") if dt else None
 
 
+def parse_iso_datetime(value: str | datetime) -> datetime:
+    """Parse ISO-8601 datetimes from the UI (including trailing Z) as timezone-aware."""
+    if isinstance(value, datetime):
+        return value if value.tzinfo is not None else value.astimezone()
+    text = str(value).strip()
+    if text.endswith(("Z", "z")):
+        text = text[:-1] + "+00:00"
+    parsed = datetime.fromisoformat(text)
+    if parsed.tzinfo is None:
+        # Date-only / naive values are treated as local wall time.
+        return parsed.astimezone()
+    return parsed
+
+
 def _parse(dt: str | None) -> datetime | None:
     if not dt:
         return None
-    return datetime.fromisoformat(dt)
+    try:
+        return parse_iso_datetime(dt)
+    except ValueError:
+        return None
 
 
 @dataclass
@@ -528,24 +542,9 @@ class Database:
             site = _top_site(label) or site_for_activity_label(label)
             return resolve_icon_url(site=site, app_name=_top_exe(label))
 
-        for exe, path in app_path_by_exe.items():
-            try:
-                ensure_app_icon(exe, path)
-            except Exception:
-                pass
-        for exe in {_top_exe(a) for a in by_activity} | set(app_exe_by_label.values()):
-            if exe not in app_path_by_exe:
-                try:
-                    # May resolve path via PATH/System32; never locks a per-app placeholder.
-                    ensure_app_icon(exe, None)
-                except Exception:
-                    pass
-        # Prefetch favicons for top sites (best-effort; UI also lazy-loads)
-        for site in list(by_site.keys())[:40]:
-            try:
-                ensure_site_icon(site)
-            except Exception:
-                pass
+        # Do not download/extract icons during summary aggregation — that can
+        # block the API for tens of seconds (favicon timeouts × many sites).
+        # The UI resolves /api/icons lazily when rows are rendered.
 
         focus = by_cat["productive"]
         focus_pct = (focus / tracked * 100.0) if tracked else 0.0

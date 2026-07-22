@@ -636,11 +636,23 @@ async function renderTasksPane(projectId, settings, summary) {
 
 async function refreshProjects() {
   const q = periodQuery(projectsReportPeriod);
-  const [projects, summary, settings] = await Promise.all([
+  const [projectsRes, summaryRes, settingsRes] = await Promise.allSettled([
     api("/api/projects"),
     api(`/api/summary?${q}`),
     api("/api/settings"),
   ]);
+  if (projectsRes.status !== "fulfilled") {
+    throw projectsRes.reason || new Error("Не удалось загрузить проекты");
+  }
+  if (settingsRes.status !== "fulfilled") {
+    throw settingsRes.reason || new Error("Не удалось загрузить настройки");
+  }
+  const projects = projectsRes.value || [];
+  const settings = settingsRes.value || {};
+  const summary =
+    summaryRes.status === "fulfilled"
+      ? summaryRes.value
+      : { by_project: [], by_task: [], total_sec: 0 };
   fillProjectSelects(projects, settings.current_project_id);
   const workToggle = document.getElementById("workModeToggle");
   if (workToggle) workToggle.checked = !!settings.work_mode;

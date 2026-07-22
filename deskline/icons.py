@@ -130,9 +130,13 @@ def is_placeholder_path(path: Path | None) -> bool:
 
 
 def resolve_icon_url(site: str | None = None, app_name: str | None = None) -> str:
-    """Prefer a real site favicon; fall back to the app icon instead of a teal placeholder."""
+    """Prefer a cached site favicon; fall back to the app icon URL.
+
+    Does not download favicons here — /media/icons fetches on demand so
+    summary/list APIs stay fast.
+    """
     if site:
-        path = ensure_site_icon(site)
+        path = icon_path_for_site(site)
         if path.exists() and not is_placeholder_path(path) and not is_weak_icon_cache(path):
             return icon_url_for_site(site)
     if app_name:
