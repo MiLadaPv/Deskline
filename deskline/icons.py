@@ -17,21 +17,24 @@ _SAFE_NAME = re.compile(r"[^a-zA-Z0-9._-]+")
 _WEAK_CACHE_MAX_BYTES = 400
 _PLACEHOLDER_NAME = "placeholder.png"
 _SITE_PREFIX = "site_"
-_FAVICON_TIMEOUT_SEC = 3.0
-_APP_ICON_PADDING = 5
+_FAVICON_TIMEOUT_SEC = 3.5
+_ICON_SIZE = 64
+_APP_ICON_PADDING = 3
 _SITE_ICON_PADDING = 2
-_APP_ICON_MAX_FILL = 0.88
-# Bump when extractor changes so old HTTP/disk caches are abandoned.
-_APP_ICON_REV = "v2"
+_APP_ICON_MAX_FILL = 0.94
+# Bump when extractor/size changes so old HTTP/disk caches are abandoned.
+_APP_ICON_REV = "v3"
 
-# Extra favicon URLs for hosts where /favicon.ico and Google s2 fail.
+# Extra favicon URLs for hosts where generic fetchers fail (prefer larger sizes).
 _SITE_FAVICON_OVERRIDES: dict[str, list[str]] = {
     "messenger.yandex.ru": [
-        "https://favicon.yandex.net/favicon/v2/messenger.yandex.ru?size=32",
+        "https://www.google.com/s2/favicons?domain=messenger.yandex.ru&sz=128",
+        "https://favicon.yandex.net/favicon/v2/messenger.yandex.ru?size=120",
         "https://yandex.ru/favicon.ico",
     ],
     "mail.yandex.ru": [
-        "https://favicon.yandex.net/favicon/v2/mail.yandex.ru?size=32",
+        "https://www.google.com/s2/favicons?domain=mail.yandex.ru&sz=128",
+        "https://favicon.yandex.net/favicon/v2/mail.yandex.ru?size=120",
         "https://yandex.ru/favicon.ico",
     ],
 }
@@ -54,21 +57,33 @@ def icon_cache_name_for_site(site: str) -> str:
     if host.startswith("www."):
         host = host[4:]
     safe = _SAFE_NAME.sub("_", host)
-    return f"{_SITE_PREFIX}{safe}.png"
+    return f"{_SITE_PREFIX}{safe}.{_APP_ICON_REV}.png"
 
 
 def app_name_from_icon_filename(name: str) -> str | None:
-    """Recover exe name from msedge.exe.v2.png (not site_/placeholder)."""
+    """Recover exe name from msedge.exe.v3.png (not site_/placeholder)."""
     safe = Path(name).name
     if safe == _PLACEHOLDER_NAME or safe.startswith(_SITE_PREFIX):
         return None
     if not safe.endswith(".png"):
         return None
     stem = safe[:-4]
-    rev_suffix = f".{_APP_ICON_REV}"
-    if stem.endswith(rev_suffix):
-        stem = stem[: -len(rev_suffix)]
+    # Strip cache revision (.v2, .v3, …) including legacy revs.
+    stem = re.sub(r"\.v\d+$", "", stem)
     return stem or None
+
+
+def site_from_icon_name(name: str) -> str | None:
+    """Recover domain from a site_*.png cache filename."""
+    safe = Path(name).name
+    if not safe.startswith(_SITE_PREFIX):
+        return None
+    stem = safe[len(_SITE_PREFIX) :]
+    if stem.endswith(".png"):
+        stem = stem[:-4]
+    stem = re.sub(r"\.v\d+$", "", stem)
+    # Legacy names without rev: site_youtube_com.png
+    return stem.replace("_", ".") or None
 
 
 def _cache_bust_qs(path: Path) -> str:
@@ -106,17 +121,6 @@ def is_site_icon_name(name: str) -> bool:
     return (name or "").startswith(_SITE_PREFIX)
 
 
-def site_from_icon_name(name: str) -> str | None:
-    """Recover domain from a site_*.png cache filename."""
-    safe = Path(name).name
-    if not safe.startswith(_SITE_PREFIX):
-        return None
-    stem = safe[len(_SITE_PREFIX) :]
-    if stem.endswith(".png"):
-        stem = stem[:-4]
-    return stem.replace("_", ".") or None
-
-
 def shared_placeholder_path() -> Path:
     ensure_data_dirs()
     out = ICONS_DIR / _PLACEHOLDER_NAME
@@ -130,15 +134,15 @@ def is_placeholder_path(path: Path | None) -> bool:
 
 
 def resolve_icon_url(site: str | None = None, app_name: str | None = None) -> str:
-    """Prefer a cached site favicon; fall back to the app icon URL.
+    """Prefer a site favicon URL; fall back to the app icon URL.
 
     Does not download favicons here — /media/icons fetches on demand so
-    summary/list APIs stay fast.
+    summary/list APIs stay fast. Always return the site URL when a host is
+    known so the UI can trigger that on-demand fetch (instead of showing a
+    generic browser icon).
     """
-    if site:
-        path = icon_path_for_site(site)
-        if path.exists() and not is_placeholder_path(path) and not is_weak_icon_cache(path):
-            return icon_url_for_site(site)
+    if site and str(site).strip():
+        return icon_url_for_site(site)
     if app_name:
         return icon_url_for_app(app_name)
     return icon_url_for_app("unknown.exe")
@@ -430,7 +434,7 @@ def _app_icon_too_tight(path: Path, margin: int = 1) -> bool:
 
 
 def ensure_app_icon(app_name: str | None, app_path: str | None = None) -> Path:
-    """Extract and cache a 32x32 PNG icon. Returns cache path or shared placeholder."""
+    """Extract and cache a crisp PNG icon. Returns cache path or shared placeholder."""
     ensure_data_dirs()
     out = icon_path_for_app(app_name)
     if out.exists() and not is_weak_icon_cache(out):
@@ -450,7 +454,7 @@ def ensure_app_icon(app_name: str | None, app_path: str | None = None) -> Path:
 
 
 def ensure_site_icon(site: str | None) -> Path:
-    """Fetch and cache a site favicon as 32x32 PNG. Returns cache path or placeholder."""
+    """Fetch and cache a site favicon as PNG. Returns cache path or placeholder."""
     ensure_data_dirs()
     host = (site or "").strip().lower()
     if host.startswith("www."):
@@ -476,11 +480,15 @@ def ensure_site_icon(site: str | None) -> Path:
 def _fetch_site_favicon(host: str, out: Path) -> bool:
     urls: list[str] = []
     urls.extend(_SITE_FAVICON_OVERRIDES.get(host, []))
+    # Prefer high-res CDN sources before tiny /favicon.ico (often 16×16).
     urls.extend(
         [
+            f"https://www.google.com/s2/favicons?domain={host}&sz=128",
+            f"https://favicon.yandex.net/favicon/v2/{host}?size=120",
+            f"https://{host}/apple-touch-icon.png",
+            f"https://{host}/apple-touch-icon-precomposed.png",
+            f"https://{host}/favicon-32x32.png",
             f"https://{host}/favicon.ico",
-            f"https://www.google.com/s2/favicons?domain={host}&sz=64",
-            f"https://favicon.yandex.net/favicon/v2/{host}?size=32",
         ]
     )
     # Apex fallback for subdomains (messenger.yandex.ru → yandex.ru)
@@ -488,9 +496,9 @@ def _fetch_site_favicon(host: str, out: Path) -> bool:
     if len(parts) > 2:
         apex = ".".join(parts[-2:])
         if apex != host:
+            urls.append(f"https://www.google.com/s2/favicons?domain={apex}&sz=128")
+            urls.append(f"https://favicon.yandex.net/favicon/v2/{apex}?size=120")
             urls.append(f"https://{apex}/favicon.ico")
-            urls.append(f"https://favicon.yandex.net/favicon/v2/{apex}?size=32")
-            urls.append(f"https://www.google.com/s2/favicons?domain={apex}&sz=64")
 
     seen: set[str] = set()
     for url in urls:
@@ -507,7 +515,7 @@ def _fetch_site_favicon(host: str, out: Path) -> bool:
                 data = resp.read()
             if not data or len(data) < 16:
                 continue
-            if _bytes_to_icon_png(data, out):
+            if _bytes_to_icon_png(data, out, size=_ICON_SIZE):
                 return True
         except (urllib.error.URLError, urllib.error.HTTPError, TimeoutError, OSError, ValueError):
             continue
@@ -516,13 +524,21 @@ def _fetch_site_favicon(host: str, out: Path) -> bool:
     return False
 
 
-def _bytes_to_icon_png(data: bytes, out: Path, size: int = 32) -> bool:
+def _bytes_to_icon_png(data: bytes, out: Path, size: int | None = None) -> bool:
+    size = int(size or _ICON_SIZE)
     try:
         img = Image.open(io.BytesIO(data))
+        # Reject tiny sources that only look sharp after heavy upscale.
+        try:
+            src_w, src_h = img.size
+            if max(src_w, src_h) < 24:
+                return False
+        except Exception:
+            pass
         if not _icon_has_usable_content(img):
             return False
         img = _trim_and_fit(img, size=size, padding=_SITE_ICON_PADDING)
-        if not _icon_has_usable_content(img, min_side=6):
+        if not _icon_has_usable_content(img, min_side=8):
             return False
         img.save(out, format="PNG")
         return out.exists() and out.stat().st_size > 0 and not _cached_icon_is_blank(out)
@@ -566,14 +582,15 @@ def _extract_exe_icon(exe_path: Path, out: Path) -> bool:
     return False
 
 
-def _hicon_to_png(hicon: int, out: Path, size: int = 32, draw_size: int | None = None) -> bool:
+def _hicon_to_png(hicon: int, out: Path, size: int | None = None, draw_size: int | None = None) -> bool:
     """Rasterize HICON via a 32bpp top-down DIB (reliable alpha vs CreateCompatibleBitmap)."""
     import ctypes
     from ctypes import wintypes
 
     import win32con
 
-    draw = int(draw_size or max(size * 8, 256))
+    size = int(size or _ICON_SIZE)
+    draw = int(draw_size or max(size * 4, 256))
 
     class BITMAPINFOHEADER(ctypes.Structure):
         _fields_ = [
@@ -691,7 +708,7 @@ def _extract_via_private_extract(exe_path: Path, out: Path) -> bool:
         if not n or not hicon:
             continue
         try:
-            if _hicon_to_png(hicon, out, size=32, draw_size=max(dim, 64)):
+            if _hicon_to_png(hicon, out, size=_ICON_SIZE, draw_size=max(dim, 64)):
                 return True
         finally:
             try:
@@ -747,7 +764,9 @@ def _extract_via_extracticonex(exe_path: Path, out: Path) -> bool:
 
 
 def _write_placeholder(out: Path) -> None:
-    img = Image.new("RGBA", (32, 32), (215, 235, 227, 255))
+    size = _ICON_SIZE
+    img = Image.new("RGBA", (size, size), (215, 235, 227, 255))
     draw = ImageDraw.Draw(img)
-    draw.ellipse((8, 8, 24, 24), fill=(47, 111, 94, 255))
+    m = size // 4
+    draw.ellipse((m, m, size - m, size - m), fill=(47, 111, 94, 255))
     img.save(out, format="PNG")

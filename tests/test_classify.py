@@ -72,8 +72,9 @@ def test_resolve_browser_youtube():
 
 
 def test_resolve_browser_email_and_messenger():
-    assert resolve_activity("chrome.exe", "Inbox", "mail.yandex.ru")["activity_label"] == "Почта"
+    assert resolve_activity("chrome.exe", "Inbox", "mail.yandex.ru")["activity_label"] == "Яндекс Почта"
     assert resolve_activity("chrome.exe", "Chat", "web.telegram.org")["activity_kind"] == "messaging"
+    assert resolve_activity("chrome.exe", "Chat", "web.telegram.org")["activity_label"] == "Telegram Web"
 
 
 def test_yandex_messenger_groups_unread_titles():
@@ -119,7 +120,7 @@ def test_yandex_mail_groups_inbox_counter():
         "msedge.exe",
         "36 · Входящие — Яндекс Почта и еще 2 страницы — Личный: Microsoft Edge",
     )
-    assert meta["activity_label"] == "Почта"
+    assert meta["activity_label"] == "Яндекс Почта"
     assert meta["url_hint"] == "mail.yandex.ru"
     assert meta["activity_kind"] == "email"
 
@@ -138,20 +139,19 @@ def test_site_for_activity_label():
 
     assert site_for_activity_label("Habr") == "habr.com"
     assert site_for_activity_label("Яндекс Мессенджер") == "messenger.yandex.ru"
-    assert site_for_activity_label("Почта") in {
-        "gmail.com",
-        "mail.google.com",
-        "mail.yandex.ru",
-        "mail.ru",
-        "outlook.live.com",
-        "outlook.office.com",
-    }
+    assert site_for_activity_label("Gmail") == "gmail.com"
+    assert site_for_activity_label("GitHub") == "github.com"
 
 
 def test_resolve_desktop_apps():
     meta = resolve_activity("telegram.exe", "Chat with Ann")
-    assert meta["activity_label"] == "Мессенджер"
+    assert meta["activity_label"] == "Telegram"
     assert meta["display_name"] == "Telegram"
+    assert meta["activity_kind"] == "messaging"
+
+    code = resolve_activity("cursor.exe", "main.py — Deskline")
+    assert code["activity_label"] == "Cursor"
+    assert code["activity_kind"] == "work"
 
 
 def test_system_noise_hidden():
@@ -224,7 +224,7 @@ def test_db_summary_includes_rdp_as_remote(tmp_path: Path):
     app_names = [x["name"] for x in summary["by_app"]]
     assert "RDP · server" in activity_names
     assert "Remote Desktop" in app_names
-    assert "Разработка" in activity_names
+    assert "Cursor" in activity_names
     assert "Cursor" in app_names
     assert summary["by_kind"].get("remote", 0) >= 1100
 
@@ -258,7 +258,7 @@ def test_db_summary_uses_friendly_labels(tmp_path: Path):
     summary = db.summary_for_day()
     names = [x["name"] for x in summary["by_activity"]]
     assert "YouTube" in names
-    assert "Разработка" in names
+    assert "Cursor" in names
     assert "msedge.exe" not in names
     app_names = [x["name"] for x in summary["by_app"]]
     assert "Microsoft Edge" in app_names
@@ -325,6 +325,6 @@ def test_db_summary_hides_sub_minute_entries(tmp_path: Path):
     summary = db.summary_for_day()
     names = [x["name"] for x in summary["by_activity"]]
     assert "Ножницы" not in names
-    assert "Разработка" in names
+    assert "Cursor" in names
     assert all(x["sec"] >= 60 for x in summary["by_activity"])
     assert all(x["sec"] >= 60 for x in summary["by_app"])

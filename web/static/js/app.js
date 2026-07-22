@@ -349,6 +349,29 @@ function renderDayGantt(rows) {
     </div>`;
 }
 
+function kindLabel(kind) {
+  const map = {
+    work: "Работа",
+    remote: "Удалёнка",
+    video: "Видео / музыка",
+    messaging: "Общение",
+    email: "Почта",
+    social: "Соцсети",
+    search: "Поиск",
+    shopping: "Покупки",
+    system: "Система",
+    other: "Прочее",
+  };
+  return map[kind] || map.other;
+}
+
+function kindSubtitle(kind) {
+  const key = String(kind || "other").toLowerCase();
+  // Hide vague buckets — they clutter the list without helping the user.
+  if (!key || key === "other" || key === "system") return "";
+  return kindLabel(key);
+}
+
 function renderList(el, rows, emptyText) {
   const sliced = (rows || []).slice(0, 15);
   const signature = sliced.length
@@ -370,7 +393,7 @@ function renderList(el, rows, emptyText) {
   el.dataset.sig = signature;
 
   if (!sliced.length) {
-    el.innerHTML = `<li><span class="rank-icon" aria-hidden="true">•</span><span class="rank-name">${emptyText || "Пока нет данных"}</span><span class="rank-meta">Оставьте Deskline включённым</span></li>`;
+    el.innerHTML = `<li><span class="rank-icon" aria-hidden="true">•</span><span class="rank-text"><span class="rank-name">${emptyText || "Пока нет данных"}</span></span><span class="rank-meta">Оставьте Deskline включённым</span></li>`;
     return;
   }
   el.innerHTML = sliced
@@ -378,9 +401,16 @@ function renderList(el, rows, emptyText) {
       const icon = r.icon_url
         ? iconImgHtml(r.icon_url)
         : `<span class="rank-icon" aria-hidden="true">•</span>`;
+      const kind = kindSubtitle(r.kind);
+      const kindHtml = kind
+        ? `<span class="rank-kind">${escapeHtml(kind)}</span>`
+        : "";
       return `<li>
         ${icon}
-        <span class="rank-name">${escapeHtml(r.name)}</span>
+        <span class="rank-text">
+          <span class="rank-name">${escapeHtml(r.name)}</span>
+          ${kindHtml}
+        </span>
         <span class="rank-meta">${fmtDur(r.sec)}</span>
       </li>`;
     })
@@ -400,7 +430,7 @@ const ICON_ONERROR =
 
 function iconImgHtml(url) {
   if (!url) return `<span class="rank-icon" aria-hidden="true">•</span>`;
-  return `<img class="rank-icon-img" src="${escapeHtml(url)}" alt="" width="32" height="32" decoding="async" onerror="${ICON_ONERROR}" />`;
+  return `<span class="rank-icon"><img class="rank-icon-img" src="${escapeHtml(url)}" alt="" width="36" height="36" decoding="async" onerror="${ICON_ONERROR}" /></span>`;
 }
 
 function updateStorageHint(cfg) {
@@ -852,8 +882,13 @@ function renderUsageList(el, rows, total, kind, emptyText) {
             </div>`;
       return `<li>
         ${icon}
-        <span>
-          <span class="rank-name">${escapeHtml(r.name)}<span class="rank-cat ${cat}">${CAT_LABELS[cat] || cat}</span></span>
+        <span class="rank-text">
+          <span class="rank-name">${escapeHtml(r.name)}${
+            kind === "activity"
+              ? ""
+              : `<span class="rank-cat ${cat}">${CAT_LABELS[cat] || cat}</span>`
+          }</span>
+          ${kind === "activity" && kindSubtitle(r.kind) ? `<span class="rank-kind">${escapeHtml(kindSubtitle(r.kind))}</span>` : ""}
           ${rate}
         </span>
         <span class="rank-meta">${fmtDur(r.sec)} · ${share}%</span>

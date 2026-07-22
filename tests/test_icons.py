@@ -6,6 +6,8 @@ from unittest.mock import patch
 from PIL import Image
 
 from deskline.icons import (
+    _APP_ICON_REV,
+    _ICON_SIZE,
     _trim_and_fit,
     ensure_app_icon,
     ensure_site_icon,
@@ -23,16 +25,17 @@ from deskline.icons import (
 
 
 def test_icon_cache_name_and_url():
-    assert icon_cache_name("MSEdge.EXE") == "msedge.exe.v2.png"
+    assert icon_cache_name("MSEdge.EXE") == f"msedge.exe.{_APP_ICON_REV}.png"
     url = icon_url_for_app("msedge.exe")
-    assert url.startswith("/media/icons/msedge.exe.v2.png?v=")
+    assert url.startswith(f"/media/icons/msedge.exe.{_APP_ICON_REV}.png?v=")
 
 
 def test_app_name_from_icon_filename():
     from deskline.icons import app_name_from_icon_filename
 
+    assert app_name_from_icon_filename(f"msedge.exe.{_APP_ICON_REV}.png") == "msedge.exe"
     assert app_name_from_icon_filename("msedge.exe.v2.png") == "msedge.exe"
-    assert app_name_from_icon_filename("site_habr.com.png") is None
+    assert app_name_from_icon_filename("site_habr.com.v3.png") is None
     assert app_name_from_icon_filename("placeholder.png") is None
 
 
@@ -46,7 +49,7 @@ def test_ensure_app_icon_uses_shared_placeholder(tmp_path: Path, monkeypatch):
     assert out.exists()
     assert not (icons / "fakeapp.exe.png").exists()
     img = Image.open(out)
-    assert img.size == (32, 32)
+    assert img.size == (_ICON_SIZE, _ICON_SIZE)
 
 
 def test_weak_placeholder_does_not_block_real_extract(tmp_path: Path, monkeypatch):
@@ -56,7 +59,7 @@ def test_weak_placeholder_does_not_block_real_extract(tmp_path: Path, monkeypatc
     monkeypatch.setattr("deskline.config.ICONS_DIR", icons)
 
     # Legacy placeholder size band (~200 bytes)
-    weak = icons / "msedge.exe.v2.png"
+    weak = icons / f"msedge.exe.{_APP_ICON_REV}.png"
     Image.new("RGBA", (32, 32), (215, 235, 227, 255)).save(weak, format="PNG")
     assert is_weak_icon_cache(weak)
 
@@ -123,15 +126,17 @@ def test_icon_path_for_app(tmp_path: Path, monkeypatch):
     monkeypatch.setattr("deskline.icons.ICONS_DIR", icons)
     monkeypatch.setattr("deskline.config.ICONS_DIR", icons)
     path = icon_path_for_app("chrome.exe")
-    assert path == icons / "chrome.exe.v2.png"
+    assert path == icons / f"chrome.exe.{_APP_ICON_REV}.png"
 
 
 def test_site_icon_names_and_urls():
-    assert icon_cache_name_for_site("Habr.com") == "site_habr.com.png"
-    assert icon_url_for_site("habr.com").startswith("/media/icons/site_habr.com.png?v=")
-    assert is_site_icon_name("site_habr.com.png")
-    assert not is_site_icon_name("msedge.exe.v2.png")
-    assert site_from_icon_name("site_habr.com.png") == "habr.com"
+    assert icon_cache_name_for_site("Habr.com") == f"site_habr.com.{_APP_ICON_REV}.png"
+    assert icon_url_for_site("habr.com").startswith(
+        f"/media/icons/site_habr.com.{_APP_ICON_REV}.png?v="
+    )
+    assert is_site_icon_name(f"site_habr.com.{_APP_ICON_REV}.png")
+    assert not is_site_icon_name(f"msedge.exe.{_APP_ICON_REV}.png")
+    assert site_from_icon_name(f"site_habr.com.{_APP_ICON_REV}.png") == "habr.com"
     assert site_from_icon_name("site_messenger.yandex.ru.png") == "messenger.yandex.ru"
 
 
@@ -188,9 +193,21 @@ def test_weak_site_cache_detects_blank(tmp_path: Path, monkeypatch):
     icons.mkdir()
     monkeypatch.setattr("deskline.icons.ICONS_DIR", icons)
     monkeypatch.setattr("deskline.config.ICONS_DIR", icons)
-    blank = icons / "site_messenger.yandex.ru.png"
+    blank = icons / f"site_messenger.yandex.ru.{_APP_ICON_REV}.png"
     Image.new("RGBA", (32, 32), (0, 0, 0, 0)).save(blank, format="PNG")
     assert is_weak_icon_cache(blank)
+
+
+def test_resolve_icon_url_prefers_site(tmp_path: Path, monkeypatch):
+    from deskline.icons import resolve_icon_url
+
+    icons = tmp_path / "icons"
+    icons.mkdir()
+    monkeypatch.setattr("deskline.icons.ICONS_DIR", icons)
+    monkeypatch.setattr("deskline.config.ICONS_DIR", icons)
+
+    url = resolve_icon_url(site="messenger.yandex.ru", app_name="msedge.exe")
+    assert url.startswith(f"/media/icons/site_messenger.yandex.ru.{_APP_ICON_REV}.png?v=")
 
 
 def test_resolve_icon_url_falls_back_to_app(tmp_path: Path, monkeypatch):
@@ -201,9 +218,8 @@ def test_resolve_icon_url_falls_back_to_app(tmp_path: Path, monkeypatch):
     monkeypatch.setattr("deskline.icons.ICONS_DIR", icons)
     monkeypatch.setattr("deskline.config.ICONS_DIR", icons)
 
-    with patch("deskline.icons._fetch_site_favicon", return_value=False):
-        url = resolve_icon_url(site="messenger.yandex.ru", app_name="msedge.exe")
-    assert url.startswith("/media/icons/msedge.exe.v2.png?v=")
+    url = resolve_icon_url(site=None, app_name="msedge.exe")
+    assert url.startswith(f"/media/icons/msedge.exe.{_APP_ICON_REV}.png?v=")
 
 
 def test_restore_alpha_if_needed():
@@ -224,7 +240,7 @@ def test_ensure_site_icon_caches_favicon(tmp_path: Path, monkeypatch):
     monkeypatch.setattr("deskline.icons.ICONS_DIR", icons)
     monkeypatch.setattr("deskline.config.ICONS_DIR", icons)
 
-    fav = Image.new("RGBA", (16, 16), (10, 120, 200, 255))
+    fav = Image.new("RGBA", (64, 64), (10, 120, 200, 255))
     buf = __import__("io").BytesIO()
     fav.save(buf, format="PNG")
     payload = buf.getvalue()
@@ -242,11 +258,11 @@ def test_ensure_site_icon_caches_favicon(tmp_path: Path, monkeypatch):
     with patch("deskline.icons.urllib.request.urlopen", return_value=_Resp()):
         out = ensure_site_icon("habr.com")
 
-    assert out.name == "site_habr.com.png"
+    assert out.name == f"site_habr.com.{_APP_ICON_REV}.png"
     assert out.exists()
     assert not is_weak_icon_cache(out)
     img = Image.open(out)
-    assert img.size == (32, 32)
+    assert img.size == (_ICON_SIZE, _ICON_SIZE)
 
 
 def test_resolve_exe_path_via_registry_uninstall(tmp_path: Path, monkeypatch):

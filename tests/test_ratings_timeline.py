@@ -58,7 +58,7 @@ def test_ratings_and_timeline(tmp_path: Path):
 
     timeline = db.timeline_for_day()
     assert len(timeline) >= 2
-    assert timeline[0]["name"] == "Разработка"
+    assert timeline[0]["name"] == "Cursor"
     assert timeline[0]["idle_sec"] >= 100
 
     ratings = db.ratings_for_day()
