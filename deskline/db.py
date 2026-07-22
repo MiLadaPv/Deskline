@@ -352,20 +352,30 @@ class Database:
             "task_id": task_id,
         }
 
-    def summary_for_day(self, day: date | None = None, project_id: int | None = None) -> dict[str, Any]:
+    def summary_for_day(
+        self,
+        day: date | None = None,
+        project_id: int | None = None,
+        task_id: int | None = None,
+    ) -> dict[str, Any]:
         day = day or date.today()
         start = datetime.combine(day, datetime.min.time()).astimezone()
         end = start + timedelta(days=1)
-        return self.summary_range(start, end, project_id=project_id)
+        return self.summary_range(start, end, project_id=project_id, task_id=task_id)
 
-    def daily_trends(self, days: int = 7, project_id: int | None = None) -> list[dict[str, Any]]:
+    def daily_trends(
+        self,
+        days: int = 7,
+        project_id: int | None = None,
+        task_id: int | None = None,
+    ) -> list[dict[str, Any]]:
         """Time Doctor–style Hours Tracked + productivity mix per day."""
         days = max(1, min(int(days), 31))
         today = date.today()
         out: list[dict[str, Any]] = []
         for i in range(days - 1, -1, -1):
             day = today - timedelta(days=i)
-            s = self.summary_for_day(day, project_id=project_id)
+            s = self.summary_for_day(day, project_id=project_id, task_id=task_id)
             by_cat = s.get("by_category") or {}
             total = float(s.get("total_sec") or 0)
             productive = float(by_cat.get("productive") or 0)
@@ -396,6 +406,7 @@ class Database:
         start: datetime,
         end: datetime,
         project_id: int | None = None,
+        task_id: int | None = None,
     ) -> dict[str, Any]:
         from deskline.config import load_config
 
@@ -417,8 +428,9 @@ class Database:
         by_app: dict[str, float] = {}
         by_site: dict[str, float] = {}
         by_activity: dict[str, float] = {}
-        by_project: dict[int, float] = {}
-        by_task: dict[int, float] = {}
+        by_project: dict[int | None, float] = {}
+        by_task: dict[int | None, float] = {}
+        task_projects: dict[int | None, int | None] = {}
         activity_kinds: dict[str, str] = {}
         app_kinds: dict[str, str] = {}
         app_exe_by_label: dict[str, str] = {}
@@ -426,6 +438,9 @@ class Database:
         activity_app_secs: dict[str, dict[str, float]] = {}
         activity_site_secs: dict[str, dict[str, float]] = {}
         by_kind: dict[str, float] = {}
+        activity_cats: dict[str, str] = {}
+        app_cats: dict[str, str] = {}
+        site_cats: dict[str, str] = {}
         total = 0.0
         tracked = 0.0
         idle_tracked = 0.0
@@ -446,6 +461,8 @@ class Database:
                 continue
             if project_id is not None and meta.get("project_id") != project_id:
                 continue
+            if task_id is not None and meta.get("task_id") != task_id:
+                continue
             tracked += dur
             # Scale idle to the overlapping segment (TD: idle is orthogonal to category)
             full_span = max(0.0, (e - s).total_seconds()) or dur
@@ -463,6 +480,8 @@ class Database:
             by_app[app_label] = by_app.get(app_label, 0.0) + dur
             if app_label not in app_kinds:
                 app_kinds[app_label] = meta["activity_kind"] or "other"
+            if app_label not in app_cats:
+                app_cats[app_label] = cat
             if app_label not in app_exe_by_label:
                 app_exe_by_label[app_label] = exe
             if meta.get("app_path") and exe not in app_path_by_exe:
@@ -472,20 +491,26 @@ class Database:
             kind = meta["activity_kind"] or "other"
             if act not in activity_kinds:
                 activity_kinds[act] = kind
+            if act not in activity_cats:
+                activity_cats[act] = cat
             bucket = activity_app_secs.setdefault(act, {})
             bucket[exe] = bucket.get(exe, 0.0) + dur
             by_kind[kind] = by_kind.get(kind, 0.0) + dur
             site = meta["url_hint"]
             if site:
                 by_site[site] = by_site.get(site, 0.0) + dur
+                if site not in site_cats:
+                    site_cats[site] = cat
                 site_bucket = activity_site_secs.setdefault(act, {})
                 site_bucket[site] = site_bucket.get(site, 0.0) + dur
             pid = meta.get("project_id")
-            if pid is not None:
-                by_project[int(pid)] = by_project.get(int(pid), 0.0) + dur
+            pid_key = int(pid) if pid is not None else None
+            by_project[pid_key] = by_project.get(pid_key, 0.0) + dur
             tid = meta.get("task_id")
-            if tid is not None:
-                by_task[int(tid)] = by_task.get(int(tid), 0.0) + dur
+            tid_key = int(tid) if tid is not None else None
+            by_task[tid_key] = by_task.get(tid_key, 0.0) + dur
+            if tid_key not in task_projects:
+                task_projects[tid_key] = pid_key
 
         def _top_exe(label: str) -> str:
             secs = activity_app_secs.get(label) or {}
@@ -543,6 +568,7 @@ class Database:
                         "name": k,
                         "sec": v,
                         "kind": activity_kinds.get(k, "other"),
+                        "category": activity_cats.get(k, "neutral"),
                         "app_name": _top_exe(k),
                         "site": _top_site(k),
                         "icon_url": _icon_for_activity(k),
@@ -559,6 +585,7 @@ class Database:
                         "name": k,
                         "sec": v,
                         "kind": app_kinds.get(k, "other"),
+                        "category": app_cats.get(k, "neutral"),
                         "app_name": app_exe_by_label.get(k, "unknown.exe"),
                         "icon_url": icon_url_for_app(app_exe_by_label.get(k)),
                     }
@@ -574,6 +601,7 @@ class Database:
                         "name": k,
                         "sec": v,
                         "kind": "search",
+                        "category": site_cats.get(k, "neutral"),
                         "icon_url": resolve_icon_url(site=k, app_name="msedge.exe"),
                     }
                     for k, v in by_site.items()
@@ -593,7 +621,11 @@ class Database:
             ),
             "by_task": sorted(
                 [
-                    {"task_id": k, "sec": v}
+                    {
+                        "task_id": k,
+                        "project_id": task_projects.get(k),
+                        "sec": v,
+                    }
                     for k, v in by_task.items()
                     if v >= 1.0
                 ],
@@ -602,14 +634,32 @@ class Database:
             ),
         }
 
-    def apps_range(self, start: datetime, end: datetime) -> list[dict[str, Any]]:
-        return self.summary_range(start, end)["by_app"]
+    def apps_range(
+        self,
+        start: datetime,
+        end: datetime,
+        project_id: int | None = None,
+        task_id: int | None = None,
+    ) -> list[dict[str, Any]]:
+        return self.summary_range(start, end, project_id=project_id, task_id=task_id)["by_app"]
 
-    def sites_range(self, start: datetime, end: datetime) -> list[dict[str, Any]]:
-        return self.summary_range(start, end)["by_site"]
+    def sites_range(
+        self,
+        start: datetime,
+        end: datetime,
+        project_id: int | None = None,
+        task_id: int | None = None,
+    ) -> list[dict[str, Any]]:
+        return self.summary_range(start, end, project_id=project_id, task_id=task_id)["by_site"]
 
-    def activities_range(self, start: datetime, end: datetime) -> list[dict[str, Any]]:
-        return self.summary_range(start, end)["by_activity"]
+    def activities_range(
+        self,
+        start: datetime,
+        end: datetime,
+        project_id: int | None = None,
+        task_id: int | None = None,
+    ) -> list[dict[str, Any]]:
+        return self.summary_range(start, end, project_id=project_id, task_id=task_id)["by_activity"]
 
     def timeline_for_day(self, day: date | None = None) -> list[dict[str, Any]]:
         """Chronological session segments for a day (merged consecutive same activity)."""

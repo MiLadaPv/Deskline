@@ -80,9 +80,7 @@ SYSTEM_APPS = {
     "applicationframehost.exe",
     "systemsettings.exe",
     "securityhealthsystray.exe",
-    # Remote Desktop client itself — track work on the PC, not the RDP window
-    "mstsc.exe",
-    "msrdc.exe",
+    # RDP clipboard helper only — the client itself is labeled as remote work
     "rdpclip.exe",
     # Credential / UAC / picker chrome
     "credentialuibroker.exe",
@@ -317,7 +315,41 @@ APP_ACTIVITY_DEFAULTS: dict[str, tuple[ActivityKind, str]] = {
     "excel.exe": ("work", "Таблицы"),
     "teams.exe": ("messaging", "Созвоны"),
     "ms-teams.exe": ("messaging", "Созвоны"),
+    "mstsc.exe": ("remote", "Удалёнка"),
+    "msrdc.exe": ("remote", "Удалёнка"),
 }
+
+RDP_CLIENTS = {"mstsc.exe", "msrdc.exe"}
+
+_RDP_TITLE_RE = re.compile(
+    r"^(?P<host>.+?)\s*[-—–]\s*(?:Remote Desktop(?: Connection)?|Подключение к удалённому рабочему столу|Удалённый рабочий стол)\s*$",
+    re.IGNORECASE,
+)
+
+
+def parse_rdp_host(window_title: str | None) -> str | None:
+    """Extract remote host from an RDP client window title, if present."""
+    title = (window_title or "").strip()
+    if not title:
+        return None
+    m = _RDP_TITLE_RE.match(title)
+    if m:
+        host = m.group("host").strip().strip('"').strip()
+        return host or None
+    # Bare connection window without host
+    lowered = title.lower()
+    if lowered in {
+        "remote desktop connection",
+        "remote desktop",
+        "подключение к удалённому рабочему столу",
+        "удалённый рабочий стол",
+    }:
+        return None
+    return None
+
+
+def is_rdp_client(app_name: str | None) -> bool:
+    return normalize_app(app_name) in RDP_CLIENTS
 
 
 def normalize_app(app_name: str | None) -> str:
@@ -486,6 +518,31 @@ def resolve_activity(
             "category": "neutral",
             "url_hint": site,
             "hidden": True,
+        }
+
+    if is_rdp_client(app):
+        host = parse_rdp_host(window_title)
+        label = f"RDP · {host}" if host else "Удалёнка"
+        cat: Category = "productive"
+        user_override = False
+        if app in user_app_rules:
+            cat = normalize_category(user_app_rules[app])
+            user_override = True
+        cat = _apply_work_context(
+            cat,
+            "remote",
+            window_title,
+            work_mode=work_mode,
+            keywords=keywords,
+            user_override=user_override,
+        )
+        return {
+            "display_name": display,
+            "activity_kind": "remote",
+            "activity_label": label,
+            "category": cat,
+            "url_hint": None,
+            "hidden": False,
         }
 
     # Site-driven activity (especially browsers)

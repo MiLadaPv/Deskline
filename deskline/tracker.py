@@ -135,6 +135,13 @@ class Tracker:
             self.cfg = load_config()
         self.purge_old_screenshots()
 
+    def apply_focus(self) -> None:
+        """Reload config and split the open session so new project/task apply immediately."""
+        with self._lock:
+            self.cfg = load_config()
+            self._close_current_unlocked()
+        self._emit()
+
     def purge_old_screenshots(self) -> dict:
         days = int(self.cfg.get("screenshot_retention_days", 7))
         result = self.db.purge_old_screenshots(days)

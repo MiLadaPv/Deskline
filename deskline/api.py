@@ -257,13 +257,30 @@ def create_app(tracker: Tracker, db: Database | None = None) -> FastAPI:
         return st
 
     @app.get("/api/summary/today")
-    def summary_today(project_id: int | None = None) -> dict[str, Any]:
-        return db.summary_for_day(date.today(), project_id=project_id)
+    def summary_today(
+        project_id: int | None = None,
+        task_id: int | None = None,
+    ) -> dict[str, Any]:
+        return db.summary_for_day(date.today(), project_id=project_id, task_id=task_id)
+
+    @app.get("/api/summary")
+    def summary_range_api(
+        from_ts: str | None = Query(default=None, alias="from"),
+        to: str | None = None,
+        project_id: int | None = None,
+        task_id: int | None = None,
+    ) -> dict[str, Any]:
+        start, end = _range(from_ts, to)
+        return db.summary_range(start, end, project_id=project_id, task_id=task_id)
 
     @app.get("/api/trends")
-    def trends(days: int = 7, project_id: int | None = None) -> list[dict[str, Any]]:
+    def trends(
+        days: int = 7,
+        project_id: int | None = None,
+        task_id: int | None = None,
+    ) -> list[dict[str, Any]]:
         days = max(1, min(int(days), 31))
-        return db.daily_trends(days=days, project_id=project_id)
+        return db.daily_trends(days=days, project_id=project_id, task_id=task_id)
 
     @app.get("/api/timeline/today")
     def timeline_today() -> list[dict[str, Any]]:
@@ -321,7 +338,7 @@ def create_app(tracker: Tracker, db: Database | None = None) -> FastAPI:
         cfg["current_project_id"] = body.project_id
         cfg["current_task_id"] = body.task_id
         saved = save_config(cfg)
-        tracker.reload_config()
+        tracker.apply_focus()
         return {
             "current_project_id": saved.get("current_project_id"),
             "current_task_id": saved.get("current_task_id"),
@@ -335,25 +352,31 @@ def create_app(tracker: Tracker, db: Database | None = None) -> FastAPI:
     def apps(
         from_ts: str | None = Query(default=None, alias="from"),
         to: str | None = None,
+        project_id: int | None = None,
+        task_id: int | None = None,
     ) -> list[dict[str, Any]]:
         start, end = _range(from_ts, to)
-        return db.apps_range(start, end)
+        return db.apps_range(start, end, project_id=project_id, task_id=task_id)
 
     @app.get("/api/sites")
     def sites(
         from_ts: str | None = Query(default=None, alias="from"),
         to: str | None = None,
+        project_id: int | None = None,
+        task_id: int | None = None,
     ) -> list[dict[str, Any]]:
         start, end = _range(from_ts, to)
-        return db.sites_range(start, end)
+        return db.sites_range(start, end, project_id=project_id, task_id=task_id)
 
     @app.get("/api/activities")
     def activities(
         from_ts: str | None = Query(default=None, alias="from"),
         to: str | None = None,
+        project_id: int | None = None,
+        task_id: int | None = None,
     ) -> list[dict[str, Any]]:
         start, end = _range(from_ts, to)
-        return db.activities_range(start, end)
+        return db.activities_range(start, end, project_id=project_id, task_id=task_id)
 
     @app.get("/api/screenshots")
     def screenshots(day: str | None = None) -> list[dict[str, Any]]:

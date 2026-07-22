@@ -160,11 +160,31 @@ def test_system_noise_hidden():
     assert meta["activity_kind"] == "system"
 
 
-def test_rdp_client_hidden_from_rankings():
-    for exe in ("mstsc.exe", "msrdc.exe", "rdpclip.exe"):
-        meta = resolve_activity(exe, "Remote Desktop Connection")
-        assert meta["hidden"] is True
-        assert meta["activity_kind"] == "system"
+def test_rdp_client_labeled_as_remote():
+    bare = resolve_activity("mstsc.exe", "Remote Desktop Connection")
+    assert bare["hidden"] is False
+    assert bare["activity_kind"] == "remote"
+    assert bare["activity_label"] == "Удалёнка"
+    assert bare["category"] == "productive"
+
+    hosted = resolve_activity("mstsc.exe", "vdip5 - Remote Desktop Connection")
+    assert hosted["activity_label"] == "RDP · vdip5"
+
+    ru = resolve_activity("msrdc.exe", "office-pc — Подключение к удалённому рабочему столу")
+    assert ru["activity_kind"] == "remote"
+    assert ru["activity_label"] == "RDP · office-pc"
+
+    # Clipboard helper stays noise
+    clip = resolve_activity("rdpclip.exe", "rdpclip")
+    assert clip["hidden"] is True
+
+
+def test_parse_rdp_host():
+    from deskline.classify import parse_rdp_host
+
+    assert parse_rdp_host("server - Remote Desktop Connection") == "server"
+    assert parse_rdp_host("host — Подключение к удалённому рабочему столу") == "host"
+    assert parse_rdp_host("Remote Desktop Connection") is None
 
 
 def test_credential_and_script_noise_hidden():
@@ -173,7 +193,7 @@ def test_credential_and_script_noise_hidden():
     assert resolve_activity("script.pyw", "script")["hidden"] is True
 
 
-def test_db_summary_excludes_rdp_client(tmp_path: Path):
+def test_db_summary_includes_rdp_as_remote(tmp_path: Path):
     db = Database(tmp_path / "rdp.db")
     start = datetime.now().astimezone() - timedelta(minutes=30)
     sid = db.start_session(
@@ -183,8 +203,8 @@ def test_db_summary_excludes_rdp_client(tmp_path: Path):
         "productive",
         started_at=start,
         display_name="Remote Desktop",
-        activity_kind="system",
-        activity_label="Система",
+        activity_kind="remote",
+        activity_label="RDP · server",
     )
     db.end_session(sid, ended_at=start + timedelta(minutes=20))
     sid2 = db.start_session(
@@ -202,12 +222,11 @@ def test_db_summary_excludes_rdp_client(tmp_path: Path):
     summary = db.summary_for_day()
     activity_names = [x["name"] for x in summary["by_activity"]]
     app_names = [x["name"] for x in summary["by_app"]]
-    assert "Remote Desktop" not in activity_names
-    assert "Удалённый рабочий стол" not in activity_names
-    assert "mstsc.exe" not in activity_names
-    assert "Remote Desktop" not in app_names
+    assert "RDP · server" in activity_names
+    assert "Remote Desktop" in app_names
     assert "Разработка" in activity_names
     assert "Cursor" in app_names
+    assert summary["by_kind"].get("remote", 0) >= 1100
 
 
 def test_db_summary_uses_friendly_labels(tmp_path: Path):

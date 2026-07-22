@@ -14,6 +14,13 @@ const fmtBytes = (n) => {
   return `${(n / (1024 * 1024 * 1024)).toFixed(2)} ГБ`;
 };
 
+const CAT_LABELS = {
+  productive: "Фокус",
+  neutral: "Нейтрально",
+  distracting: "Отвлечение",
+  unrated: "Без оценки",
+};
+
 let lastSummaryKey = "";
 let lastStatusKey = "";
 let lastBarsKey = "";
@@ -454,7 +461,34 @@ function closeLightbox() {
 let projectCache = [];
 let taskCache = [];
 let filterProjectId = "";
+let filterTaskId = "";
 let selectedProjectId = "";
+let usagePeriod = "today";
+let projectsReportPeriod = "today";
+let expandedReportProjects = new Set();
+let lastFocusNames = { project: "", task: "" };
+let reportTaskCache = [];
+
+function periodBounds(period) {
+  const end = new Date();
+  const start = new Date(end);
+  if (period === "today") {
+    start.setHours(0, 0, 0, 0);
+  } else {
+    const days = Number(period) || 7;
+    start.setDate(start.getDate() - (days - 1));
+    start.setHours(0, 0, 0, 0);
+  }
+  return { from: start.toISOString(), to: end.toISOString() };
+}
+
+function periodQuery(period, projectId = "", taskId = "") {
+  const { from, to } = periodBounds(period);
+  const parts = [`from=${encodeURIComponent(from)}`, `to=${encodeURIComponent(to)}`];
+  if (projectId) parts.push(`project_id=${encodeURIComponent(projectId)}`);
+  if (taskId) parts.push(`task_id=${encodeURIComponent(taskId)}`);
+  return parts.join("&");
+}
 
 async function setFocus(projectId, taskId) {
   await api("/api/focus", {
@@ -473,13 +507,13 @@ function fillTaskSelect(tasks, currentTaskId) {
   if (!sel) return;
   const open = taskCache.filter((t) => !t.done);
   if (!selectedProjectId) {
-    sel.innerHTML = `<option value="">Задача…</option>`;
+    sel.innerHTML = `<option value="">Без задачи</option>`;
     sel.disabled = true;
     return;
   }
   sel.disabled = false;
   sel.innerHTML =
-    `<option value="">Задача…</option>` +
+    `<option value="">Без задачи</option>` +
     open
       .map(
         (t) =>
@@ -494,7 +528,7 @@ function fillTaskSelect(tasks, currentTaskId) {
 function fillProjectSelects(projects, currentId) {
   projectCache = projects || [];
   const opts =
-    `<option value="">Проект…</option>` +
+    `<option value="">Без проекта</option>` +
     projectCache
       .map(
         (p) =>
@@ -508,6 +542,7 @@ function fillProjectSelects(projects, currentId) {
       .join("");
   const cur = document.getElementById("currentProjectSelect");
   const fil = document.getElementById("filterProjectToday");
+  const filUsage = document.getElementById("filterProjectUsage");
   if (cur) {
     cur.innerHTML = opts;
     if (currentId != null && currentId !== "") cur.value = String(currentId);
@@ -517,8 +552,38 @@ function fillProjectSelects(projects, currentId) {
     fil.innerHTML = filterOpts;
     fil.value = keep || filterProjectId || "";
   }
+  if (filUsage) {
+    const keep = filUsage.value;
+    filUsage.innerHTML = filterOpts;
+    filUsage.value = keep || filterProjectId || "";
+  }
 }
 
+async function syncUsageTaskFilter() {
+  const sel = document.getElementById("filterTaskUsage");
+  if (!sel) return;
+  if (!filterProjectId) {
+    sel.innerHTML = `<option value="">Все</option>`;
+    sel.disabled = true;
+    filterTaskId = "";
+    return;
+  }
+  const tasks = await api(`/api/tasks?project_id=${encodeURIComponent(filterProjectId)}`);
+  sel.disabled = false;
+  sel.innerHTML =
+    `<option value="">Все</option>` +
+    (tasks || [])
+      .filter((t) => !t.done)
+      .map(
+        (t) =>
+          `<option value="${t.id}" ${String(filterTaskId) === String(t.id) ? "selected" : ""}>${escapeHtml(t.name)}</option>`
+      )
+      .join("");
+  if (filterTaskId && !(tasks || []).some((t) => String(t.id) === String(filterTaskId))) {
+    filterTaskId = "";
+    sel.value = "";
+  }
+}
 async function renderTasksPane(projectId, settings, summary) {
   const list = document.getElementById("tasksList");
   const title = document.getElementById("tasksProjectTitle");
@@ -570,9 +635,10 @@ async function renderTasksPane(projectId, settings, summary) {
 }
 
 async function refreshProjects() {
+  const q = periodQuery(projectsReportPeriod);
   const [projects, summary, settings] = await Promise.all([
     api("/api/projects"),
-    api("/api/summary/today"),
+    api(`/api/summary?${q}`),
     api("/api/settings"),
   ]);
   fillProjectSelects(projects, settings.current_project_id);
@@ -595,14 +661,16 @@ async function refreshProjects() {
         .map((p) => {
           const selected = selectedProjectId === String(p.id);
           const tracking = String(settings.current_project_id) === String(p.id);
-          return `<button type="button" class="pt-item pt-project ${selected ? "is-selected" : ""} ${tracking ? "is-active" : ""}" data-select-project="${p.id}" style="--pc:${escapeHtml(p.color || "#2f6f5e")}">
-            <span class="pt-swatch" aria-hidden="true"></span>
-            <span class="pt-item-main">
-              <span class="pt-item-name">${escapeHtml(p.name)}</span>
-              ${tracking ? `<span class="pt-item-meta">в учёте</span>` : ""}
-            </span>
-            <span class="btn danger pt-del" data-del-project="${p.id}" role="button">×</span>
-          </button>`;
+          return `<div class="pt-item pt-project ${selected ? "is-selected" : ""} ${tracking ? "is-active" : ""}" style="--pc:${escapeHtml(p.color || "#2f6f5e")}">
+            <button type="button" class="pt-project-main" data-select-project="${p.id}" aria-pressed="${selected ? "true" : "false"}">
+              <span class="pt-swatch" aria-hidden="true"></span>
+              <span class="pt-item-main">
+                <span class="pt-item-name">${escapeHtml(p.name)}</span>
+                ${tracking ? `<span class="pt-item-meta">Текущий проект</span>` : ""}
+              </span>
+            </button>
+            <button type="button" class="btn danger pt-del" data-del-project="${p.id}" aria-label="Удалить проект ${escapeHtml(p.name)}">×</button>
+          </div>`;
         })
         .join("");
     }
@@ -610,14 +678,70 @@ async function refreshProjects() {
 
   await renderTasksPane(selectedProjectId, settings, summary);
 
+  reportTaskCache = [];
+  for (const p of projects) {
+    try {
+      const tasks = await api(`/api/tasks?project_id=${encodeURIComponent(p.id)}`);
+      reportTaskCache.push(...(tasks || []));
+    } catch (_) {}
+  }
+  const proj = projects.find((p) => String(p.id) === String(settings.current_project_id));
+  const task = reportTaskCache.find((t) => String(t.id) === String(settings.current_task_id));
+  lastFocusNames = {
+    project: proj ? proj.name : "",
+    task: task ? task.name : "",
+  };
+
   const byProj = summary.by_project || [];
   const nameById = Object.fromEntries(projects.map((p) => [String(p.id), p.name]));
-  const timeRows = byProj.map((r) => ({
-    name: nameById[String(r.project_id)] || `Проект #${r.project_id}`,
-    sec: r.sec,
-  }));
-  const timeEl = document.getElementById("projectTimeList");
-  if (timeEl) renderList(timeEl, timeRows, "Пока нет времени по проектам");
+  renderProjectReport(byProj, summary.by_task || [], nameById, summary.total_sec || 0);
+}
+
+function renderProjectReport(byProj, byTask, nameById, totalSec) {
+  const el = document.getElementById("projectTimeList");
+  if (!el) return;
+  if (!byProj.length) {
+    el.innerHTML = `<p class="hint">Пока нет времени по проектам.</p>`;
+    return;
+  }
+  const taskNameById = Object.fromEntries((reportTaskCache || []).map((t) => [String(t.id), t.name]));
+  el.innerHTML = byProj
+    .map((r) => {
+      const id = r.project_id;
+      const key = id == null ? "null" : String(id);
+      const name =
+        id == null ? "Без проекта" : nameById[String(id)] || `Проект #${id}`;
+      const share = totalSec ? Math.round((r.sec / totalSec) * 100) : 0;
+      const open = expandedReportProjects.has(key);
+      const tasks =
+        id == null
+          ? (byTask || []).filter((t) => t.project_id == null)
+          : (byTask || []).filter((t) => String(t.project_id) === String(id));
+      const taskHtml = open
+        ? `<div class="report-tasks">${
+            tasks.length
+              ? tasks
+                  .map((t) => {
+                    const tname =
+                      t.task_id == null
+                        ? "Без задачи"
+                        : taskNameById[String(t.task_id)] || `Задача #${t.task_id}`;
+                    return `<div class="report-task"><span>${escapeHtml(tname)}</span><span>${fmtDur(t.sec)}</span></div>`;
+                  })
+                  .join("")
+              : `<div class="report-task"><span>Нет задач в этом периоде</span><span></span></div>`
+          }</div>`
+        : "";
+      return `<div class="report-row" data-report-project="${escapeHtml(key)}">
+        <button type="button" class="report-row-main" data-toggle-report="${escapeHtml(key)}">
+          <span class="report-name">${open ? "▾" : "▸"} ${escapeHtml(name)}</span>
+          <span class="report-meta">${share}%</span>
+          <span class="report-meta">${fmtDur(r.sec)}</span>
+        </button>
+        ${taskHtml}
+      </div>`;
+    })
+    .join("");
 }
 
 async function refreshSummary() {
@@ -644,9 +768,72 @@ async function refreshSummary() {
   refreshTrends().catch(() => {});
   const activities = summary.by_activity || [];
   renderList(document.getElementById("topAppsToday"), activities, "Занятий пока нет");
-  renderList(document.getElementById("activitiesList"), activities, "Занятий пока нет");
-  renderList(document.getElementById("appsList"), summary.by_app || [], "Приложений пока нет");
-  renderList(document.getElementById("sitesList"), summary.by_site || [], "Сайтов пока нет");
+}
+
+async function refreshUsageReport() {
+  const q = periodQuery(usagePeriod, filterProjectId, filterTaskId);
+  const summary = await api(`/api/summary?${q}`);
+  const total = summary.total_sec || 0;
+  renderUsageList(
+    document.getElementById("activitiesList"),
+    summary.by_activity || [],
+    total,
+    "activity",
+    "Занятий пока нет"
+  );
+  renderUsageList(
+    document.getElementById("appsList"),
+    summary.by_app || [],
+    total,
+    "app",
+    "Приложений пока нет"
+  );
+  renderUsageList(
+    document.getElementById("sitesList"),
+    summary.by_site || [],
+    total,
+    "site",
+    "Сайтов пока нет"
+  );
+}
+
+function renderUsageList(el, rows, total, kind, emptyText) {
+  if (!el) return;
+  const sliced = (rows || []).slice(0, 20);
+  if (!sliced.length) {
+    el.innerHTML = `<li class="empty-state"><span class="rank-icon" aria-hidden="true">•</span><span class="rank-name">${emptyText}</span><span class="rank-meta">—</span></li>`;
+    return;
+  }
+  el.innerHTML = sliced
+    .map((r) => {
+      const icon = r.icon_url
+        ? iconImgHtml(r.icon_url)
+        : `<span class="rank-icon" aria-hidden="true">•</span>`;
+      const cat = r.category || "unrated";
+      const share = total ? Math.round((r.sec / total) * 100) : 0;
+      const ruleKey =
+        kind === "site" ? r.name : kind === "app" ? r.app_name || r.name : "";
+      const rate =
+        kind === "activity"
+          ? ""
+          : `<div class="usage-rate" data-rate-kind="${kind === "site" ? "site" : "app"}" data-rate-key="${escapeHtml(ruleKey)}">
+              ${["productive", "neutral", "distracting", "unrated"]
+                .map(
+                  (c) =>
+                    `<button type="button" class="cat-${c} ${cat === c ? "active" : ""}" data-cat="${c}">${CAT_LABELS[c]}</button>`
+                )
+                .join("")}
+            </div>`;
+      return `<li>
+        ${icon}
+        <span>
+          <span class="rank-name">${escapeHtml(r.name)}<span class="rank-cat ${cat}">${CAT_LABELS[cat] || cat}</span></span>
+          ${rate}
+        </span>
+        <span class="rank-meta">${fmtDur(r.sec)} · ${share}%</span>
+      </li>`;
+    })
+    .join("");
 }
 
 async function refreshStatus() {
@@ -658,6 +845,8 @@ async function refreshStatus() {
     current_app: st.current_app || "",
     work_mode: !!st.work_mode,
     project: st.current_project_id || "",
+    task: st.current_task_id || "",
+    focusNames: lastFocusNames,
   });
   if (key === lastStatusKey) return;
   lastStatusKey = key;
@@ -670,8 +859,12 @@ async function refreshStatus() {
   const label = st.current_label || st.current_app || "";
   let line = "Запись";
   if (st.paused) line = "Пауза";
-  else if (st.idle) line = label ? `Idle · ${label}` : "Idle";
+  else if (st.idle) line = label ? `Без ввода · ${label}` : "Без ввода";
   else if (label) line = `Запись · ${label}`;
+  if (lastFocusNames.project || lastFocusNames.task) {
+    const focusBits = [lastFocusNames.project, lastFocusNames.task].filter(Boolean).join(" · ");
+    line = `${focusBits} · ${line}`;
+  }
   if (st.work_mode) line = `На работе · ${line}`;
   document.getElementById("statusLine").textContent = line;
   const ver = document.getElementById("appVersion");
@@ -778,13 +971,6 @@ function summaryKey(summary) {
   });
 }
 
-const CAT_LABELS = {
-  productive: "Фокус",
-  neutral: "Нейтрально",
-  distracting: "Отвлечение",
-  unrated: "Без оценки",
-};
-
 function fmtClock(iso) {
   if (!iso) return "";
   const d = new Date(iso);
@@ -862,6 +1048,7 @@ function wireUi() {
       if (tab.dataset.tab === "day") refreshTimeline();
       if (tab.dataset.tab === "ratings") refreshRatings();
       if (tab.dataset.tab === "projects") refreshProjects();
+      if (tab.dataset.tab === "usage") refreshUsageReport();
     });
   });
 
@@ -921,8 +1108,50 @@ function wireUi() {
   if (filterToday) {
     filterToday.addEventListener("change", async () => {
       filterProjectId = filterToday.value || "";
+      const usageFil = document.getElementById("filterProjectUsage");
+      if (usageFil) usageFil.value = filterProjectId;
+      filterTaskId = "";
+      await syncUsageTaskFilter();
       lastSummaryKey = "";
       await refreshSummary();
+      await refreshUsageReport();
+    });
+  }
+
+  const usagePeriodSel = document.getElementById("usagePeriod");
+  if (usagePeriodSel) {
+    usagePeriodSel.addEventListener("change", async () => {
+      usagePeriod = usagePeriodSel.value || "today";
+      await refreshUsageReport();
+    });
+  }
+
+  const filterUsage = document.getElementById("filterProjectUsage");
+  if (filterUsage) {
+    filterUsage.addEventListener("change", async () => {
+      filterProjectId = filterUsage.value || "";
+      if (filterToday) filterToday.value = filterProjectId;
+      filterTaskId = "";
+      await syncUsageTaskFilter();
+      lastSummaryKey = "";
+      await refreshSummary();
+      await refreshUsageReport();
+    });
+  }
+
+  const filterTaskUsage = document.getElementById("filterTaskUsage");
+  if (filterTaskUsage) {
+    filterTaskUsage.addEventListener("change", async () => {
+      filterTaskId = filterTaskUsage.value || "";
+      await refreshUsageReport();
+    });
+  }
+
+  const projectsPeriodSel = document.getElementById("projectsReportPeriod");
+  if (projectsPeriodSel) {
+    projectsPeriodSel.addEventListener("change", async () => {
+      projectsReportPeriod = projectsPeriodSel.value || "today";
+      await refreshProjects();
     });
   }
 
@@ -987,6 +1216,36 @@ function wireUi() {
       }
     });
   }
+
+  const projectReport = document.getElementById("projectTimeList");
+  if (projectReport) {
+    projectReport.addEventListener("click", (ev) => {
+      const btn = ev.target.closest("[data-toggle-report]");
+      if (!btn) return;
+      const key = btn.dataset.toggleReport;
+      if (expandedReportProjects.has(key)) expandedReportProjects.delete(key);
+      else expandedReportProjects.add(key);
+      refreshProjects().catch(() => {});
+    });
+  }
+
+  document.getElementById("panel-usage")?.addEventListener("click", async (ev) => {
+    const btn = ev.target.closest(".usage-rate button[data-cat]");
+    if (!btn) return;
+    const wrap = btn.closest(".usage-rate");
+    if (!wrap) return;
+    const kind = wrap.dataset.rateKind;
+    const key = wrap.dataset.rateKey;
+    const category = btn.dataset.cat;
+    if (!kind || !key) return;
+    await api(`/api/rules/${encodeURIComponent(key)}`, {
+      method: "PUT",
+      body: JSON.stringify({ kind, category }),
+    });
+    lastSummaryKey = "";
+    await refreshUsageReport();
+    await refreshSummary();
+  });
 
   const tasksList = document.getElementById("tasksList");
   if (tasksList) {
@@ -1201,10 +1460,16 @@ function wireUi() {
 
 async function boot() {
   wireUi();
-  await Promise.all([refreshSummary(), refreshStatus(), refreshProjects()]);
+  await Promise.all([
+    refreshSummary(),
+    refreshStatus(),
+    refreshProjects(),
+    refreshUsageReport(),
+  ]);
   setInterval(() => {
     refreshSummary().catch(() => {});
     refreshStatus().catch(() => {});
+    refreshUsageReport().catch(() => {});
   }, 5000);
 }
 

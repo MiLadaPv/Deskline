@@ -119,6 +119,28 @@
     <section id="panel-usage" class="panel">
       <div class="panel-head">
         <h2>Где время</h2>
+        <div class="filter-bar">
+          <label class="filter-inline">
+            Период
+            <select id="usagePeriod">
+              <option value="today" selected>Сегодня</option>
+              <option value="7">7 дней</option>
+              <option value="30">30 дней</option>
+            </select>
+          </label>
+          <label class="filter-inline">
+            Проект
+            <select id="filterProjectUsage">
+              <option value="">Все</option>
+            </select>
+          </label>
+          <label class="filter-inline">
+            Задача
+            <select id="filterTaskUsage" disabled>
+              <option value="">Все</option>
+            </select>
+          </label>
+        </div>
       </div>
       <div class="seg" role="tablist" aria-label="Срез времени">
         <button type="button" class="seg-btn active" data-usage="activities">Занятия</button>
@@ -139,6 +161,14 @@
     <section id="panel-projects" class="panel">
       <div class="panel-head">
         <h2>Проекты и задачи</h2>
+        <label class="filter-inline">
+          Отчёт за
+          <select id="projectsReportPeriod">
+            <option value="today" selected>Сегодня</option>
+            <option value="7">7 дней</option>
+            <option value="30">30 дней</option>
+          </select>
+        </label>
       </div>
       <div class="pt-workspace">
         <aside class="pt-col pt-projects">
@@ -163,8 +193,8 @@
           <div class="pt-list" id="tasksList"></div>
         </section>
       </div>
-      <h3 class="subhead">Время сегодня</h3>
-      <ol class="rank-list" id="projectTimeList"></ol>
+      <h3 class="subhead">Отчёт по проектам</h3>
+      <div class="project-report" id="projectTimeList"></div>
     </section>
 
     <section id="panel-ratings" class="panel">
