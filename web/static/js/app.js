@@ -392,6 +392,24 @@ function updateStorageHint(cfg) {
   el.textContent = `Папка: ${path} · ${count} файл(ов), ${fmtBytes(bytes)}`;
 }
 
+function showToast(message, type = "ok") {
+  const region = document.getElementById("toastRegion");
+  if (!region) return;
+  const toast = document.createElement("div");
+  toast.className = `toast ${type}`;
+  toast.textContent = message;
+  region.appendChild(toast);
+  window.setTimeout(() => toast.remove(), 4200);
+}
+
+function setSaveStatus(el, message, state) {
+  if (!el) return;
+  el.hidden = !message;
+  el.textContent = message || "";
+  el.classList.remove("is-saving", "is-ok", "is-error");
+  if (state) el.classList.add(state);
+}
+
 let lightboxItems = [];
 let lightboxIndex = 0;
 
@@ -1068,8 +1086,16 @@ function wireUi() {
   document.getElementById("settingsForm").addEventListener("submit", async (ev) => {
     ev.preventDefault();
     const form = ev.currentTarget;
-    const submit = form.querySelector('button[type="submit"]');
-    if (submit) submit.disabled = true;
+    const submit = document.getElementById("settingsSaveBtn") || form.querySelector('button[type="submit"]');
+    const status = document.getElementById("settingsSaveStatus");
+    const defaultLabel = "Сохранить";
+    if (submit) {
+      submit.disabled = true;
+      submit.classList.add("is-busy");
+      submit.classList.remove("is-saved");
+      submit.textContent = "Сохранение…";
+    }
+    setSaveStatus(status, "Сохранение настроек…", "is-saving");
     const kwRaw = form.work_chat_keywords ? form.work_chat_keywords.value : "";
     const keywords = String(kwRaw || "")
       .split(",")
@@ -1101,21 +1127,44 @@ function wireUi() {
       lastStatusKey = "";
       await refreshSummary();
       await refreshStatus();
-      alert(`Сохранено. Интервал: ${saved.screenshot_interval_sec} сек`);
+      const msg = `Сохранено · интервал ${saved.screenshot_interval_sec} сек`;
+      setSaveStatus(status, `✓ ${msg}`, "is-ok");
+      showToast(msg, "ok");
+      if (submit) {
+        submit.classList.remove("is-busy");
+        submit.classList.add("is-saved");
+        submit.textContent = "Сохранено";
+      }
+      window.setTimeout(() => {
+        if (submit) {
+          submit.disabled = false;
+          submit.classList.remove("is-saved", "is-busy");
+          submit.textContent = defaultLabel;
+        }
+      }, 2200);
     } catch (err) {
       console.error(err);
-      alert(err?.message || "Не удалось сохранить настройки");
-    } finally {
-      if (submit) submit.disabled = false;
+      const message = err?.message || "Не удалось сохранить настройки";
+      setSaveStatus(status, message, "is-error");
+      showToast(message, "error");
+      if (submit) {
+        submit.disabled = false;
+        submit.classList.remove("is-busy", "is-saved");
+        submit.textContent = defaultLabel;
+      }
     }
   });
 
   document.getElementById("purgeShotsBtn").addEventListener("click", async () => {
     if (!confirm("Удалить скриншоты старше срока хранения из настроек?")) return;
-    const result = await api("/api/screenshots/purge", { method: "POST" });
-    updateStorageHint({ screenshots_storage: result.screenshots_storage });
-    await refreshShots();
-    alert(`Удалено файлов: ${result.deleted_files || 0}`);
+    try {
+      const result = await api("/api/screenshots/purge", { method: "POST" });
+      updateStorageHint({ screenshots_storage: result.screenshots_storage });
+      await refreshShots();
+      showToast(`Удалено файлов: ${result.deleted_files || 0}`, "ok");
+    } catch (err) {
+      showToast(err?.message || "Не удалось очистить скриншоты", "error");
+    }
   });
 
   document.getElementById("passwordForm").addEventListener("submit", async (ev) => {
@@ -1128,9 +1177,9 @@ function wireUi() {
     try {
       await api("/api/auth/change-password", { method: "POST", body: JSON.stringify(body) });
       form.reset();
-      alert("Пароль изменён");
+      showToast("Пароль изменён", "ok");
     } catch (e) {
-      alert("Не удалось сменить пароль. Проверьте текущий пароль.");
+      showToast("Не удалось сменить пароль. Проверьте текущий пароль.", "error");
     }
   });
 

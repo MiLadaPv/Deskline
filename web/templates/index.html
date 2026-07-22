@@ -231,7 +231,10 @@
           <input type="checkbox" name="autostart" />
           Запускать с Windows
         </label>
-        <button type="submit" class="btn">Сохранить</button>
+        <div class="settings-save-row">
+          <button type="submit" class="btn primary" id="settingsSaveBtn">Сохранить</button>
+          <p class="save-status" id="settingsSaveStatus" role="status" aria-live="polite" hidden></p>
+        </div>
       </form>
       <form id="passwordForm" class="settings-form">
         <h3 class="subhead">Пароль входа</h3>
@@ -260,6 +263,8 @@
     <img id="lightboxImg" alt="Скриншот" />
     <p class="lightbox-caption" id="lightboxCaption"></p>
   </div>
+
+  <div class="toast-region" id="toastRegion" aria-live="polite" aria-atomic="true"></div>
 
   <footer class="foot">
     <span id="appVersion">Deskline v{{ version }}</span>
