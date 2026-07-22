@@ -46,6 +46,8 @@ DEFAULT_CONFIG: dict[str, Any] = {
     "screenshot_on_app_switch": True,
     "screenshots_enabled": True,
     "screenshot_retention_days": 7,
+    # Empty = default under AppData\Local\Deskline\screenshots
+    "screenshots_dir": "",
     "open_dashboard_on_start": False,
     "autostart": False,
     "paused": False,
@@ -64,8 +66,22 @@ def ensure_data_dirs() -> None:
     ICONS_DIR.mkdir(parents=True, exist_ok=True)
 
 
-def load_config() -> dict[str, Any]:
-    ensure_data_dirs()
+def get_screenshots_dir(cfg: dict[str, Any] | None = None) -> Path:
+    """Return configured screenshots folder, or the default under DATA_ROOT."""
+    data = cfg if cfg is not None else _read_raw_config()
+    custom = str(data.get("screenshots_dir") or "").strip()
+    if custom:
+        return Path(custom).expanduser()
+    return SCREENSHOTS_DIR
+
+
+def ensure_screenshots_dir(cfg: dict[str, Any] | None = None) -> Path:
+    path = get_screenshots_dir(cfg)
+    path.mkdir(parents=True, exist_ok=True)
+    return path
+
+
+def _read_raw_config() -> dict[str, Any]:
     cfg = deepcopy(DEFAULT_CONFIG)
     if CONFIG_PATH.exists():
         try:
@@ -77,9 +93,29 @@ def load_config() -> dict[str, Any]:
     return cfg
 
 
-def save_config(cfg: dict[str, Any]) -> dict[str, Any]:
-    ensure_data_dirs()
+def _normalize_config(cfg: dict[str, Any]) -> dict[str, Any]:
     merged = deepcopy(DEFAULT_CONFIG)
     merged.update({k: cfg[k] for k in DEFAULT_CONFIG if k in cfg})
+    try:
+        interval = int(merged.get("screenshot_interval_sec", 300))
+    except (TypeError, ValueError):
+        interval = 300
+    merged["screenshot_interval_sec"] = max(60, min(3600, interval))
+    custom = str(merged.get("screenshots_dir") or "").strip()
+    merged["screenshots_dir"] = custom
+    return merged
+
+
+def load_config() -> dict[str, Any]:
+    ensure_data_dirs()
+    cfg = _normalize_config(_read_raw_config())
+    ensure_screenshots_dir(cfg)
+    return cfg
+
+
+def save_config(cfg: dict[str, Any]) -> dict[str, Any]:
+    ensure_data_dirs()
+    merged = _normalize_config(cfg)
+    ensure_screenshots_dir(merged)
     CONFIG_PATH.write_text(json.dumps(merged, indent=2), encoding="utf-8")
     return merged

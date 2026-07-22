@@ -23,15 +23,16 @@ from deskline.auth import (
     validate_session_token,
     verify_password,
 )
-from deskline.capture import screenshots_storage_info
+from deskline.capture import resolve_screenshot_file, screenshots_storage_info
 from deskline.config import (
     APP_NAME,
     BASE_URL,
     HOST,
     PORT,
     ICONS_DIR,
-    SCREENSHOTS_DIR,
     WEB_ROOT,
+    ensure_screenshots_dir,
+    get_screenshots_dir,
     load_config,
     save_config,
 )
@@ -48,16 +49,37 @@ class SettingsUpdate(BaseModel):
     poor_time_popup: bool | None = None
     poor_time_min_sec: float | None = Field(default=None, ge=15, le=3600)
     blur_screenshots: bool | None = None
-    screenshot_interval_sec: int | None = None
+    screenshot_interval_sec: int | None = Field(default=None, ge=60, le=3600)
     screenshot_on_app_switch: bool | None = None
     screenshots_enabled: bool | None = None
     screenshot_retention_days: int | None = Field(default=None, ge=0, le=3650)
+    screenshots_dir: str | None = Field(default=None, max_length=500)
     open_dashboard_on_start: bool | None = None
     autostart: bool | None = None
     work_mode: bool | None = None
     work_chat_keywords: list[str] | None = None
     current_project_id: int | None = None
     current_task_id: int | None = None
+
+
+def _validate_screenshots_dir(raw: str) -> str:
+    value = (raw or "").strip()
+    if not value:
+        return ""
+    path = Path(value).expanduser()
+    if not path.is_absolute():
+        raise HTTPException(
+            400,
+            "Укажите полный путь к папке, например D:\\Deskline\\screenshots",
+        )
+    try:
+        path.mkdir(parents=True, exist_ok=True)
+        probe = path / ".deskline_write_test"
+        probe.write_text("ok", encoding="utf-8")
+        probe.unlink(missing_ok=True)
+    except OSError as exc:
+        raise HTTPException(400, f"Не удалось использовать папку: {exc}") from exc
+    return str(path)
 
 
 class ProjectCreate(BaseModel):
@@ -345,9 +367,8 @@ def create_app(tracker: Tracker, db: Database | None = None) -> FastAPI:
 
     @app.get("/media/screenshots/{name}")
     def media_screenshot(name: str) -> FileResponse:
-        safe = Path(name).name
-        path = SCREENSHOTS_DIR / safe
-        if not path.exists() or not path.is_file():
+        path = resolve_screenshot_file(name)
+        if path is None:
             raise HTTPException(404, "Screenshot not found")
         return FileResponse(path, media_type="image/jpeg")
 
@@ -392,19 +413,32 @@ def create_app(tracker: Tracker, db: Database | None = None) -> FastAPI:
     def get_settings() -> dict[str, Any]:
         cfg = load_config()
         storage = screenshots_storage_info()
-        return {**cfg, "screenshots_path": storage["path"], "screenshots_storage": storage}
+        return {
+            **cfg,
+            "screenshots_path": storage["path"],
+            "screenshots_storage": storage,
+            "screenshots_dir_effective": str(get_screenshots_dir(cfg)),
+        }
 
     @app.put("/api/settings")
     def put_settings(body: SettingsUpdate) -> dict[str, Any]:
         cfg = load_config()
         data = body.model_dump(exclude_none=True)
+        if "screenshots_dir" in data:
+            data["screenshots_dir"] = _validate_screenshots_dir(str(data["screenshots_dir"]))
         cfg.update(data)
         saved = save_config(cfg)
+        ensure_screenshots_dir(saved)
         tracker.reload_config()
         if "autostart" in data:
             _set_autostart(bool(saved.get("autostart")))
         storage = screenshots_storage_info()
-        return {**saved, "screenshots_path": storage["path"], "screenshots_storage": storage}
+        return {
+            **saved,
+            "screenshots_path": storage["path"],
+            "screenshots_storage": storage,
+            "screenshots_dir_effective": str(get_screenshots_dir(saved)),
+        }
 
     @app.post("/api/screenshots/purge")
     def purge_screenshots() -> dict[str, Any]:

@@ -162,7 +162,6 @@ def test_screenshot_flag_distracting_only_in_work_mode(tmp_path: Path, monkeypat
     shots = tmp_path / "shots"
     shots.mkdir()
     monkeypatch.setattr("deskline.config.SCREENSHOTS_DIR", shots)
-    monkeypatch.setattr("deskline.db.SCREENSHOTS_DIR", shots)
     monkeypatch.setattr("deskline.config.CONFIG_PATH", tmp_path / "config.json")
     monkeypatch.setattr("deskline.config.DATA_ROOT", tmp_path)
     monkeypatch.setattr("deskline.config.DB_PATH", tmp_path / "deskline.db")

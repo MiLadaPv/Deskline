@@ -722,10 +722,13 @@ async function loadSettings() {
   form.idle_after_sec.value = cfg.idle_after_sec ?? 180;
   form.poor_time_popup.checked = cfg.poor_time_popup !== false;
   form.blur_screenshots.checked = !!cfg.blur_screenshots;
-  form.screenshot_interval_sec.value = cfg.screenshot_interval_sec;
+  form.screenshot_interval_sec.value = cfg.screenshot_interval_sec ?? 300;
   form.screenshots_enabled.checked = !!cfg.screenshots_enabled;
   form.screenshot_on_app_switch.checked = !!cfg.screenshot_on_app_switch;
   form.screenshot_retention_days.value = cfg.screenshot_retention_days ?? 7;
+  if (form.screenshots_dir) {
+    form.screenshots_dir.value = cfg.screenshots_dir || "";
+  }
   form.open_dashboard_on_start.checked = !!cfg.open_dashboard_on_start;
   form.autostart.checked = !!cfg.autostart;
   if (form.work_mode) form.work_mode.checked = !!cfg.work_mode;
@@ -1065,31 +1068,46 @@ function wireUi() {
   document.getElementById("settingsForm").addEventListener("submit", async (ev) => {
     ev.preventDefault();
     const form = ev.currentTarget;
+    const submit = form.querySelector('button[type="submit"]');
+    if (submit) submit.disabled = true;
     const kwRaw = form.work_chat_keywords ? form.work_chat_keywords.value : "";
     const keywords = String(kwRaw || "")
       .split(",")
       .map((s) => s.trim())
       .filter(Boolean);
+    const interval = Number(form.screenshot_interval_sec.value);
     const body = {
       idle_after_sec: Number(form.idle_after_sec.value),
       poor_time_popup: form.poor_time_popup.checked,
       blur_screenshots: form.blur_screenshots.checked,
-      screenshot_interval_sec: Number(form.screenshot_interval_sec.value),
+      screenshot_interval_sec: Number.isFinite(interval) ? Math.max(60, Math.min(3600, interval)) : 300,
       screenshots_enabled: form.screenshots_enabled.checked,
       screenshot_on_app_switch: form.screenshot_on_app_switch.checked,
       screenshot_retention_days: Number(form.screenshot_retention_days.value),
+      screenshots_dir: form.screenshots_dir ? form.screenshots_dir.value.trim() : "",
       open_dashboard_on_start: form.open_dashboard_on_start.checked,
       autostart: form.autostart.checked,
       work_mode: form.work_mode ? form.work_mode.checked : false,
       work_chat_keywords: keywords,
     };
-    const saved = await api("/api/settings", { method: "PUT", body: JSON.stringify(body) });
-    updateStorageHint(saved);
-    lastSummaryKey = "";
-    lastStatusKey = "";
-    await refreshSummary();
-    await refreshStatus();
-    alert("Сохранено");
+    try {
+      const saved = await api("/api/settings", { method: "PUT", body: JSON.stringify(body) });
+      form.screenshot_interval_sec.value = saved.screenshot_interval_sec ?? body.screenshot_interval_sec;
+      if (form.screenshots_dir) {
+        form.screenshots_dir.value = saved.screenshots_dir || "";
+      }
+      updateStorageHint(saved);
+      lastSummaryKey = "";
+      lastStatusKey = "";
+      await refreshSummary();
+      await refreshStatus();
+      alert(`Сохранено. Интервал: ${saved.screenshot_interval_sec} сек`);
+    } catch (err) {
+      console.error(err);
+      alert(err?.message || "Не удалось сохранить настройки");
+    } finally {
+      if (submit) submit.disabled = false;
+    }
   });
 
   document.getElementById("purgeShotsBtn").addEventListener("click", async () => {

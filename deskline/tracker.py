@@ -107,8 +107,11 @@ class Tracker:
 
     def pause(self) -> None:
         with self._lock:
-            self.cfg["paused"] = True
-            save_config(self.cfg)
+            # Reload from disk first so pause cannot overwrite fresher settings
+            # (e.g. screenshot_interval_sec) with a stale in-memory copy.
+            cfg = load_config()
+            cfg["paused"] = True
+            self.cfg = save_config(cfg)
             self._close_current_unlocked()
             self._idle = False
             self._idle_since = None
@@ -118,8 +121,9 @@ class Tracker:
 
     def resume(self) -> None:
         with self._lock:
-            self.cfg["paused"] = False
-            save_config(self.cfg)
+            cfg = load_config()
+            cfg["paused"] = False
+            self.cfg = save_config(cfg)
             self._last_tick_at = time.time()
             self._idle_since = None
             self._still_working_prompting = False

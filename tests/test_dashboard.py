@@ -36,3 +36,5 @@ def test_dashboard_index_ok(tmp_path, monkeypatch):
     assert body["screenshot_retention_days"] == 7
     assert "screenshots_path" in body
     assert "screenshots_storage" in body
+    assert "screenshots_dir" in body
+    assert body["screenshot_interval_sec"] >= 60

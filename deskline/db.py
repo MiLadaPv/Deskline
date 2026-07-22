@@ -16,7 +16,7 @@ from deskline.classify import (
     resolve_activity,
     site_for_activity_label,
 )
-from deskline.config import DB_PATH, SCREENSHOTS_DIR, ensure_data_dirs
+from deskline.config import DB_PATH, ensure_data_dirs, get_screenshots_dir
 from deskline.icons import (
     ensure_app_icon,
     ensure_site_icon,
@@ -762,15 +762,17 @@ class Database:
 
         ensure_data_dirs()
         cutoff_ts = cutoff.timestamp()
-        for path in SCREENSHOTS_DIR.iterdir():
-            if not path.is_file():
-                continue
-            try:
-                if path.stat().st_mtime < cutoff_ts:
-                    if delete_screenshot_file(path):
-                        deleted_files += 1
-            except OSError:
-                continue
+        shots_dir = get_screenshots_dir()
+        if shots_dir.is_dir():
+            for path in shots_dir.iterdir():
+                if not path.is_file():
+                    continue
+                try:
+                    if path.stat().st_mtime < cutoff_ts:
+                        if delete_screenshot_file(path):
+                            deleted_files += 1
+                except OSError:
+                    continue
 
         return {"deleted_rows": deleted_rows, "deleted_files": deleted_files}
 
@@ -887,6 +889,8 @@ class Database:
             conn.execute("DELETE FROM screenshots")
             conn.execute("DELETE FROM sessions")
         ensure_data_dirs()
-        for path in SCREENSHOTS_DIR.iterdir():
-            if path.is_file():
-                delete_screenshot_file(path)
+        shots_dir = get_screenshots_dir()
+        if shots_dir.is_dir():
+            for path in shots_dir.iterdir():
+                if path.is_file():
+                    delete_screenshot_file(path)

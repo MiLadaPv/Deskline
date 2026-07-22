@@ -202,7 +202,7 @@
         </label>
         <label>
           Интервал скриншотов (сек)
-          <input type="number" name="screenshot_interval_sec" min="60" step="30" />
+          <input type="number" name="screenshot_interval_sec" min="60" max="3600" step="30" />
         </label>
         <label class="check">
           <input type="checkbox" name="screenshots_enabled" />
@@ -217,6 +217,11 @@
           <input type="number" name="screenshot_retention_days" min="0" max="3650" step="1" />
         </label>
         <p class="hint">0 — не удалять. По умолчанию 7.</p>
+        <label>
+          Папка скриншотов
+          <input type="text" name="screenshots_dir" placeholder="D:\Deskline\screenshots" spellcheck="false" />
+        </label>
+        <p class="hint">Пустое поле — папка по умолчанию на диске C. Укажите полный путь на другом диске, если C забит.</p>
         <p class="hint" id="shotsStorageHint">Папка скриншотов…</p>
         <label class="check">
           <input type="checkbox" name="open_dashboard_on_start" />
