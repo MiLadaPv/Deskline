@@ -161,40 +161,30 @@
     <section id="panel-projects" class="panel">
       <div class="panel-head">
         <h2>Проекты и задачи</h2>
-        <label class="filter-inline">
-          Отчёт за
-          <select id="projectsReportPeriod">
-            <option value="today" selected>Сегодня</option>
-            <option value="7">7 дней</option>
-            <option value="30">30 дней</option>
-          </select>
-        </label>
+        <div class="pt-toolbar">
+          <label class="filter-inline">
+            Период
+            <select id="projectsReportPeriod">
+              <option value="today" selected>Сегодня</option>
+              <option value="7">7 дней</option>
+              <option value="30">30 дней</option>
+            </select>
+          </label>
+          <label class="filter-inline">
+            Сортировка
+            <select id="projectsSort">
+              <option value="time" selected>По времени</option>
+              <option value="name">По имени</option>
+            </select>
+          </label>
+        </div>
       </div>
-      <div class="pt-workspace">
-        <aside class="pt-col pt-projects">
-          <div class="pt-col-head">
-            <h3 class="subhead">Проекты</h3>
-          </div>
-          <form id="projectCreateForm" class="inline-form pt-form">
-            <input type="text" name="name" placeholder="Новый проект" required maxlength="120" />
-            <input type="color" name="color" value="#2f6f5e" title="Цвет" />
-            <button type="submit" class="btn">+</button>
-          </form>
-          <div class="pt-list" id="projectsList"></div>
-        </aside>
-        <section class="pt-col pt-tasks">
-          <div class="pt-col-head">
-            <h3 class="subhead" id="tasksProjectTitle">Задачи</h3>
-          </div>
-          <form id="taskCreateForm" class="inline-form pt-form">
-            <input type="text" name="name" placeholder="Новая задача" required maxlength="120" />
-            <button type="submit" class="btn" id="taskCreateBtn" disabled>+</button>
-          </form>
-          <div class="pt-list" id="tasksList"></div>
-        </section>
-      </div>
-      <h3 class="subhead">Отчёт по проектам</h3>
-      <div class="project-report" id="projectTimeList"></div>
+      <form id="projectCreateForm" class="inline-form pt-form">
+        <input type="text" name="name" placeholder="Новый проект" required maxlength="120" />
+        <input type="color" name="color" value="#2f6f5e" title="Цвет" />
+        <button type="submit" class="btn" aria-label="Создать проект">+</button>
+      </form>
+      <div class="pt-list" id="projectsList"></div>
     </section>
 
     <section id="panel-ratings" class="panel">

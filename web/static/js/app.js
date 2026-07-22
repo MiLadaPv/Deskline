@@ -509,9 +509,11 @@ let filterTaskId = "";
 let selectedProjectId = "";
 let usagePeriod = "today";
 let projectsReportPeriod = "today";
+let projectsSort = "time";
 let expandedReportProjects = new Set();
 let lastFocusNames = { project: "", task: "" };
-let reportTaskCache = [];
+/** @type {Record<string, any[]>} */
+let tasksByProjectCache = {};
 
 function periodBounds(period) {
   const end = new Date();
@@ -628,54 +630,199 @@ async function syncUsageTaskFilter() {
     sel.value = "";
   }
 }
-async function renderTasksPane(projectId, settings, summary) {
-  const list = document.getElementById("tasksList");
-  const title = document.getElementById("tasksProjectTitle");
-  const createBtn = document.getElementById("taskCreateBtn");
-  const form = document.getElementById("taskCreateForm");
-  if (!list) return;
 
-  if (!projectId) {
-    if (title) title.textContent = "Задачи";
-    if (createBtn) createBtn.disabled = true;
-    if (form) form.querySelector("input[name=name]").disabled = true;
-    list.innerHTML = `<p class="hint">Выберите проект слева.</p>`;
-    fillTaskSelect([], null);
-    return;
+async function loadProjectTasks(projectId, { force = false } = {}) {
+  if (projectId == null || projectId === "" || projectId === "null") return [];
+  const key = String(projectId);
+  if (!force && Object.prototype.hasOwnProperty.call(tasksByProjectCache, key)) {
+    return tasksByProjectCache[key];
   }
+  const tasks = await api(`/api/tasks?project_id=${encodeURIComponent(key)}`);
+  tasksByProjectCache[key] = tasks || [];
+  return tasksByProjectCache[key];
+}
 
-  const proj = projectCache.find((p) => String(p.id) === String(projectId));
-  if (title) title.textContent = proj ? `Задачи · ${proj.name}` : "Задачи";
-  if (createBtn) createBtn.disabled = false;
-  if (form) form.querySelector("input[name=name]").disabled = false;
+function buildSortedProjectRows(projects, summary) {
+  const byProj = summary.by_project || [];
+  const secById = {};
+  let noneSec = 0;
+  for (const r of byProj) {
+    if (r.project_id == null) noneSec = r.sec || 0;
+    else secById[String(r.project_id)] = r.sec || 0;
+  }
+  const totalSec = summary.total_sec || 0;
+  const rows = (projects || []).map((p) => ({
+    key: String(p.id),
+    id: p.id,
+    name: p.name,
+    color: p.color || "#2f6f5e",
+    sec: secById[String(p.id)] || 0,
+    managed: true,
+  }));
+  if (noneSec > 0) {
+    rows.push({
+      key: "null",
+      id: null,
+      name: "Без проекта",
+      color: null,
+      sec: noneSec,
+      managed: false,
+    });
+  }
+  if (projectsSort === "name") {
+    rows.sort((a, b) => {
+      if (!a.managed) return 1;
+      if (!b.managed) return -1;
+      return a.name.localeCompare(b.name, "ru", { sensitivity: "base" });
+    });
+  } else {
+    rows.sort((a, b) => {
+      if (b.sec !== a.sec) return b.sec - a.sec;
+      if (!a.managed) return 1;
+      if (!b.managed) return -1;
+      return a.name.localeCompare(b.name, "ru", { sensitivity: "base" });
+    });
+  }
+  return { rows, totalSec };
+}
 
-  const tasks = await api(`/api/tasks?project_id=${encodeURIComponent(projectId)}`);
-  fillTaskSelect(tasks, settings.current_task_id);
-
+function renderProjectTasksHtml(row, settings, summary) {
+  const byTask = summary.by_task || [];
   const secByTask = Object.fromEntries(
-    (summary.by_task || []).map((r) => [String(r.task_id), r.sec])
+    byTask
+      .filter((t) =>
+        row.managed
+          ? String(t.project_id) === String(row.id)
+          : t.project_id == null
+      )
+      .map((t) => [String(t.task_id == null ? "null" : t.task_id), t.sec])
   );
   const focusTask = String(settings.current_task_id || "");
-  if (!tasks.length) {
-    list.innerHTML = `<p class="hint">Добавьте первую задачу.</p>`;
-    return;
+
+  if (!row.managed) {
+    const orphanTasks = byTask.filter((t) => t.project_id == null && (t.sec || 0) > 0);
+    if (!orphanTasks.length) {
+      return `<div class="pt-expand"><p class="hint">Нет задач в этом периоде.</p></div>`;
+    }
+    return `<div class="pt-expand"><div class="pt-task-list">${orphanTasks
+      .map((t) => {
+        const tname = t.task_id == null ? "Без задачи" : `Задача #${t.task_id}`;
+        return `<div class="pt-item pt-task is-readonly">
+          <div class="pt-item-main">
+            <div class="pt-item-name">${escapeHtml(tname)}</div>
+            <div class="pt-item-meta">${fmtDur(t.sec)}</div>
+          </div>
+        </div>`;
+      })
+      .join("")}</div></div>`;
   }
-  list.innerHTML = tasks
+
+  const tasks = tasksByProjectCache[row.key] || [];
+  const form = `<form class="inline-form pt-form pt-task-form" data-create-task-for="${row.id}">
+    <input type="text" name="name" placeholder="Новая задача" required maxlength="120" />
+    <button type="submit" class="btn" aria-label="Создать задачу">+</button>
+  </form>`;
+
+  if (!tasks.length) {
+    return `<div class="pt-expand">${form}<p class="hint">Добавьте первую задачу.</p></div>`;
+  }
+
+  const taskRows = tasks
     .map((t) => {
       const active = focusTask === String(t.id);
       const done = !!t.done;
       const sec = secByTask[String(t.id)] || 0;
-      return `<div class="pt-item ${active ? "is-active" : ""} ${done ? "is-done" : ""}" data-task-id="${t.id}">
+      return `<div class="pt-item pt-task ${active ? "is-active" : ""} ${done ? "is-done" : ""}" data-task-id="${t.id}" data-project-id="${row.id}">
         <button type="button" class="pt-check" data-toggle-done="${t.id}" title="${done ? "Вернуть" : "Готово"}">${done ? "✓" : "○"}</button>
         <div class="pt-item-main">
           <div class="pt-item-name">${escapeHtml(t.name)}</div>
           <div class="pt-item-meta">${sec ? fmtDur(sec) : "—"}</div>
         </div>
-        <button type="button" class="btn ${active ? "primary" : ""}" data-focus-task="${t.id}" ${done ? "disabled" : ""}>${active ? "Сейчас" : "Выбрать"}</button>
-        <button type="button" class="btn danger pt-del" data-del-task="${t.id}">×</button>
+        <button type="button" class="btn ${active ? "primary" : ""}" data-focus-task="${t.id}" data-project-id="${row.id}" ${done ? "disabled" : ""}>${active ? "Сейчас" : "Выбрать"}</button>
+        <button type="button" class="btn danger pt-del" data-del-task="${t.id}" aria-label="Удалить задачу">×</button>
       </div>`;
     })
     .join("");
+
+  return `<div class="pt-expand">${form}<div class="pt-task-list">${taskRows}</div></div>`;
+}
+
+async function renderProjectsWorkspace(projects, settings, summary) {
+  const list = document.getElementById("projectsList");
+  if (!list) return;
+
+  if (selectedProjectId && !projects.some((p) => String(p.id) === selectedProjectId)) {
+    selectedProjectId = "";
+  }
+  if (!selectedProjectId && settings.current_project_id) {
+    selectedProjectId = String(settings.current_project_id);
+  }
+
+  // Keep header task select in sync with focused / selected project.
+  const headerProjectId = settings.current_project_id || selectedProjectId || "";
+  if (headerProjectId) {
+    const headerTasks = await loadProjectTasks(headerProjectId);
+    fillTaskSelect(headerTasks, settings.current_task_id);
+  } else {
+    fillTaskSelect([], null);
+  }
+
+  for (const key of expandedReportProjects) {
+    if (key !== "null") {
+      try {
+        await loadProjectTasks(key);
+      } catch (_) {}
+    }
+  }
+
+  const { rows, totalSec } = buildSortedProjectRows(projects, summary);
+  if (!rows.length) {
+    list.innerHTML = `<p class="hint">Создайте проект — здесь появятся задачи и время за период.</p>`;
+    lastFocusNames = { project: "", task: "" };
+    return;
+  }
+
+  const focusPid = String(settings.current_project_id || "");
+  list.innerHTML = rows
+    .map((row) => {
+      const open = expandedReportProjects.has(row.key);
+      const tracking = row.managed && focusPid === String(row.id);
+      const share = totalSec ? Math.round((row.sec / totalSec) * 100) : 0;
+      const chevron = open ? "▾" : "▸";
+      const swatch = row.managed
+        ? `<span class="pt-swatch" aria-hidden="true"></span>`
+        : `<span class="pt-swatch pt-swatch-muted" aria-hidden="true"></span>`;
+      const badge = tracking ? `<span class="pt-badge">Сейчас</span>` : "";
+      const del = row.managed
+        ? `<button type="button" class="btn danger pt-del" data-del-project="${row.id}" aria-label="Удалить проект ${escapeHtml(row.name)}">×</button>`
+        : "";
+      const body = open ? renderProjectTasksHtml(row, settings, summary) : "";
+      const style = row.managed ? `style="--pc:${escapeHtml(row.color)}"` : "";
+      return `<div class="pt-row ${open ? "is-open" : ""} ${tracking ? "is-active" : ""}" data-project-key="${escapeHtml(row.key)}" ${style}>
+        <div class="pt-row-head">
+          <button type="button" class="pt-row-main" data-toggle-project="${escapeHtml(row.key)}" aria-expanded="${open ? "true" : "false"}">
+            <span class="pt-chevron" aria-hidden="true">${chevron}</span>
+            ${swatch}
+            <span class="pt-item-main">
+              <span class="pt-item-name">${escapeHtml(row.name)}${badge}</span>
+            </span>
+            <span class="pt-row-meta">${share}%</span>
+            <span class="pt-row-meta">${fmtDur(row.sec)}</span>
+          </button>
+          ${del}
+        </div>
+        ${body}
+      </div>`;
+    })
+    .join("");
+
+  const proj = projects.find((p) => String(p.id) === focusPid);
+  const focusTasks = focusPid ? tasksByProjectCache[focusPid] || [] : [];
+  const task = focusTasks.find((t) => String(t.id) === String(settings.current_task_id));
+  lastFocusNames = {
+    project: proj ? proj.name : "",
+    task: task ? task.name : "",
+  };
 }
 
 async function refreshProjects() {
@@ -697,107 +844,23 @@ async function refreshProjects() {
     summaryRes.status === "fulfilled"
       ? summaryRes.value
       : { by_project: [], by_task: [], total_sec: 0 };
+
+  // Drop task cache so mutations and period changes stay fresh.
+  tasksByProjectCache = {};
+
   fillProjectSelects(projects, settings.current_project_id);
   const workToggle = document.getElementById("workModeToggle");
   if (workToggle) workToggle.checked = !!settings.work_mode;
 
-  if (!selectedProjectId && settings.current_project_id) {
-    selectedProjectId = String(settings.current_project_id);
-  }
-  if (selectedProjectId && !projects.some((p) => String(p.id) === selectedProjectId)) {
-    selectedProjectId = projects[0] ? String(projects[0].id) : "";
-  }
-
-  const list = document.getElementById("projectsList");
-  if (list) {
-    if (!projects.length) {
-      list.innerHTML = `<p class="hint">Создайте проект — справа появятся задачи.</p>`;
-    } else {
-      list.innerHTML = projects
-        .map((p) => {
-          const selected = selectedProjectId === String(p.id);
-          const tracking = String(settings.current_project_id) === String(p.id);
-          return `<div class="pt-item pt-project ${selected ? "is-selected" : ""} ${tracking ? "is-active" : ""}" style="--pc:${escapeHtml(p.color || "#2f6f5e")}">
-            <button type="button" class="pt-project-main" data-select-project="${p.id}" aria-pressed="${selected ? "true" : "false"}">
-              <span class="pt-swatch" aria-hidden="true"></span>
-              <span class="pt-item-main">
-                <span class="pt-item-name">${escapeHtml(p.name)}</span>
-                ${tracking ? `<span class="pt-item-meta">Текущий проект</span>` : ""}
-              </span>
-            </button>
-            <button type="button" class="btn danger pt-del" data-del-project="${p.id}" aria-label="Удалить проект ${escapeHtml(p.name)}">×</button>
-          </div>`;
-        })
-        .join("");
-    }
+  if (
+    expandedReportProjects.size === 0 &&
+    settings.current_project_id != null &&
+    settings.current_project_id !== ""
+  ) {
+    expandedReportProjects.add(String(settings.current_project_id));
   }
 
-  await renderTasksPane(selectedProjectId, settings, summary);
-
-  reportTaskCache = [];
-  for (const p of projects) {
-    try {
-      const tasks = await api(`/api/tasks?project_id=${encodeURIComponent(p.id)}`);
-      reportTaskCache.push(...(tasks || []));
-    } catch (_) {}
-  }
-  const proj = projects.find((p) => String(p.id) === String(settings.current_project_id));
-  const task = reportTaskCache.find((t) => String(t.id) === String(settings.current_task_id));
-  lastFocusNames = {
-    project: proj ? proj.name : "",
-    task: task ? task.name : "",
-  };
-
-  const byProj = summary.by_project || [];
-  const nameById = Object.fromEntries(projects.map((p) => [String(p.id), p.name]));
-  renderProjectReport(byProj, summary.by_task || [], nameById, summary.total_sec || 0);
-}
-
-function renderProjectReport(byProj, byTask, nameById, totalSec) {
-  const el = document.getElementById("projectTimeList");
-  if (!el) return;
-  if (!byProj.length) {
-    el.innerHTML = `<p class="hint">Пока нет времени по проектам.</p>`;
-    return;
-  }
-  const taskNameById = Object.fromEntries((reportTaskCache || []).map((t) => [String(t.id), t.name]));
-  el.innerHTML = byProj
-    .map((r) => {
-      const id = r.project_id;
-      const key = id == null ? "null" : String(id);
-      const name =
-        id == null ? "Без проекта" : nameById[String(id)] || `Проект #${id}`;
-      const share = totalSec ? Math.round((r.sec / totalSec) * 100) : 0;
-      const open = expandedReportProjects.has(key);
-      const tasks =
-        id == null
-          ? (byTask || []).filter((t) => t.project_id == null)
-          : (byTask || []).filter((t) => String(t.project_id) === String(id));
-      const taskHtml = open
-        ? `<div class="report-tasks">${
-            tasks.length
-              ? tasks
-                  .map((t) => {
-                    const tname =
-                      t.task_id == null
-                        ? "Без задачи"
-                        : taskNameById[String(t.task_id)] || `Задача #${t.task_id}`;
-                    return `<div class="report-task"><span>${escapeHtml(tname)}</span><span>${fmtDur(t.sec)}</span></div>`;
-                  })
-                  .join("")
-              : `<div class="report-task"><span>Нет задач в этом периоде</span><span></span></div>`
-          }</div>`
-        : "";
-      return `<div class="report-row" data-report-project="${escapeHtml(key)}">
-        <button type="button" class="report-row-main" data-toggle-report="${escapeHtml(key)}">
-          <span class="report-name">${open ? "▾" : "▸"} ${escapeHtml(name)}</span>
-          <span class="report-meta">${share}%</span>
-          <span class="report-meta">${fmtDur(r.sec)}</span>
-        </button>
-        ${taskHtml}
-      </div>`;
-    })
-    .join("");
+  await renderProjectsWorkspace(projects, settings, summary);
 }
 
 async function refreshSummary() {
@@ -1219,6 +1282,14 @@ function wireUi() {
     });
   }
 
+  const projectsSortSel = document.getElementById("projectsSort");
+  if (projectsSortSel) {
+    projectsSortSel.addEventListener("change", async () => {
+      projectsSort = projectsSortSel.value === "name" ? "name" : "time";
+      await refreshProjects();
+    });
+  }
+
   const projectForm = document.getElementById("projectCreateForm");
   if (projectForm) {
     projectForm.addEventListener("submit", async (ev) => {
@@ -1236,6 +1307,7 @@ function wireUi() {
         projectForm.reset();
         if (colorInput && "value" in colorInput) colorInput.value = "#2f6f5e";
         selectedProjectId = String(created.id);
+        expandedReportProjects.add(String(created.id));
         const tasks = await api(`/api/tasks?project_id=${created.id}`);
         const first = (tasks || []).find((t) => !t.done);
         await setFocus(created.id, first ? first.id : null);
@@ -1248,24 +1320,26 @@ function wireUi() {
     });
   }
 
-  const taskForm = document.getElementById("taskCreateForm");
-  if (taskForm) {
-    taskForm.addEventListener("submit", async (ev) => {
+  const projectsList = document.getElementById("projectsList");
+  if (projectsList) {
+    projectsList.addEventListener("submit", async (ev) => {
+      const form = ev.target.closest("[data-create-task-for]");
+      if (!form) return;
       ev.preventDefault();
-      if (!selectedProjectId) {
-        showToast("Сначала выберите проект", "error");
-        return;
-      }
-      const nameInput = taskForm.elements.namedItem("name");
+      const projectId = form.dataset.createTaskFor;
+      if (!projectId) return;
+      const nameInput = form.elements.namedItem("name");
       const name = String(nameInput && "value" in nameInput ? nameInput.value : "").trim();
       if (!name) return;
       try {
         const created = await api("/api/tasks", {
           method: "POST",
-          body: JSON.stringify({ project_id: Number(selectedProjectId), name }),
+          body: JSON.stringify({ project_id: Number(projectId), name }),
         });
-        taskForm.reset();
-        await setFocus(selectedProjectId, created.id);
+        form.reset();
+        selectedProjectId = String(projectId);
+        expandedReportProjects.add(String(projectId));
+        await setFocus(projectId, created.id);
         await refreshProjects();
         showToast(`Задача «${name}» создана`, "ok");
       } catch (err) {
@@ -1273,41 +1347,71 @@ function wireUi() {
         showToast(err?.message || "Не удалось создать задачу", "error");
       }
     });
-  }
 
-  const projectsList = document.getElementById("projectsList");
-  if (projectsList) {
     projectsList.addEventListener("click", async (ev) => {
-      const delBtn = ev.target.closest("[data-del-project]");
-      if (delBtn) {
+      const delProjectBtn = ev.target.closest("[data-del-project]");
+      if (delProjectBtn) {
         ev.preventDefault();
         ev.stopPropagation();
         if (!confirm("Удалить проект и его задачи?")) return;
-        await api(`/api/projects/${delBtn.dataset.delProject}`, { method: "DELETE" });
-        if (selectedProjectId === String(delBtn.dataset.delProject)) {
-          selectedProjectId = "";
+        const pid = String(delProjectBtn.dataset.delProject);
+        await api(`/api/projects/${pid}`, { method: "DELETE" });
+        expandedReportProjects.delete(pid);
+        if (selectedProjectId === pid) selectedProjectId = "";
+        const cur = document.getElementById("currentProjectSelect");
+        if (cur && String(cur.value) === pid) {
           await setFocus(null, null);
         }
         await refreshProjects();
         return;
       }
-      const row = ev.target.closest("[data-select-project]");
-      if (row) {
-        selectedProjectId = String(row.dataset.selectProject);
+
+      const focusBtn = ev.target.closest("[data-focus-task]");
+      if (focusBtn) {
+        ev.preventDefault();
+        const pid = focusBtn.dataset.projectId || selectedProjectId;
+        selectedProjectId = String(pid || "");
+        await setFocus(pid, focusBtn.dataset.focusTask);
+        await refreshProjects();
+        return;
+      }
+
+      const doneBtn = ev.target.closest("[data-toggle-done]");
+      if (doneBtn) {
+        ev.preventDefault();
+        const id = doneBtn.dataset.toggleDone;
+        const row = doneBtn.closest("[data-project-id]");
+        const pid = row ? row.dataset.projectId : "";
+        const tasks = pid ? tasksByProjectCache[String(pid)] || [] : taskCache;
+        const task = tasks.find((t) => String(t.id) === String(id));
+        await api(`/api/tasks/${id}`, {
+          method: "PUT",
+          body: JSON.stringify({ done: !(task && task.done) }),
+        });
+        await refreshProjects();
+        return;
+      }
+
+      const delTaskBtn = ev.target.closest("[data-del-task]");
+      if (delTaskBtn) {
+        ev.preventDefault();
+        if (!confirm("Удалить задачу?")) return;
+        await api(`/api/tasks/${delTaskBtn.dataset.delTask}`, { method: "DELETE" });
+        await refreshProjects();
+        return;
+      }
+
+      const toggleBtn = ev.target.closest("[data-toggle-project]");
+      if (toggleBtn) {
+        ev.preventDefault();
+        const key = toggleBtn.dataset.toggleProject;
+        if (expandedReportProjects.has(key)) expandedReportProjects.delete(key);
+        else {
+          expandedReportProjects.add(key);
+          if (key !== "null") selectedProjectId = key;
+        }
         await refreshProjects();
       }
-    });
-  }
-
-  const projectReport = document.getElementById("projectTimeList");
-  if (projectReport) {
-    projectReport.addEventListener("click", (ev) => {
-      const btn = ev.target.closest("[data-toggle-report]");
-      if (!btn) return;
-      const key = btn.dataset.toggleReport;
-      if (expandedReportProjects.has(key)) expandedReportProjects.delete(key);
-      else expandedReportProjects.add(key);
-      refreshProjects().catch(() => {});
     });
   }
 
@@ -1328,35 +1432,6 @@ function wireUi() {
     await refreshUsageReport();
     await refreshSummary();
   });
-
-  const tasksList = document.getElementById("tasksList");
-  if (tasksList) {
-    tasksList.addEventListener("click", async (ev) => {
-      const focusBtn = ev.target.closest("[data-focus-task]");
-      if (focusBtn) {
-        await setFocus(selectedProjectId, focusBtn.dataset.focusTask);
-        await refreshProjects();
-        return;
-      }
-      const doneBtn = ev.target.closest("[data-toggle-done]");
-      if (doneBtn) {
-        const id = doneBtn.dataset.toggleDone;
-        const task = taskCache.find((t) => String(t.id) === String(id));
-        await api(`/api/tasks/${id}`, {
-          method: "PUT",
-          body: JSON.stringify({ done: !(task && task.done) }),
-        });
-        await refreshProjects();
-        return;
-      }
-      const delBtn = ev.target.closest("[data-del-task]");
-      if (delBtn) {
-        if (!confirm("Удалить задачу?")) return;
-        await api(`/api/tasks/${delBtn.dataset.delTask}`, { method: "DELETE" });
-        await refreshProjects();
-      }
-    });
-  }
 
   const shotsGrid = document.getElementById("shotsGrid");
   shotsGrid.addEventListener("click", (ev) => {
