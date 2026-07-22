@@ -319,9 +319,12 @@ function renderDayGantt(rows) {
       const width = Math.max(0.4, ((r.endMs - r.startMs) / span) * 100);
       const cat = categoryClass(r.category);
       const title = `${r.name || ""} · ${fmtClock(r.started_at)}–${fmtClock(r.ended_at)} · ${fmtDur(r.sec)}`;
-      return `<div class="gantt-block ${cat}" style="left:${left}%;width:${width}%" title="${escapeHtml(title)}">
-        <span>${escapeHtml(r.name || "")}</span>
-      </div>`;
+      // Narrow chips only show a letter or two — hide label, keep full tooltip.
+      const showLabel = width >= 4.5;
+      const labelHtml = showLabel
+        ? `<span>${escapeHtml(r.name || "")}</span>`
+        : "";
+      return `<div class="gantt-block ${cat}${showLabel ? "" : " is-narrow"}" style="left:${left}%;width:${width}%" title="${escapeHtml(title)}">${labelHtml}</div>`;
     })
     .join("");
 

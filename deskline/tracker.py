@@ -10,7 +10,7 @@ from deskline.classify import extract_site_from_title, normalize_category, resol
 from deskline.config import load_config, save_config
 from deskline.db import Database
 from deskline.idle import is_idle, seconds_since_last_input
-from deskline.notify import ask_still_working, notify
+from deskline.notify import ask_still_working, notify, still_working_body
 from deskline.power import DEFAULT_SLEEP_GAP_SEC, is_sleep_gap
 from deskline.windows import get_active_window
 
@@ -335,8 +335,7 @@ class Tracker:
         notify("Deskline", "Давно нет ввода — вы ещё за компьютером?")
         answer = ask_still_working(
             "Deskline",
-            f"Нет клавиатуры и мыши уже некоторое время.\nСейчас: {label}\n\n"
-            "Если это был перерыв или сон — выберите «Да, работаю» или просто подождите.",
+            still_working_body(label),
             timeout_sec=45.0,
         )
         with self._lock:
@@ -350,6 +349,8 @@ class Tracker:
         if pause_now:
             self.pause()
             notify("Deskline", "Трекинг на паузе")
+        else:
+            notify("Deskline", "Трекинг продолжается")
 
     def _shot_unlocked(self, reason: str) -> None:
         path = capture_screenshot(prefix="deskline")

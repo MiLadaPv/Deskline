@@ -12,6 +12,12 @@
   --shadow: 0 16px 36px rgba(21, 36, 31, 0.1);
   --display: "Fraunces", Georgia, serif;
   --sans: "Manrope", "Segoe UI", sans-serif;
+  --sheen: linear-gradient(
+    125deg,
+    rgba(255, 255, 255, 0.55) 0%,
+    rgba(255, 255, 255, 0.12) 28%,
+    rgba(255, 255, 255, 0) 52%
+  );
 }
 
 * { box-sizing: border-box; }
@@ -56,6 +62,18 @@ html, body {
   grid-template-columns: 1.4fr 1fr;
   gap: 28px;
   align-items: end;
+  position: relative;
+}
+
+.top::before {
+  content: "";
+  position: absolute;
+  inset: 12px 8px auto 8px;
+  height: 120px;
+  pointer-events: none;
+  background: var(--sheen);
+  opacity: 0.7;
+  border-radius: 2px;
 }
 
 .eyebrow {
@@ -108,8 +126,11 @@ html, body {
   align-items: center;
   padding: 10px 12px;
   border: 1px solid var(--line);
-  background: rgba(255, 255, 255, 0.55);
+  background:
+    var(--sheen),
+    rgba(255, 255, 255, 0.55);
   backdrop-filter: blur(8px);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.65);
 }
 
 .work-toggle {
@@ -284,8 +305,11 @@ html, body {
 .btn:hover { transform: translateY(-1px); }
 
 .btn.primary {
-  background: var(--ink);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.18), rgba(255, 255, 255, 0) 55%),
+    var(--ink);
   color: var(--paper);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.22);
 }
 
 .btn.danger {
@@ -741,6 +765,11 @@ main {
   grid-template-columns: auto 1fr;
   align-items: center;
   gap: 10px;
+}
+
+.settings-hint {
+  margin: -4px 0 12px 1.6rem;
+  font-size: 0.82rem;
 }
 
 .settings-form input[type="number"] {
@@ -1388,7 +1417,10 @@ button.pt-item {
   margin: 12px 0 20px;
   padding: 14px;
   border: 1px solid var(--line);
-  background: rgba(255, 255, 255, 0.5);
+  background:
+    var(--sheen),
+    rgba(255, 255, 255, 0.5);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.55);
 }
 
 .gantt-scale {
@@ -1433,6 +1465,11 @@ button.pt-item {
   font-weight: 600;
   white-space: nowrap;
   cursor: default;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.22);
+}
+
+.gantt-block.is-narrow {
+  padding: 0;
 }
 
 .gantt-block.productive { background: var(--accent); }

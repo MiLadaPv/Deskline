@@ -524,20 +524,32 @@ def _set_autostart(enabled: bool) -> None:
     name = "Deskline"
     with winreg.OpenKey(winreg.HKEY_CURRENT_USER, key_path, 0, winreg.KEY_SET_VALUE) as key:
         if enabled:
-            import sys
-
-            if getattr(sys, "frozen", False):
-                cmd = f'"{sys.executable}" --no-browser'
-            else:
-                pythonw = Path(sys.executable).with_name("pythonw.exe")
-                exe = str(pythonw if pythonw.exists() else sys.executable)
-                cmd = f'"{exe}" -m deskline --no-browser'
-            winreg.SetValueEx(key, name, 0, winreg.REG_SZ, cmd)
+            winreg.SetValueEx(key, name, 0, winreg.REG_SZ, autostart_command())
         else:
             try:
                 winreg.DeleteValue(key, name)
             except FileNotFoundError:
                 pass
+
+
+def autostart_command() -> str:
+    """Command written to HKCU Run when 'Start with Windows' is enabled."""
+    import os
+    import sys
+
+    desktop = (
+        Path(os.environ.get("LOCALAPPDATA", ""))
+        / "Programs"
+        / "Deskline"
+        / "deskline-desktop.exe"
+    )
+    if desktop.is_file():
+        return f'"{desktop}"'
+    if getattr(sys, "frozen", False):
+        return f'"{sys.executable}" --no-browser'
+    pythonw = Path(sys.executable).with_name("pythonw.exe")
+    exe = str(pythonw if pythonw.exists() else sys.executable)
+    return f'"{exe}" -m deskline --no-browser'
 
 
 def open_dashboard() -> None:
