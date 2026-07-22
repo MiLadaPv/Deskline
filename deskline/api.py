@@ -247,7 +247,14 @@ def create_app(tracker: Tracker, db: Database | None = None) -> FastAPI:
 
     @app.get("/api/health")
     def health() -> dict[str, Any]:
-        return {"ok": True, "app": APP_NAME, "version": __version__}
+        return {
+            "ok": True,
+            "app": APP_NAME,
+            "version": __version__,
+            # Fingerprint so the desktop shell can reject older packaged builds
+            # that also listen on :8787 (e.g. legacy Deskline.exe).
+            "edition": "local-python",
+        }
 
     @app.get("/api/status")
     def status() -> dict[str, Any]:

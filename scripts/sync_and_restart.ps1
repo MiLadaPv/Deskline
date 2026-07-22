@@ -11,12 +11,33 @@ Write-Host "Install: $InstallRoot"
 
 function Stop-DesklineProcesses {
   $killed = 0
+
+  # Free :8787 first — a legacy packaged Deskline.exe often owns this port.
+  $listenPids = @()
+  foreach ($line in (netstat -ano 2>$null)) {
+    if ($line -match "127\.0\.0\.1:$Port\s+.*LISTENING\s+(\d+)\s*$") {
+      $listenPids += [int]$Matches[1]
+    }
+  }
+  foreach ($pid in ($listenPids | Select-Object -Unique)) {
+    if ($pid -le 0) { continue }
+    $proc = Get-Process -Id $pid -ErrorAction SilentlyContinue
+    $name = if ($proc) { $proc.ProcessName } else { "?" }
+    Write-Host "Stopping listener PID $pid ($name) on port $Port"
+    Stop-Process -Id $pid -Force -ErrorAction SilentlyContinue
+    $killed++
+  }
+
   Get-CimInstance Win32_Process -ErrorAction SilentlyContinue |
     Where-Object {
-      $_.CommandLine -and (
-        $_.CommandLine -match '-m\s+deskline' -or
-        $_.CommandLine -match 'deskline_app\.py' -or
-        ($_.Name -match 'pythonw?\.exe' -and $_.CommandLine -match 'Deskline')
+      ($_.Name -eq 'deskline-desktop.exe') -or
+      ($_.Name -eq 'Deskline.exe' -and $_.ExecutablePath -and $_.ExecutablePath -notlike '*\Programs\Deskline\*') -or
+      (
+        $_.CommandLine -and (
+          $_.CommandLine -match '-m\s+deskline' -or
+          $_.CommandLine -match 'deskline_app\.py' -or
+          ($_.Name -match 'pythonw?\.exe' -and $_.CommandLine -match 'Deskline')
+        )
       )
     } |
     ForEach-Object {
@@ -51,9 +72,21 @@ function Sync-Install {
       Copy-Item $src (Join-Path $InstallRoot $f) -Force
     }
   }
+  $releaseExe = Join-Path $ProjectRoot "deskline-desktop\src-tauri\target\release\deskline-desktop.exe"
+  $installExe = Join-Path $InstallRoot "deskline-desktop.exe"
+  if (Test-Path $releaseExe) {
+    Write-Host "Sync deskline-desktop.exe"
+    Copy-Item $releaseExe $installExe -Force
+  }
 }
 
 function Start-Deskline {
+  $desktop = Join-Path $InstallRoot "deskline-desktop.exe"
+  if (Test-Path $desktop) {
+    Write-Host "Starting desktop shell: $desktop"
+    Start-Process -FilePath $desktop -WorkingDirectory $InstallRoot
+    return
+  }
   $pythonw = Join-Path $InstallRoot "venv\Scripts\pythonw.exe"
   $python = Join-Path $InstallRoot "venv\Scripts\python.exe"
   if (Test-Path $pythonw) {
