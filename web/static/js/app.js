@@ -261,24 +261,26 @@ function renderKpis(summary) {
   const neutral = by.neutral || 0;
   const idle = summary.idle_sec || 0;
   const active = summary.active_sec || 0;
+  const pctOf = (sec) => (total ? Math.round((sec / total) * 100) : 0);
   const items = [
-    { label: "Productive time", value: fmtDur(productive), sec: productive, tone: "productive" },
-    { label: "Unproductive time", value: fmtDur(distracting), sec: distracting, tone: "distracting" },
-    { label: "Neutral time", value: fmtDur(neutral), sec: neutral, tone: "neutral" },
-    { label: "Idle", value: fmtDur(idle), sec: idle, tone: "idle" },
-    { label: "Active", value: fmtDur(active), sec: active, tone: "active" },
-    { label: "Tracked", value: fmtDur(total), sec: total, tone: "tracked" },
+    { label: "В фокусе", value: fmtDur(productive), pct: pctOf(productive), tone: "productive" },
+    { label: "Отвлечения", value: fmtDur(distracting), pct: pctOf(distracting), tone: "distracting" },
+    { label: "Нейтрально", value: fmtDur(neutral), pct: pctOf(neutral), tone: "neutral" },
+    { label: "Без ввода", value: fmtDur(idle), pct: pctOf(idle), tone: "idle" },
+    { label: "Активно", value: fmtDur(active), pct: pctOf(active), tone: "active" },
+    { label: "Всего", value: fmtDur(total), pct: total ? 100 : 0, tone: "tracked" },
   ];
-  const max = Math.max(...items.map((it) => it.sec), 1);
   el.innerHTML = items
-    .map((it) => {
-      const pct = Math.max(3, Math.round((it.sec / max) * 100));
-      return `<div class="kpi-card kpi-metric">
-        <span class="kpi-label">${it.label}</span>
-        <strong class="kpi-value">${it.value}</strong>
-        <div class="kpi-mini-bar"><span class="${it.tone}" style="width:${pct}%"></span></div>
-      </div>`;
-    })
+    .map(
+      (it) => `<div class="pulse-stat ${it.tone}">
+        <span class="pulse-stat-label">${it.label}</span>
+        <strong class="pulse-stat-value">${it.value}</strong>
+        <div class="pulse-stat-foot">
+          <em>${it.pct}%</em>
+          <div class="pulse-stat-meter"><span style="width:${Math.max(it.pct, it.pct ? 4 : 0)}%"></span></div>
+        </div>
+      </div>`
+    )
     .join("");
 }
 
@@ -293,24 +295,23 @@ function renderTeamGauges(team) {
   el.innerHTML = rows
     .map((m) => {
       const pct = Math.max(0, Math.min(100, Math.round(Number(m.focus_pct) || 0)));
-      const color = "#22c55e";
+      const color = m.color || "#1f6b56";
       const name = escapeHtml(m.display_name || "—");
       const initials = escapeHtml(m.initials || "?");
-      const avatarBg = m.color || "#64748b";
       const c = 2 * Math.PI * 15.9155;
       const dash = (pct / 100) * c;
       const selected = String(m.id) === String(filterEmployeeId) ? " is-selected" : "";
       return `<button type="button" class="team-gauge${selected}" data-employee-id="${m.id}" title="${name}: ${pct}%">
-        <div class="team-gauge-ring">
+        <div class="team-gauge-ring" style="--ring:${color}">
           <svg viewBox="0 0 36 36" aria-hidden="true">
-            <circle class="gauge-track" cx="18" cy="18" r="15.9155" fill="none" stroke-width="2.6"/>
-            <circle class="gauge-value" cx="18" cy="18" r="15.9155" fill="none" stroke="${color}" stroke-width="2.6"
+            <circle class="gauge-track" cx="18" cy="18" r="15.9155" fill="none" stroke-width="2.8"/>
+            <circle class="gauge-value" cx="18" cy="18" r="15.9155" fill="none" stroke="${color}" stroke-width="2.8"
               stroke-linecap="round" stroke-dasharray="${dash.toFixed(2)} ${(c - dash).toFixed(2)}" transform="rotate(-90 18 18)"/>
           </svg>
           <span class="team-gauge-pct">${pct}%</span>
         </div>
         <span class="team-person">
-          <span class="team-avatar" style="background:${avatarBg}">${initials}</span>
+          <span class="team-avatar" style="background:${color}">${initials}</span>
           <span class="team-name">${name}</span>
         </span>
       </button>`;
@@ -352,9 +353,9 @@ function renderTodayTimelineStrip(rows, summary) {
   startH.setMinutes(0, 0, 0);
   for (let t = startH.getTime(); t <= endMs; t += 3600 * 1000) {
     const left = ((t - startMs) / span) * 100;
-    if (left < 0 || left > 100) continue;
+    if (left < -1 || left > 101) continue;
     hours.push(
-      `<span class="td-hour-tick" style="left:${left}%"><i></i><b>${fmtClock(new Date(t).toISOString())}</b></span>`
+      `<span class="pulse-hour" style="left:${left}%"><b>${fmtClock(new Date(t).toISOString())}</b></span>`
     );
   }
 
@@ -366,22 +367,23 @@ function renderTodayTimelineStrip(rows, summary) {
       const width = Math.max(0.35, ((b - a) / span) * 100);
       const idleRatio = r.sec > 0 ? Math.min(1, (r.idle_sec || 0) / r.sec) : 0;
       const cat = idleRatio >= 0.55 ? "idle" : categoryClass(r.category);
-      return `<span class="today-strip-seg ${cat}" style="left:${left}%;width:${width}%" title="${escapeHtml(r.name || "")}: ${fmtDur(r.sec)}"></span>`;
+      return `<span class="pulse-seg ${cat}" style="left:${left}%;width:${width}%" title="${escapeHtml(r.name || "")}: ${fmtDur(r.sec)}"></span>`;
     })
     .join("");
 
   el.innerHTML = `
-    <div class="td-tl-times">
-      <span>Start time: ${startLabel}</span>
-      <span>End time: ${endLabel}</span>
+    <div class="pulse-ribbon-meta">
+      <span>с ${startLabel}</span>
+      <span class="pulse-ribbon-total">${fmtDur(summary?.total_sec || 0)}</span>
+      <span>до ${endLabel}</span>
     </div>
-    <div class="td-hour-row">${hours.join("")}</div>
-    <div class="today-strip-track">${segs}</div>
-    <div class="td-tl-legend">
-      <span><i class="productive"></i>Productive</span>
-      <span><i class="neutral"></i>Neutral</span>
-      <span><i class="distracting"></i>Unproductive</span>
-      <span><i class="idle"></i>Idle</span>
+    <div class="pulse-hour-row">${hours.join("")}</div>
+    <div class="pulse-track">${segs}</div>
+    <div class="pulse-legend">
+      <span><i class="productive"></i>Фокус</span>
+      <span><i class="neutral"></i>Нейтрально</span>
+      <span><i class="distracting"></i>Отвлечения</span>
+      <span><i class="idle"></i>Простой</span>
     </div>`;
 }
 
@@ -616,16 +618,14 @@ function renderProdDaysChart(trends) {
   const rangeEl = document.getElementById("prodDaysRange");
   const foot = document.getElementById("prodDaysFoot");
   if (rows.length && rangeEl) {
-    const a = rows[0].day;
-    const b = rows[rows.length - 1].day;
-    rangeEl.textContent = `${a} – ${b}`;
+    rangeEl.textContent = `${rows.length} дн.`;
   }
   if (rows.length && foot) {
     const a = new Date(`${rows[0].day}T12:00:00`);
     const b = new Date(`${rows[rows.length - 1].day}T12:00:00`);
     const fmt = (d) =>
-      d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
-    foot.textContent = `${fmt(a)} – ${fmt(b)}`;
+      d.toLocaleDateString("ru-RU", { day: "numeric", month: "short" });
+    foot.textContent = `${fmt(a)} — ${fmt(b)}`;
   }
   el.innerHTML = rows
     .map((r) => {
@@ -633,7 +633,7 @@ function renderProdDaysChart(trends) {
       const cats = r.by_category || {};
       const d = new Date(`${r.day}T12:00:00`);
       const isWeekend = d.getDay() === 0 || d.getDay() === 6;
-      const letter = d.toLocaleDateString("en-US", { weekday: "narrow" });
+      const label = d.toLocaleDateString("ru-RU", { weekday: "short" });
       const segs = [
         ["distracting", cats.distracting || 0],
         ["neutral", cats.neutral || 0],
@@ -648,7 +648,8 @@ function renderProdDaysChart(trends) {
         .join("");
       return `<div class="prod-day-col${isWeekend ? " is-weekend" : ""}" title="${r.day}: фокус ${r.focus_pct}%">
         <div class="prod-day-stack">${total ? segs : `<span class="stack-seg empty" style="height:6%"></span>`}</div>
-        <span class="hours-label">${letter}</span>
+        <span class="hours-label">${label}</span>
+        <span class="hours-val">${Math.round(r.focus_pct || 0)}%</span>
       </div>`;
     })
     .join("");
@@ -1531,7 +1532,7 @@ function updateCompanyUiVisibility() {
   if (wrap) wrap.hidden = !companyMode;
   if (hub) hub.hidden = !companyMode;
   if (whoCap) {
-    whoCap.textContent = companyMode ? "team" : "you";
+    whoCap.textContent = companyMode ? "команда" : "сегодня";
   }
 }
 

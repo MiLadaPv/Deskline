@@ -57,5 +57,6 @@ def test_login_template_has_launch_and_forgot():
     assert "logo-anim" in html
     assert "preview-gauge" in html
     assert "preview-donut" not in html or "preview-gauge" in html
-    assert "Highest % productive time" in html
-    assert "Productivity percentages" in html
+    assert "Кто в фокусе" in html
+    assert "Ритм фокуса" in html
+    assert "Highest % productive time" not in html

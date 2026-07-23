@@ -155,6 +155,8 @@ def test_index_has_layered_reports_and_company_settings():
     assert 'id="companyModeToggle"' in html
     assert 'name="hub_url"' in html
     assert 'id="filterEmployeeToday"' in html
-    assert "td-stack" in html
-    assert "Highest % productive time" in html
-    assert "Productivity percentages" in html
+    assert "pulse-board" in html
+    assert "Кто в фокусе" in html
+    assert "Картина дня" in html
+    assert "Ритм фокуса" in html
+    assert "Highest % productive time" not in html

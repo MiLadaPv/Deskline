@@ -100,40 +100,47 @@
         </div>
       </div>
 
-      <div class="td-stack" id="tdReports">
-        <article class="td-card td-card-who" id="whoBlock">
-          <div class="td-card-head">
-            <h3>Highest % productive time</h3>
-            <span class="report-caption" id="whoCaption">команда</span>
-          </div>
+      <div class="pulse-board" id="tdReports">
+        <section class="pulse-panel pulse-people" id="whoBlock">
+          <header class="pulse-head">
+            <div>
+              <p class="pulse-kicker">Люди</p>
+              <h3>Кто в фокусе</h3>
+            </div>
+            <span class="pulse-aside" id="whoCaption">сегодня</span>
+          </header>
           <div class="team-gauges" id="teamGauges" aria-label="Фокус по людям"></div>
-        </article>
+        </section>
 
-        <article class="td-card td-card-mid">
+        <section class="pulse-panel pulse-day">
+          <header class="pulse-head">
+            <div>
+              <p class="pulse-kicker">День</p>
+              <h3>Картина дня</h3>
+            </div>
+            <span class="pulse-aside" id="todayTimelineMeta"></span>
+          </header>
           <div class="kpi-strip kpi-strip-metric" id="kpiStrip" aria-label="Сводка за день"></div>
-          <div class="td-timeline-block">
-            <div class="td-card-head">
-              <h3>Timeline</h3>
-              <span class="report-caption" id="todayTimelineMeta"></span>
-            </div>
-            <div class="today-timeline-strip" id="todayTimelineStrip" aria-label="Лента дня"></div>
-            <div class="td-card-foot">
-              <a class="td-report-link" href="#day" data-tab="day">Timeline report</a>
-            </div>
+          <div class="pulse-ribbon" id="todayTimelineStrip" aria-label="Лента дня"></div>
+          <div class="pulse-actions">
+            <a class="pulse-link" href="#day" data-tab="day">Открыть по часам →</a>
           </div>
-        </article>
+        </section>
 
-        <article class="td-card td-card-prod">
-          <div class="td-card-head">
-            <h3>Productivity percentages</h3>
-            <span class="report-caption" id="prodDaysRange">Focus by day</span>
-          </div>
+        <section class="pulse-panel pulse-week">
+          <header class="pulse-head">
+            <div>
+              <p class="pulse-kicker">Неделя</p>
+              <h3>Ритм фокуса</h3>
+            </div>
+            <span class="pulse-aside" id="prodDaysRange">7 дней</span>
+          </header>
           <div class="prod-days-chart prod-days-chart-wide" id="prodDaysChart"></div>
-          <div class="td-card-foot">
-            <span class="td-range-label" id="prodDaysFoot"></span>
-            <a class="td-report-link" href="#usage" data-tab="usage">Productivity report</a>
+          <div class="pulse-actions">
+            <span class="pulse-foot-note" id="prodDaysFoot"></span>
+            <a class="pulse-link" href="#usage" data-tab="usage">Где ушло время →</a>
           </div>
-        </article>
+        </section>
       </div>
 
       <div class="charts-grid pies-grid">
