@@ -629,6 +629,50 @@ function donutSegmentPath(cx, cy, rOut, rIn, a0, a1) {
   return `M${x0.toFixed(2)} ${y0.toFixed(2)} A${rOut} ${rOut} 0 ${large} 1 ${x1.toFixed(2)} ${y1.toFixed(2)} L${x2.toFixed(2)} ${y2.toFixed(2)} A${rIn} ${rIn} 0 ${large} 0 ${x3.toFixed(2)} ${y3.toFixed(2)} Z`;
 }
 
+function wireDonutHover(root) {
+  if (!root) return;
+  const segs = [...root.querySelectorAll(".donut-seg")];
+  const legs = [...root.querySelectorAll(".pie-legend li")];
+  const centerPct = root.querySelector(".donut-center strong");
+  const centerLabel = root.querySelector(".donut-center span");
+  const basePct = centerPct?.textContent || "";
+  const baseLabel = centerLabel?.textContent || "";
+
+  const setActive = (key, on) => {
+    segs.forEach((s) => {
+      const match = s.dataset.key === key;
+      s.classList.toggle("is-hot", on && match);
+      s.classList.toggle("is-dim", on && !match);
+    });
+    legs.forEach((li) => {
+      const match = li.dataset.key === key;
+      li.classList.toggle("is-hot", on && match);
+      li.classList.toggle("is-dim", on && !match);
+    });
+    if (on) {
+      const seg = segs.find((s) => s.dataset.key === key);
+      if (seg && centerPct && centerLabel) {
+        centerPct.textContent = `${seg.dataset.pct}%`;
+        centerLabel.textContent = seg.dataset.label || "";
+      }
+    } else if (centerPct && centerLabel) {
+      centerPct.textContent = basePct;
+      centerLabel.textContent = baseLabel;
+    }
+  };
+
+  segs.forEach((seg) => {
+    seg.addEventListener("pointerenter", () => setActive(seg.dataset.key, true));
+    seg.addEventListener("pointerleave", () => setActive(seg.dataset.key, false));
+    seg.addEventListener("focus", () => setActive(seg.dataset.key, true));
+    seg.addEventListener("blur", () => setActive(seg.dataset.key, false));
+  });
+  legs.forEach((li) => {
+    li.addEventListener("pointerenter", () => setActive(li.dataset.key, true));
+    li.addEventListener("pointerleave", () => setActive(li.dataset.key, false));
+  });
+}
+
 function renderPieChart(el, slices, total, emptyText) {
   if (!el) return;
   const usable = (slices || []).filter((s) => (s.sec || 0) > 0);
@@ -636,27 +680,39 @@ function renderPieChart(el, slices, total, emptyText) {
     el.innerHTML = `<p class="hint">${emptyText || "Пока нет данных."}</p>`;
     return;
   }
-  const cx = 60;
-  const cy = 60;
-  const rOut = 52;
-  const rIn = 34;
+  const cx = 110;
+  const cy = 110;
+  const rOut = 96;
+  const rIn = 58;
   let angle = 0;
   const paths = usable
-    .map((s) => {
+    .map((s, idx) => {
       const sweep = (s.sec / total) * 360;
-      const d = donutSegmentPath(cx, cy, rOut, rIn, angle, angle + sweep);
-      angle += sweep;
+      const a0 = angle;
+      const a1 = angle + sweep;
+      angle = a1;
+      const d = donutSegmentPath(cx, cy, rOut, rIn, a0, a1);
       if (!d) return "";
-      return `<path d="${d}" fill="${s.color}" stroke="#fff" stroke-width="1.5"/>`;
+      const mid = a0 + sweep / 2;
+      const share = Math.round((s.sec / total) * 100);
+      const key = String(s.key || s.label || idx);
+      return `<path class="donut-seg" data-key="${escapeHtml(key)}" data-pct="${share}" data-label="${escapeHtml(s.label)}" data-mid="${mid.toFixed(2)}"
+        d="${d}" fill="${s.color}" tabindex="0" role="img"
+        aria-label="${escapeHtml(s.label)}: ${share}%" style="--i:${idx}"/>`;
     })
     .join("");
   const primary = usable[0];
   const primaryPct = Math.round((primary.sec / total) * 100);
   el.innerHTML = `<div class="pie-layout">
-    <div class="donut-wrap" role="img" aria-label="Диаграмма">
-      <svg class="donut-svg" viewBox="0 0 120 120" width="148" height="148">
-        <circle cx="60" cy="60" r="43" fill="none" stroke="rgba(21,36,31,0.06)" stroke-width="16"/>
-        ${paths}
+    <div class="donut-wrap" role="group" aria-label="Диаграмма">
+      <svg class="donut-svg" viewBox="0 0 220 220" width="220" height="220">
+        <defs>
+          <filter id="donutGlow" x="-20%" y="-20%" width="140%" height="140%">
+            <feDropShadow dx="0" dy="6" stdDeviation="6" flood-color="#15241f" flood-opacity="0.12"/>
+          </filter>
+        </defs>
+        <circle class="donut-track" cx="110" cy="110" r="77" fill="none"/>
+        <g class="donut-segs" filter="url(#donutGlow)">${paths}</g>
       </svg>
       <div class="donut-center">
         <strong>${primaryPct}%</strong>
@@ -665,9 +721,10 @@ function renderPieChart(el, slices, total, emptyText) {
     </div>
     <ul class="pie-legend">
       ${usable
-        .map((s) => {
+        .map((s, idx) => {
           const share = Math.round((s.sec / total) * 100);
-          return `<li>
+          const key = String(s.key || s.label || idx);
+          return `<li data-key="${escapeHtml(key)}">
             <span class="pie-swatch" style="background:${s.color}"></span>
             <span class="pie-name">${escapeHtml(s.label)}</span>
             <span class="pie-meta">${fmtDur(s.sec)} · ${share}%</span>
@@ -676,6 +733,7 @@ function renderPieChart(el, slices, total, emptyText) {
         .join("")}
     </ul>
   </div>`;
+  wireDonutHover(el);
 }
 
 function categoryPieSlices(byCategory) {

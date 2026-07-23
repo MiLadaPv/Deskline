@@ -1437,28 +1437,77 @@ main {
 }
 
 .pie-chart {
-  margin: 8px 0 14px;
+  margin: 10px 0 16px;
 }
 
 .pie-layout {
   display: grid;
-  grid-template-columns: 160px minmax(0, 1fr);
-  gap: 18px;
+  grid-template-columns: 240px minmax(0, 1fr);
+  gap: 22px;
   align-items: center;
 }
 
 .donut-wrap {
   position: relative;
-  width: 148px;
-  height: 148px;
+  width: 220px;
+  height: 220px;
   margin: 0 auto;
+  transition: transform 0.35s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.donut-wrap:hover {
+  transform: scale(1.03);
 }
 
 .donut-svg {
   display: block;
-  width: 148px;
-  height: 148px;
-  filter: drop-shadow(0 8px 16px rgba(21, 36, 31, 0.08));
+  width: 220px;
+  height: 220px;
+  overflow: visible;
+}
+
+.donut-track {
+  stroke: rgba(21, 36, 31, 0.07);
+  stroke-width: 34;
+}
+
+.donut-seg {
+  cursor: pointer;
+  transform-box: fill-box;
+  transform-origin: center;
+  transform: scale(1);
+  transition:
+    transform 0.28s cubic-bezier(0.22, 1, 0.36, 1),
+    filter 0.28s ease,
+    opacity 0.28s ease;
+  stroke: #fff;
+  stroke-width: 2.5;
+  outline: none;
+  animation: donutPop 0.55s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation-delay: calc(var(--i, 0) * 60ms);
+}
+
+.donut-seg:hover,
+.donut-seg.is-hot,
+.donut-seg:focus-visible {
+  transform: scale(1.07);
+  filter: brightness(1.08) saturate(1.08);
+}
+
+.donut-seg.is-dim {
+  opacity: 0.38;
+  filter: grayscale(0.15);
+}
+
+@keyframes donutPop {
+  from {
+    opacity: 0;
+    transform: scale(0.86);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
 }
 
 .donut-center {
@@ -1468,20 +1517,23 @@ main {
   place-content: center;
   text-align: center;
   pointer-events: none;
-  gap: 2px;
+  gap: 4px;
+  transition: opacity 0.2s ease;
 }
 
 .donut-center strong {
   font-family: var(--display);
-  font-size: 1.55rem;
+  font-size: 2.05rem;
   line-height: 1;
   color: var(--ink);
+  letter-spacing: -0.03em;
 }
 
 .donut-center span {
-  font-size: 0.72rem;
+  font-size: 0.82rem;
+  font-weight: 600;
   color: var(--ink-soft);
-  max-width: 4.8rem;
+  max-width: 6.5rem;
   margin: 0 auto;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1493,15 +1545,30 @@ main {
   margin: 0;
   padding: 0;
   display: grid;
-  gap: 8px;
+  gap: 10px;
 }
 
 .pie-legend li {
   display: grid;
-  grid-template-columns: 12px minmax(0, 1fr) auto;
-  gap: 8px;
+  grid-template-columns: 14px minmax(0, 1fr) auto;
+  gap: 10px;
   align-items: center;
-  font-size: 0.88rem;
+  font-size: 0.92rem;
+  padding: 8px 10px;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: background 0.2s ease, transform 0.2s ease, opacity 0.2s ease;
+}
+
+.pie-legend li:hover,
+.pie-legend li.is-hot {
+  background: rgba(31, 107, 86, 0.08);
+  transform: translateX(3px);
+}
+
+.pie-legend li.is-dim {
+  opacity: 0.45;
+}
 }
 
 .pie-swatch {
@@ -1890,7 +1957,13 @@ main {
     grid-template-columns: 1fr;
   }
   .pie-layout {
-    grid-template-columns: 120px minmax(0, 1fr);
+    grid-template-columns: 1fr;
+    justify-items: center;
+  }
+  .donut-wrap,
+  .donut-svg {
+    width: 200px;
+    height: 200px;
   }
   .kind-row {
     grid-template-columns: 90px 1fr 72px;
