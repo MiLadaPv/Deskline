@@ -100,35 +100,40 @@
         </div>
       </div>
 
-      <div class="report-block" id="whoBlock">
-        <div class="report-block-head">
-          <h3 class="subhead">Команда</h3>
-          <span class="report-caption" id="whoCaption">Highest % productive</span>
-        </div>
-        <div class="team-gauges" id="teamGauges" aria-label="Фокус по людям"></div>
-      </div>
+      <div class="td-stack" id="tdReports">
+        <article class="td-card td-card-who" id="whoBlock">
+          <div class="td-card-head">
+            <h3>Highest % productive time</h3>
+            <span class="report-caption" id="whoCaption">команда</span>
+          </div>
+          <div class="team-gauges" id="teamGauges" aria-label="Фокус по людям"></div>
+        </article>
 
-      <div class="report-block">
-        <div class="report-block-head">
-          <h3 class="subhead">Метрики дня</h3>
-        </div>
-        <div class="kpi-strip kpi-strip-metric" id="kpiStrip" aria-label="Сводка за день"></div>
-      </div>
+        <article class="td-card td-card-mid">
+          <div class="kpi-strip kpi-strip-metric" id="kpiStrip" aria-label="Сводка за день"></div>
+          <div class="td-timeline-block">
+            <div class="td-card-head">
+              <h3>Timeline</h3>
+              <span class="report-caption" id="todayTimelineMeta"></span>
+            </div>
+            <div class="today-timeline-strip" id="todayTimelineStrip" aria-label="Лента дня"></div>
+            <div class="td-card-foot">
+              <a class="td-report-link" href="#day" data-tab="day">Timeline report</a>
+            </div>
+          </div>
+        </article>
 
-      <div class="report-block">
-        <div class="report-block-head">
-          <h3 class="subhead">Лента</h3>
-          <span class="report-caption" id="todayTimelineMeta"></span>
-        </div>
-        <div class="today-timeline-strip" id="todayTimelineStrip" aria-label="Лента дня"></div>
-      </div>
-
-      <div class="report-block">
-        <div class="report-block-head">
-          <h3 class="subhead">Продуктивность</h3>
-          <span class="report-caption">по дням недели</span>
-        </div>
-        <div class="prod-days-chart prod-days-chart-wide" id="prodDaysChart"></div>
+        <article class="td-card td-card-prod">
+          <div class="td-card-head">
+            <h3>Productivity percentages</h3>
+            <span class="report-caption" id="prodDaysRange">Focus by day</span>
+          </div>
+          <div class="prod-days-chart prod-days-chart-wide" id="prodDaysChart"></div>
+          <div class="td-card-foot">
+            <span class="td-range-label" id="prodDaysFoot"></span>
+            <a class="td-report-link" href="#usage" data-tab="usage">Productivity report</a>
+          </div>
+        </article>
       </div>
 
       <div class="charts-grid pies-grid">

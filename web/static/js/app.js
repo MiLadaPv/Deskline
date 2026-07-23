@@ -258,20 +258,21 @@ function renderKpis(summary) {
   const by = summary.by_category || {};
   const productive = by.productive || 0;
   const distracting = by.distracting || 0;
+  const neutral = by.neutral || 0;
   const idle = summary.idle_sec || 0;
   const active = summary.active_sec || 0;
   const items = [
     { label: "Productive time", value: fmtDur(productive), sec: productive, tone: "productive" },
     { label: "Unproductive time", value: fmtDur(distracting), sec: distracting, tone: "distracting" },
+    { label: "Neutral time", value: fmtDur(neutral), sec: neutral, tone: "neutral" },
     { label: "Idle", value: fmtDur(idle), sec: idle, tone: "idle" },
     { label: "Active", value: fmtDur(active), sec: active, tone: "active" },
-    { label: "Focus", value: `${summary.focus_pct ?? 0}%`, sec: summary.focus_sec || 0, tone: "productive" },
-    { label: "Всего", value: fmtDur(total), sec: total, tone: "neutral" },
+    { label: "Tracked", value: fmtDur(total), sec: total, tone: "tracked" },
   ];
   const max = Math.max(...items.map((it) => it.sec), 1);
   el.innerHTML = items
     .map((it) => {
-      const pct = Math.max(2, Math.round((it.sec / max) * 100));
+      const pct = Math.max(3, Math.round((it.sec / max) * 100));
       return `<div class="kpi-card kpi-metric">
         <span class="kpi-label">${it.label}</span>
         <strong class="kpi-value">${it.value}</strong>
@@ -292,23 +293,26 @@ function renderTeamGauges(team) {
   el.innerHTML = rows
     .map((m) => {
       const pct = Math.max(0, Math.min(100, Math.round(Number(m.focus_pct) || 0)));
-      const color = m.color || "#1f6b56";
+      const color = "#22c55e";
       const name = escapeHtml(m.display_name || "—");
       const initials = escapeHtml(m.initials || "?");
+      const avatarBg = m.color || "#64748b";
       const c = 2 * Math.PI * 15.9155;
       const dash = (pct / 100) * c;
       const selected = String(m.id) === String(filterEmployeeId) ? " is-selected" : "";
       return `<button type="button" class="team-gauge${selected}" data-employee-id="${m.id}" title="${name}: ${pct}%">
-        <div class="team-gauge-ring" style="--c:${color}">
+        <div class="team-gauge-ring">
           <svg viewBox="0 0 36 36" aria-hidden="true">
-            <circle class="gauge-track" cx="18" cy="18" r="15.9155" fill="none" stroke-width="3"/>
-            <circle class="gauge-value" cx="18" cy="18" r="15.9155" fill="none" stroke="${color}" stroke-width="3"
+            <circle class="gauge-track" cx="18" cy="18" r="15.9155" fill="none" stroke-width="2.6"/>
+            <circle class="gauge-value" cx="18" cy="18" r="15.9155" fill="none" stroke="${color}" stroke-width="2.6"
               stroke-linecap="round" stroke-dasharray="${dash.toFixed(2)} ${(c - dash).toFixed(2)}" transform="rotate(-90 18 18)"/>
           </svg>
           <span class="team-gauge-pct">${pct}%</span>
         </div>
-        <span class="team-avatar" style="background:${color}">${initials}</span>
-        <span class="team-name">${name}</span>
+        <span class="team-person">
+          <span class="team-avatar" style="background:${avatarBg}">${initials}</span>
+          <span class="team-name">${name}</span>
+        </span>
       </button>`;
     })
     .join("");
@@ -337,22 +341,48 @@ function renderTodayTimelineStrip(rows, summary) {
   const startMs = Math.min(...list.map((r) => new Date(r.started_at).getTime()));
   const endMs = Math.max(...list.map((r) => new Date(r.ended_at || Date.now()).getTime()));
   const span = Math.max(endMs - startMs, 1);
+  const startLabel = fmtClock(new Date(startMs).toISOString());
+  const endLabel = fmtClock(new Date(endMs).toISOString());
   if (meta) {
-    meta.textContent = `${fmtDur(summary?.total_sec || 0)} · ${fmtClock(new Date(startMs).toISOString())} – ${fmtClock(new Date(endMs).toISOString())}`;
+    meta.textContent = fmtDur(summary?.total_sec || 0);
   }
-  el.innerHTML =
-    `<div class="today-strip-track">` +
-    list
-      .map((r) => {
-        const a = new Date(r.started_at).getTime();
-        const b = new Date(r.ended_at || Date.now()).getTime();
-        const left = ((a - startMs) / span) * 100;
-        const width = Math.max(0.4, ((b - a) / span) * 100);
-        const cat = categoryClass(r.category);
-        return `<span class="today-strip-seg ${cat}" style="left:${left}%;width:${width}%" title="${escapeHtml(r.name || "")}: ${fmtDur(r.sec)}"></span>`;
-      })
-      .join("") +
-    `</div>`;
+
+  const hours = [];
+  const startH = new Date(startMs);
+  startH.setMinutes(0, 0, 0);
+  for (let t = startH.getTime(); t <= endMs; t += 3600 * 1000) {
+    const left = ((t - startMs) / span) * 100;
+    if (left < 0 || left > 100) continue;
+    hours.push(
+      `<span class="td-hour-tick" style="left:${left}%"><i></i><b>${fmtClock(new Date(t).toISOString())}</b></span>`
+    );
+  }
+
+  const segs = list
+    .map((r) => {
+      const a = new Date(r.started_at).getTime();
+      const b = new Date(r.ended_at || Date.now()).getTime();
+      const left = ((a - startMs) / span) * 100;
+      const width = Math.max(0.35, ((b - a) / span) * 100);
+      const idleRatio = r.sec > 0 ? Math.min(1, (r.idle_sec || 0) / r.sec) : 0;
+      const cat = idleRatio >= 0.55 ? "idle" : categoryClass(r.category);
+      return `<span class="today-strip-seg ${cat}" style="left:${left}%;width:${width}%" title="${escapeHtml(r.name || "")}: ${fmtDur(r.sec)}"></span>`;
+    })
+    .join("");
+
+  el.innerHTML = `
+    <div class="td-tl-times">
+      <span>Start time: ${startLabel}</span>
+      <span>End time: ${endLabel}</span>
+    </div>
+    <div class="td-hour-row">${hours.join("")}</div>
+    <div class="today-strip-track">${segs}</div>
+    <div class="td-tl-legend">
+      <span><i class="productive"></i>Productive</span>
+      <span><i class="neutral"></i>Neutral</span>
+      <span><i class="distracting"></i>Unproductive</span>
+      <span><i class="idle"></i>Idle</span>
+    </div>`;
 }
 
 function renderProdStack(byCategory, total) {
@@ -583,15 +613,33 @@ function renderProdDaysChart(trends) {
   const el = document.getElementById("prodDaysChart");
   if (!el) return;
   const rows = trends || [];
+  const rangeEl = document.getElementById("prodDaysRange");
+  const foot = document.getElementById("prodDaysFoot");
+  if (rows.length && rangeEl) {
+    const a = rows[0].day;
+    const b = rows[rows.length - 1].day;
+    rangeEl.textContent = `${a} – ${b}`;
+  }
+  if (rows.length && foot) {
+    const a = new Date(`${rows[0].day}T12:00:00`);
+    const b = new Date(`${rows[rows.length - 1].day}T12:00:00`);
+    const fmt = (d) =>
+      d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+    foot.textContent = `${fmt(a)} – ${fmt(b)}`;
+  }
   el.innerHTML = rows
     .map((r) => {
       const total = r.total_sec || 0;
       const cats = r.by_category || {};
       const d = new Date(`${r.day}T12:00:00`);
       const isWeekend = d.getDay() === 0 || d.getDay() === 6;
-      const segs = ["productive", "neutral", "distracting"]
-        .map((k) => {
-          const sec = cats[k] || 0;
+      const letter = d.toLocaleDateString("en-US", { weekday: "narrow" });
+      const segs = [
+        ["distracting", cats.distracting || 0],
+        ["neutral", cats.neutral || 0],
+        ["productive", cats.productive || 0],
+      ]
+        .map(([k, sec]) => {
           const pct = total ? Math.round((sec / total) * 100) : 0;
           return pct > 0
             ? `<span class="stack-seg ${k}" style="height:${pct}%" title="${k}: ${pct}%"></span>`
@@ -599,9 +647,8 @@ function renderProdDaysChart(trends) {
         })
         .join("");
       return `<div class="prod-day-col${isWeekend ? " is-weekend" : ""}" title="${r.day}: фокус ${r.focus_pct}%">
-        <div class="prod-day-stack">${total ? segs : `<span class="stack-seg empty" style="height:4%"></span>`}</div>
-        <span class="hours-label">${weekdayShort(r.day)}</span>
-        <span class="hours-val">${Math.round(r.focus_pct || 0)}%</span>
+        <div class="prod-day-stack">${total ? segs : `<span class="stack-seg empty" style="height:6%"></span>`}</div>
+        <span class="hours-label">${letter}</span>
       </div>`;
     })
     .join("");
@@ -1484,7 +1531,7 @@ function updateCompanyUiVisibility() {
   if (wrap) wrap.hidden = !companyMode;
   if (hub) hub.hidden = !companyMode;
   if (whoCap) {
-    whoCap.textContent = companyMode ? "Highest % productive · команда" : "Highest % productive";
+    whoCap.textContent = companyMode ? "team" : "you";
   }
 }
 

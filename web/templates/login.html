@@ -46,41 +46,47 @@
       <div class="launch-previews" aria-hidden="true">
         <div class="preview-card preview-gauges">
           <div class="preview-card-head">
-            <strong>Фокус за день</strong>
-            <span>Highest % productive</span>
+            <strong>Highest % productive time</strong>
+            <span>Focus</span>
           </div>
           <div class="preview-gauge-row">
             <div class="preview-gauge">
-              <div class="gauge-ring" style="--p:72;--c:#1f6b56">
-                <svg viewBox="0 0 36 36"><circle class="gauge-track" cx="18" cy="18" r="15.9155"/><circle class="gauge-value" cx="18" cy="18" r="15.9155" stroke="#1f6b56" stroke-dasharray="72 28" transform="rotate(-90 18 18)"/></svg>
+              <div class="gauge-ring" style="--p:72;--c:#22c55e">
+                <svg viewBox="0 0 36 36"><circle class="gauge-track" cx="18" cy="18" r="15.9155"/><circle class="gauge-value" cx="18" cy="18" r="15.9155" stroke="#22c55e" stroke-dasharray="72 28" transform="rotate(-90 18 18)"/></svg>
                 <span>72%</span>
               </div>
-              <em>Design</em>
+              <div class="preview-person"><i style="background:#6366f1">DN</i><em>Design</em></div>
             </div>
             <div class="preview-gauge">
-              <div class="gauge-ring" style="--p:54;--c:#2f8f74">
-                <svg viewBox="0 0 36 36"><circle class="gauge-track" cx="18" cy="18" r="15.9155"/><circle class="gauge-value" cx="18" cy="18" r="15.9155" stroke="#2f8f74" stroke-dasharray="54 46" transform="rotate(-90 18 18)"/></svg>
+              <div class="gauge-ring" style="--p:54;--c:#22c55e">
+                <svg viewBox="0 0 36 36"><circle class="gauge-track" cx="18" cy="18" r="15.9155"/><circle class="gauge-value" cx="18" cy="18" r="15.9155" stroke="#22c55e" stroke-dasharray="54 46" transform="rotate(-90 18 18)"/></svg>
                 <span>54%</span>
               </div>
-              <em>Code</em>
+              <div class="preview-person"><i style="background:#0ea5e9">CD</i><em>Code</em></div>
             </div>
             <div class="preview-gauge">
-              <div class="gauge-ring" style="--p:38;--c:#4a7c59">
-                <svg viewBox="0 0 36 36"><circle class="gauge-track" cx="18" cy="18" r="15.9155"/><circle class="gauge-value" cx="18" cy="18" r="15.9155" stroke="#4a7c59" stroke-dasharray="38 62" transform="rotate(-90 18 18)"/></svg>
+              <div class="gauge-ring" style="--p:38;--c:#22c55e">
+                <svg viewBox="0 0 36 36"><circle class="gauge-track" cx="18" cy="18" r="15.9155"/><circle class="gauge-value" cx="18" cy="18" r="15.9155" stroke="#22c55e" stroke-dasharray="38 62" transform="rotate(-90 18 18)"/></svg>
                 <span>38%</span>
               </div>
-              <em>Ops</em>
+              <div class="preview-person"><i style="background:#f59e0b">OP</i><em>Ops</em></div>
             </div>
           </div>
         </div>
         <div class="preview-card preview-timeline">
+          <div class="preview-kpi-row">
+            <div><b>Productive</b><strong>4ч 12м</strong><span class="preview-mini productive"></span></div>
+            <div><b>Unproductive</b><strong>48м</strong><span class="preview-mini distracting"></span></div>
+            <div><b>Idle</b><strong>1ч 05м</strong><span class="preview-mini idle"></span></div>
+            <div><b>Tracked</b><strong>7ч 20м</strong><span class="preview-mini tracked"></span></div>
+          </div>
           <div class="preview-card-head">
-            <strong>Лента дня</strong>
-            <span>7ч 20м tracked</span>
+            <strong>Timeline</strong>
+            <span>7ч 20м</span>
           </div>
           <div class="preview-timeline-meta">
-            <span>09:12</span>
-            <span>17:48</span>
+            <span>Start 09:12</span>
+            <span>End 17:48</span>
           </div>
           <div class="preview-bar preview-bar-lg">
             <i class="productive" style="width:46%"></i>
@@ -89,23 +95,25 @@
             <i class="idle" style="width:26%"></i>
           </div>
           <div class="preview-timeline-legs">
-            <span><i class="productive"></i>Фокус</span>
-            <span><i class="neutral"></i>Нейтр.</span>
-            <span><i class="distracting"></i>Отвлеч.</span>
-            <span><i class="idle"></i>Простой</span>
+            <span><i class="productive"></i>Productive</span>
+            <span><i class="neutral"></i>Neutral</span>
+            <span><i class="distracting"></i>Unproductive</span>
+            <span><i class="idle"></i>Idle</span>
           </div>
         </div>
         <div class="preview-card preview-week">
           <div class="preview-card-head">
-            <strong>Неделя</strong>
+            <strong>Productivity percentages</strong>
             <span>Focus by day</span>
           </div>
-          <div class="preview-week-chart">
-            <div class="preview-week-col"><span style="height:62%"></span><b>пн</b></div>
-            <div class="preview-week-col"><span style="height:44%"></span><b>вт</b></div>
-            <div class="preview-week-col"><span style="height:88%"></span><b>ср</b></div>
-            <div class="preview-week-col"><span style="height:36%"></span><b>чт</b></div>
-            <div class="preview-week-col"><span style="height:71%"></span><b>пт</b></div>
+          <div class="preview-week-chart preview-week-stack">
+            <div class="preview-week-col"><span class="stack"><i class="distracting" style="height:18%"></i><i class="productive" style="height:62%"></i></span><b>M</b></div>
+            <div class="preview-week-col"><span class="stack"><i class="distracting" style="height:28%"></i><i class="productive" style="height:44%"></i></span><b>T</b></div>
+            <div class="preview-week-col"><span class="stack"><i class="distracting" style="height:10%"></i><i class="productive" style="height:78%"></i></span><b>W</b></div>
+            <div class="preview-week-col"><span class="stack"><i class="distracting" style="height:32%"></i><i class="productive" style="height:36%"></i></span><b>T</b></div>
+            <div class="preview-week-col"><span class="stack"><i class="distracting" style="height:14%"></i><i class="productive" style="height:66%"></i></span><b>F</b></div>
+            <div class="preview-week-col weekend"><span class="stack"><i class="distracting" style="height:40%"></i><i class="productive" style="height:20%"></i></span><b>S</b></div>
+            <div class="preview-week-col weekend"><span class="stack"><i class="productive" style="height:12%"></i></span><b>S</b></div>
           </div>
         </div>
       </div>
