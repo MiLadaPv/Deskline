@@ -11,6 +11,12 @@ HOST = "127.0.0.1"
 PORT = 8787
 BASE_URL = f"http://{HOST}:{PORT}"
 
+# Public brand / legal (shown in footer and /about|/privacy|/terms)
+COMPANY_NAME = "Milanochka Games"
+SUPPORT_EMAIL = "milanochka.llc@gmail.com"
+GITHUB_URL = "https://github.com/AndalusGames"
+LEGAL_JURISDICTION = "Hashemite Kingdom of Jordan"
+
 PACKAGE_ROOT = Path(__file__).resolve().parent
 
 
@@ -121,3 +127,21 @@ def save_config(cfg: dict[str, Any]) -> dict[str, Any]:
     ensure_screenshots_dir(merged)
     CONFIG_PATH.write_text(json.dumps(merged, indent=2), encoding="utf-8")
     return merged
+
+
+def brand_template_context(*, version: str | None = None, base_url: str | None = None) -> dict[str, Any]:
+    """Shared Jinja context for dashboard and legal pages."""
+    from datetime import datetime
+
+    from deskline import __version__
+
+    return {
+        "app_name": APP_NAME,
+        "version": version or __version__,
+        "base_url": base_url if base_url is not None else BASE_URL,
+        "company_name": COMPANY_NAME,
+        "support_email": SUPPORT_EMAIL,
+        "github_url": GITHUB_URL,
+        "legal_jurisdiction": LEGAL_JURISDICTION,
+        "copyright_year": datetime.now().astimezone().year,
+    }

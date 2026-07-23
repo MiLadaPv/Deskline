@@ -131,6 +131,16 @@ def validate_session_token(token: str | None) -> bool:
 def is_public_path(path: str) -> bool:
     if path.startswith("/static/"):
         return True
-    if path in {"/login", "/api/health", "/api/auth/status", "/api/auth/login", "/api/auth/setup", "/favicon.ico"}:
+    if path in {
+        "/login",
+        "/about",
+        "/privacy",
+        "/terms",
+        "/api/health",
+        "/api/auth/status",
+        "/api/auth/login",
+        "/api/auth/setup",
+        "/favicon.ico",
+    }:
         return True
     return False

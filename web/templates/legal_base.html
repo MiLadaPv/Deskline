@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>{% block title %}Deskline{% endblock %}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/static/css/app.css?v={{ version }}" />
+</head>
+<body class="legal-body">
+  <div class="atmosphere" aria-hidden="true"></div>
+  <header class="legal-top">
+    <a class="legal-brand" href="/">Deskline</a>
+    <nav class="legal-nav" aria-label="Legal">
+      <a href="/about"{% if active == "about" %} aria-current="page"{% endif %}>About</a>
+      <a href="/privacy"{% if active == "privacy" %} aria-current="page"{% endif %}>Privacy</a>
+      <a href="/terms"{% if active == "terms" %} aria-current="page"{% endif %}>Terms</a>
+      <a href="/">Dashboard</a>
+    </nav>
+  </header>
+  <main class="legal-main">
+    {% block content %}{% endblock %}
+  </main>
+  <footer class="legal-foot">
+    <p>© {{ copyright_year }} {{ company_name }}. Deskline v{{ version }}.</p>
+    <p>
+      <a href="mailto:{{ support_email }}">{{ support_email }}</a>
+      ·
+      <a href="{{ github_url }}" target="_blank" rel="noopener noreferrer">GitHub</a>
+    </p>
+  </footer>
+</body>
+</html>

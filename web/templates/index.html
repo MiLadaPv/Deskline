@@ -293,7 +293,17 @@
   <div class="toast-region" id="toastRegion" aria-live="polite" aria-atomic="true"></div>
 
   <footer class="foot">
-    <span id="appVersion">Deskline v{{ version }}</span>
+    <div class="foot-brand">
+      <span id="appVersion">Deskline v{{ version }}</span>
+      <span class="foot-copy">© {{ copyright_year }} {{ company_name }}</span>
+      <nav class="foot-links" aria-label="О компании">
+        <a href="/about">О программе</a>
+        <a href="/privacy">Конфиденциальность</a>
+        <a href="/terms">Условия</a>
+        <a href="mailto:{{ support_email }}">Поддержка</a>
+        <a href="{{ github_url }}" target="_blank" rel="noopener noreferrer">GitHub</a>
+      </nav>
+    </div>
     <span id="statusLine">…</span>
   </footer>
   <script src="/static/js/app.js?v={{ version }}"></script>

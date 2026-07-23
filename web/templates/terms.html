@@ -1,0 +1,79 @@
+{% extends "legal_base.html" %}
+{% set active = "terms" %}
+{% block title %}Terms of Use · Deskline{% endblock %}
+{% block content %}
+  <p class="eyebrow">Legal draft</p>
+  <h1>Terms of Use</h1>
+  <p class="legal-lede">
+    These draft terms apply to your use of Deskline. They are a product template,
+    not formal legal advice. Last updated: {{ copyright_year }}.
+  </p>
+
+  <h2>1. Agreement</h2>
+  <p>
+    By installing or using Deskline, you agree to these Terms of Use with
+    <strong>{{ company_name }}</strong> ({{ legal_jurisdiction }}).
+    If you do not agree, do not use the software.
+  </p>
+
+  <h2>2. License</h2>
+  <p>
+    Subject to these terms, {{ company_name }} grants you a personal, non-exclusive,
+    non-transferable license to use Deskline on devices you control for lawful productivity
+    tracking. You may not reverse engineer, redistribute, or misrepresent the software as your own product.
+  </p>
+
+  <h2>3. Local software</h2>
+  <p>
+    Deskline runs locally. You are responsible for how you use tracking features (including
+    screenshots) and for complying with workplace policies and applicable law when monitoring
+    activity on shared or employer-owned machines.
+  </p>
+
+  <h2>4. No warranty</h2>
+  <p>
+    Deskline is provided “as is” without warranties of any kind, express or implied,
+    including fitness for a particular purpose and non-infringement, to the maximum extent
+    permitted by law.
+  </p>
+
+  <h2>5. Limitation of liability</h2>
+  <p>
+    To the maximum extent permitted by law, {{ company_name }} is not liable for indirect,
+    incidental, special, consequential, or lost-profit damages, or for loss of data arising
+    from use of Deskline. Your sole remedy for dissatisfaction is to stop using and uninstall the software.
+  </p>
+
+  <h2>6. Acceptable use</h2>
+  <ul>
+    <li>Do not use Deskline to unlawfully intercept communications or invade privacy</li>
+    <li>Do not attempt to bypass local authentication to access another person’s dashboard data</li>
+    <li>Do not use the software for any illegal purpose</li>
+  </ul>
+
+  <h2>7. Support</h2>
+  <p>
+    Support is provided on a best-effort basis via
+    <a href="mailto:{{ support_email }}">{{ support_email }}</a>
+    and project updates on
+    <a href="{{ github_url }}" target="_blank" rel="noopener noreferrer">GitHub</a>.
+  </p>
+
+  <h2>8. Changes</h2>
+  <p>
+    We may update these terms with new Deskline releases. Continued use after an update
+    constitutes acceptance of the revised terms displayed in the app.
+  </p>
+
+  <h2>9. Governing law</h2>
+  <p>
+    These terms are governed by the laws of the {{ legal_jurisdiction }},
+    without regard to conflict-of-law principles, to the extent applicable.
+  </p>
+
+  <h2>10. Contact</h2>
+  <p>
+    {{ company_name }} ·
+    <a href="mailto:{{ support_email }}">{{ support_email }}</a>
+  </p>
+{% endblock %}

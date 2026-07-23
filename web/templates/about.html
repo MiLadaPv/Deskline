@@ -1,0 +1,34 @@
+{% extends "legal_base.html" %}
+{% set active = "about" %}
+{% block title %}About · Deskline{% endblock %}
+{% block content %}
+  <p class="eyebrow">{{ company_name }}</p>
+  <h1>About Deskline</h1>
+  <p class="legal-lede">
+    Deskline is a local Windows productivity tracker. Activity data, screenshots, and settings stay on this computer unless you copy them yourself.
+  </p>
+  <p class="legal-note-ru" lang="ru">
+    Deskline — локальный трекер для Windows. Данные хранятся на этом компьютере.
+  </p>
+
+  <h2>Product</h2>
+  <ul>
+    <li>Version: Deskline v{{ version }}</li>
+    <li>Runs locally at <code>{{ base_url }}</code></li>
+    <li>Optional dashboard password protects the local UI</li>
+  </ul>
+
+  <h2>Company</h2>
+  <ul>
+    <li>{{ company_name }}</li>
+    <li>Jurisdiction: {{ legal_jurisdiction }}</li>
+    <li>Support: <a href="mailto:{{ support_email }}">{{ support_email }}</a></li>
+    <li>GitHub: <a href="{{ github_url }}" target="_blank" rel="noopener noreferrer">{{ github_url }}</a></li>
+  </ul>
+
+  <h2>Documents</h2>
+  <p>
+    <a href="/privacy">Privacy Policy</a> ·
+    <a href="/terms">Terms of Use</a>
+  </p>
+{% endblock %}

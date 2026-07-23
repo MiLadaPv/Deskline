@@ -31,6 +31,7 @@ from deskline.config import (
     PORT,
     ICONS_DIR,
     WEB_ROOT,
+    brand_template_context,
     ensure_screenshots_dir,
     get_screenshots_dir,
     load_config,
@@ -196,7 +197,31 @@ def create_app(tracker: Tracker, db: Database | None = None) -> FastAPI:
         return templates.TemplateResponse(
             request,
             "login.html",
-            {"app_name": APP_NAME, "version": __version__},
+            brand_template_context(),
+        )
+
+    @app.get("/about", response_class=HTMLResponse)
+    def about_page(request: Request) -> HTMLResponse:
+        return templates.TemplateResponse(
+            request,
+            "about.html",
+            brand_template_context(),
+        )
+
+    @app.get("/privacy", response_class=HTMLResponse)
+    def privacy_page(request: Request) -> HTMLResponse:
+        return templates.TemplateResponse(
+            request,
+            "privacy.html",
+            brand_template_context(),
+        )
+
+    @app.get("/terms", response_class=HTMLResponse)
+    def terms_page(request: Request) -> HTMLResponse:
+        return templates.TemplateResponse(
+            request,
+            "terms.html",
+            brand_template_context(),
         )
 
     @app.get("/api/auth/status")
@@ -252,11 +277,7 @@ def create_app(tracker: Tracker, db: Database | None = None) -> FastAPI:
         return templates.TemplateResponse(
             request,
             "index.html",
-            {
-                "app_name": APP_NAME,
-                "version": __version__,
-                "base_url": BASE_URL,
-            },
+            brand_template_context(),
         )
 
     @app.get("/api/health")

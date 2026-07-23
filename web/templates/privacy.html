@@ -1,0 +1,75 @@
+{% extends "legal_base.html" %}
+{% set active = "privacy" %}
+{% block title %}Privacy Policy · Deskline{% endblock %}
+{% block content %}
+  <p class="eyebrow">Legal draft</p>
+  <h1>Privacy Policy</h1>
+  <p class="legal-lede">
+    This draft describes how Deskline handles information on your device.
+    It is a product template, not formal legal advice. Last updated: {{ copyright_year }}.
+  </p>
+
+  <h2>1. Who we are</h2>
+  <p>
+    Deskline is provided by <strong>{{ company_name }}</strong>
+    ({{ legal_jurisdiction }}). Contact:
+    <a href="mailto:{{ support_email }}">{{ support_email }}</a>.
+  </p>
+
+  <h2>2. Local-first product</h2>
+  <p>
+    Deskline is designed to run on your Windows PC. Time tracking records, project/task
+    metadata, configuration, and screenshots are stored locally under your user profile
+    (AppData) on this machine. Deskline does not require an online account to operate.
+  </p>
+
+  <h2>3. What may be collected on this device</h2>
+  <ul>
+    <li>Foreground application names and window titles used for activity classification</li>
+    <li>Optional website hints derived from browser titles</li>
+    <li>Session durations, idle/activity signals, and productivity categories you set</li>
+    <li>Optional screenshots of the screen when that feature is enabled</li>
+    <li>A local dashboard password hash if you set one</li>
+  </ul>
+
+  <h2>4. What we do not do by default</h2>
+  <ul>
+    <li>We do not sell your tracking data</li>
+    <li>We do not upload activity logs or screenshots to {{ company_name }} servers as part of normal operation</li>
+    <li>We do not use advertising trackers inside the local dashboard</li>
+  </ul>
+
+  <h2>5. Screenshots and sensitive content</h2>
+  <p>
+    If screenshots are enabled, images may include anything visible on screen (documents,
+    chats, passwords typed into visible fields, etc.). You control retention and can delete
+    screenshots from the dashboard. Blur and retention settings are available in Settings.
+  </p>
+
+  <h2>6. Security</h2>
+  <p>
+    Access to the local dashboard can be protected with a password stored only on this device.
+    Physical or remote access to your Windows account may expose Deskline data. Keep your OS
+    account secured.
+  </p>
+
+  <h2>7. Third-party services</h2>
+  <p>
+    The dashboard may load fonts or favicon helpers from the network when online. Those
+    requests are not used to sync your activity history. Optional outbound requests (for
+    example favicon lookups) happen from your machine, not from a {{ company_name }} cloud backend.
+  </p>
+
+  <h2>8. Your choices</h2>
+  <ul>
+    <li>Pause tracking, disable screenshots, or clear local data from Settings</li>
+    <li>Contact us at <a href="mailto:{{ support_email }}">{{ support_email }}</a> with privacy questions</li>
+  </ul>
+
+  <h2>9. Governing law</h2>
+  <p>
+    This policy is intended to be interpreted under the laws of the
+    {{ legal_jurisdiction }}, without regard to conflict-of-law rules, to the extent applicable
+    to a local software product.
+  </p>
+{% endblock %}
