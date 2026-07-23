@@ -1,8 +1,8 @@
 ; Deskline Inno Setup script — Tauri shell + PyInstaller backend
 #define MyAppName "Deskline"
-#define MyAppVersion "0.4.0"
-#define MyAppPublisher "Deskline"
-#define MyAppURL "http://127.0.0.1:8787"
+#define MyAppVersion "0.5.2"
+#define MyAppPublisher "AndalusGames"
+#define MyAppURL "https://github.com/AndalusGames"
 #define MyAppExeName "deskline-desktop.exe"
 
 [Setup]
