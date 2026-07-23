@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Deskline · Local focus tracker by {{ company_name }}</title>
+  <meta name="description" content="Deskline — локальный трекер фокуса для Windows. Free навсегда, Pro — скриншоты, история и экспорт. Данные остаются на вашем ПК." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/static/css/app.css?v={{ version }}" />
+</head>
+<body class="welcome-body">
+  <div class="atmosphere" aria-hidden="true"></div>
+  <header class="welcome-top">
+    <a class="brand-lockup welcome-lockup" href="/welcome">
+      {% with anim=true, soft=true, size=44 %}
+        {% include "partials/logo_mark.html" %}
+      {% endwith %}
+      <span class="brand-lockup-name">Deskline</span>
+    </a>
+    <nav class="welcome-nav">
+      <a href="#pricing">Тарифы</a>
+      <a href="/privacy">Privacy</a>
+      <a href="/terms">Terms</a>
+      <a class="btn primary" href="/login">Открыть приложение</a>
+    </nav>
+  </header>
+
+  <main class="welcome-main">
+    <section class="welcome-hero">
+      <p class="eyebrow">by {{ company_name }} · Windows · local-first</p>
+      <h1>Верни контроль над рабочим днём</h1>
+      <p class="welcome-lead">
+        Deskline считает фокус на вашем ПК. Без облака активности, без кейлоггера —
+        понятная картина дня и спокойствие вечером.
+      </p>
+      <div class="welcome-cta">
+        <a class="btn primary" href="/login">Запустить Deskline</a>
+        <a class="btn" href="{{ github_url }}" target="_blank" rel="noopener noreferrer">GitHub / Releases</a>
+      </div>
+      <ul class="welcome-bullets">
+        <li>Трекинг приложений и сайтов локально</li>
+        <li>14 дней Pro trial с первого запуска</li>
+        <li>Free навсегда для базового фокуса</li>
+      </ul>
+    </section>
+
+    <section class="welcome-pricing" id="pricing">
+      <h2>Free и Pro</h2>
+      <p class="welcome-lead">Оплата через Lemon Squeezy (Merchant of Record). Ключ активируется в настройках.</p>
+      <div class="pricing-grid">
+        <article class="price-card">
+          <h3>Free</h3>
+          <p class="price-amount">$0</p>
+          <ul>
+            <li>Трекинг и отчёты за день</li>
+            <li>История 14 дней</li>
+            <li>До 3 проектов</li>
+            <li>Пароль дашборда, tray, мини-трекер</li>
+            <li>Без скриншотов и экспорта</li>
+          </ul>
+          <a class="btn" href="/login">Начать бесплатно</a>
+        </article>
+        <article class="price-card price-card-pro">
+          <h3>Pro</h3>
+          <p class="price-amount">Annual / Lifetime</p>
+          <ul>
+            <li>Всё из Free</li>
+            <li>Безлимитная история</li>
+            <li>Скриншоты, blur, retention</li>
+            <li>Неограниченные проекты</li>
+            <li>Экспорт JSON / CSV</li>
+          </ul>
+          <a class="btn primary" href="/login">Активировать в приложении</a>
+          <p class="hint">Team (LAN hub) — следующий SKU после Pro.</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="welcome-faq">
+      <h2>FAQ</h2>
+      <details open>
+        <summary>Это кейлоггер?</summary>
+        <p>Нет. Deskline не читает клавиатуру, буфер обмена и микрофон. Только активное окно и (в Pro) опциональные скриншоты.</p>
+      </details>
+      <details>
+        <summary>Куда уходят данные?</summary>
+        <p>Активность и скриншоты хранятся в %LOCALAPPDATA%\Deskline. В облако для оплаты уходит только проверка лицензии.</p>
+      </details>
+      <details>
+        <summary>Как купить Pro?</summary>
+        <p>Оформите заказ в Lemon Squeezy, вставьте ключ в Настройки → Лицензия. Поддержка: <a href="mailto:{{ support_email }}">{{ support_email }}</a>.</p>
+      </details>
+    </section>
+  </main>
+
+  <footer class="welcome-foot">
+    <p>© {{ copyright_year }} {{ company_name }} · Deskline v{{ version }}</p>
+    <p><a href="/privacy">Privacy</a> · <a href="/terms">Terms</a> · <a href="mailto:{{ support_email }}">{{ support_email }}</a></p>
+  </footer>
+</body>
+</html>

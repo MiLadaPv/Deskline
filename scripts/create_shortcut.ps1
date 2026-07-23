@@ -1,4 +1,4 @@
-﻿#Requires -Version 5.1
+#Requires -Version 5.1
 $ErrorActionPreference = 'Continue'
 
 $InstallRoot = Join-Path $env:LOCALAPPDATA 'Programs\Deskline'
@@ -23,6 +23,7 @@ function New-DesklineShortcut {
     if ($dir -and -not (Test-Path -LiteralPath $dir)) {
       New-Item -ItemType Directory -Path $dir -Force | Out-Null
     }
+    # Remove broken/empty shortcuts so Save can recreate them cleanly
     if (Test-Path -LiteralPath $Path) {
       Remove-Item -LiteralPath $Path -Force -ErrorAction SilentlyContinue
     }
@@ -39,7 +40,7 @@ function New-DesklineShortcut {
       $s.WorkingDirectory = $InstallRoot
       $s.WindowStyle = 7
     }
-    $s.Description = 'Deskline local productivity tracker'
+    $s.Description = 'Deskline — локальный трекер времени'
     if ($Icon -and (Test-Path -LiteralPath $Icon)) {
       $s.IconLocation = "$Icon,0"
     }
@@ -58,21 +59,10 @@ $desktopCandidates = New-Object System.Collections.Generic.List[string]
 foreach ($p in @(
   (Join-Path $env:USERPROFILE 'Desktop'),
   (Join-Path $env:USERPROFILE 'OneDrive\Desktop'),
+  (Join-Path $env:USERPROFILE 'OneDrive\Рабочий стол'),
   [Environment]::GetFolderPath('Desktop')
 )) {
   if ($p -and (Test-Path -LiteralPath $p)) { [void]$desktopCandidates.Add($p) }
-}
-
-# Also pick OneDrive desktop folders with non-ASCII names (e.g. Russian "Рабочий стол")
-$od = Join-Path $env:USERPROFILE 'OneDrive'
-if (Test-Path -LiteralPath $od) {
-  Get-ChildItem -LiteralPath $od -Directory -ErrorAction SilentlyContinue | ForEach-Object {
-    $looksDesktop = $_.Name -match 'Desktop|desk|стол|Стол'
-    $hasDeskline = Test-Path -LiteralPath (Join-Path $_.FullName 'Deskline.lnk')
-    if ($looksDesktop -or $hasDeskline) {
-      [void]$desktopCandidates.Add($_.FullName)
-    }
-  }
 }
 
 $desktopCandidates = $desktopCandidates | Select-Object -Unique
@@ -85,7 +75,7 @@ foreach ($desktop in $desktopCandidates) {
 
 $startMenu = Join-Path $env:APPDATA 'Microsoft\Windows\Start Menu\Programs'
 New-Item -ItemType Directory -Path $startMenu -Force | Out-Null
-[void](New-DesklineShortcut -Path (Join-Path $startMenu 'Deskline.lnk') -Icon $icon)
+New-DesklineShortcut -Path (Join-Path $startMenu 'Deskline.lnk') -Icon $icon | Out-Null
 
 if (-not $ok) {
   Write-Warning 'Desktop shortcut was not created. Use Start Menu -> Deskline.'

@@ -16,6 +16,16 @@ from deskline.power import DEFAULT_SLEEP_GAP_SEC, is_sleep_gap
 from deskline.windows import get_active_window
 
 
+def _shots_allowed(cfg: dict) -> bool:
+    try:
+        from deskline.entitlements import resolve_entitlements
+        from deskline.license_store import load_license
+
+        return resolve_entitlements(cfg, load_license()).screenshots
+    except Exception:
+        return False
+
+
 class Tracker:
     def __init__(self, db: Database | None = None) -> None:
         self.db = db or Database()
@@ -294,7 +304,11 @@ class Tracker:
                 self._distracting_since = (
                     now if self._current_category == "distracting" else None
                 )
-                if cfg.get("screenshots_enabled") and cfg.get("screenshot_on_app_switch"):
+                if (
+                    _shots_allowed(cfg)
+                    and cfg.get("screenshots_enabled")
+                    and cfg.get("screenshot_on_app_switch")
+                ):
                     self._shot_unlocked("app_switch")
                     self._last_screenshot_at = now
             else:
@@ -305,7 +319,8 @@ class Tracker:
                     self._distracting_since = None
 
                 if (
-                    cfg.get("screenshots_enabled")
+                    _shots_allowed(cfg)
+                    and cfg.get("screenshots_enabled")
                     and self._current_session_id
                     and not self._idle
                     and (now - self._last_screenshot_at)

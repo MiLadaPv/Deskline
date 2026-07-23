@@ -1,9 +1,10 @@
 ; Deskline Inno Setup script — produces a normal Windows Setup.exe
 #define MyAppName "Deskline"
-#define MyAppVersion "0.1.0"
-#define MyAppPublisher "Deskline"
-#define MyAppURL "http://127.0.0.1:8787"
+#define MyAppVersion "0.5.0"
+#define MyAppPublisher "AndalusGames"
+#define MyAppURL "https://github.com/AndalusGames"
 #define MyAppExeName "Deskline.exe"
+#define MySupportURL "mailto:milanochka.llc@gmail.com"
 
 [Setup]
 AppId={{8F3C2A91-6D4E-4B17-9C2A-DESKLINE0001}
@@ -11,6 +12,7 @@ AppName={#MyAppName}
 AppVersion={#MyAppVersion}
 AppPublisher={#MyAppPublisher}
 AppPublisherURL={#MyAppURL}
+AppSupportURL={#MySupportURL}
 DefaultDirName={autopf}\{#MyAppName}
 DefaultGroupName={#MyAppName}
 DisableProgramGroupPage=yes
@@ -24,8 +26,8 @@ PrivilegesRequired=lowest
 PrivilegesRequiredOverridesAllowed=dialog
 ArchitecturesInstallIn64BitMode=x64compatible
 UninstallDisplayIcon={app}\{#MyAppExeName}
+LicenseFile=LICENSE.txt
 InfoBeforeFile=
-LicenseFile=
 
 [Languages]
 Name: "english"; MessagesFile: "compiler:Default.isl"

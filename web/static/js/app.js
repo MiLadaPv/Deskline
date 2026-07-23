@@ -46,6 +46,8 @@ let lastStatusKey = "";
 let lastBarsKey = "";
 /** @type {string} YYYY-MM-DD — always defaults to today */
 let selectedDayIso = "";
+/** @type {any} */
+let currentEntitlements = null;
 
 function localDayIso(d = new Date()) {
   const y = d.getFullYear();
@@ -60,6 +62,11 @@ function ensureSelectedDay() {
     selectedDayIso = today;
   }
   if (selectedDayIso > today) selectedDayIso = today;
+  const hist = currentEntitlements?.history_days;
+  if (hist) {
+    const oldest = shiftDayIso(today, -(hist - 1));
+    if (selectedDayIso < oldest) selectedDayIso = oldest;
+  }
   return selectedDayIso;
 }
 
@@ -151,17 +158,76 @@ async function api(path, opts = {}) {
   if (!res.ok) {
     const raw = await res.text();
     let message = raw || res.statusText || "Request failed";
+    let detail = null;
     try {
       const parsed = JSON.parse(raw);
-      if (parsed && typeof parsed.detail === "string") message = parsed.detail;
-      else if (parsed && Array.isArray(parsed.detail)) {
-        message = parsed.detail.map((d) => d.msg || JSON.stringify(d)).join("; ");
+      detail = parsed?.detail ?? parsed;
+      if (typeof detail === "string") message = detail;
+      else if (detail && typeof detail.message === "string") message = detail.message;
+      else if (Array.isArray(detail)) {
+        message = detail.map((d) => d.msg || JSON.stringify(d)).join("; ");
       }
     } catch (_) {}
+    if (res.status === 402) {
+      if (detail?.entitlements) applyEntitlements(detail.entitlements);
+      showPaywall(message);
+    }
     throw new Error(message);
   }
   if (res.status === 204) return null;
   return res.json();
+}
+
+function applyEntitlements(ent) {
+  if (!ent) return;
+  currentEntitlements = ent;
+  const chip = document.getElementById("planChip");
+  if (chip) chip.textContent = ent.label || ent.tier || "Free";
+  const badge = document.getElementById("planBadge");
+  if (badge) badge.textContent = `${ent.label || "Free"} · ${ent.status_detail || ""}`;
+  const detail = document.getElementById("planDetail");
+  if (detail) {
+    detail.textContent = ent.license_key_masked
+      ? `Ключ: ${ent.license_key_masked}`
+      : ent.trial_ends_at
+        ? `Trial до ${ent.trial_ends_at.slice(0, 10)}`
+        : "Без активного ключа";
+  }
+  const annual = document.getElementById("checkoutAnnual");
+  if (annual && ent.checkout?.annual) annual.href = ent.checkout.annual;
+  const companyToggle = document.getElementById("companyModeToggle");
+  if (companyToggle) {
+    companyToggle.disabled = !ent.company_hub;
+  }
+  const shotsToggle = document.querySelector('input[name="screenshots_enabled"]');
+  if (shotsToggle) shotsToggle.disabled = !ent.screenshots;
+  const teamHint = document.getElementById("teamUpsellHint");
+  if (teamHint) teamHint.hidden = !!ent.company_hub;
+  ensureSelectedDay();
+}
+
+function showPaywall(message) {
+  const modal = document.getElementById("paywallModal");
+  const msg = document.getElementById("paywallMessage");
+  if (msg) msg.textContent = message || "Доступно в Deskline Pro";
+  if (modal) modal.hidden = false;
+}
+
+async function refreshLicenseStatus() {
+  try {
+    const st = await api("/api/license/status");
+    applyEntitlements(st.entitlements);
+    return st;
+  } catch (_) {
+    return null;
+  }
+}
+
+async function maybeShowOnboarding() {
+  const st = await refreshLicenseStatus();
+  if (!st || st.onboarding_done) return;
+  const modal = document.getElementById("onboardModal");
+  if (modal) modal.hidden = false;
 }
 
 function setActiveTab(name, { syncHash = true } = {}) {
@@ -1773,6 +1839,7 @@ async function loadSettings() {
   updateStorageHint(cfg);
   const workToggle = document.getElementById("workModeToggle");
   if (workToggle) workToggle.checked = !!cfg.work_mode;
+  if (cfg.entitlements) applyEntitlements(cfg.entitlements);
 }
 
 function updateCompanyUiVisibility() {
@@ -2565,6 +2632,72 @@ function wireUi() {
     await refreshShots();
     await loadSettings();
   });
+
+  document.getElementById("licenseActivateBtn")?.addEventListener("click", async () => {
+    const key = document.getElementById("licenseKeyInput")?.value || "";
+    try {
+      const res = await api("/api/license/activate", {
+        method: "POST",
+        body: JSON.stringify({ key }),
+      });
+      applyEntitlements(res.entitlements);
+      showToast("Лицензия активирована", "ok");
+      await loadSettings();
+    } catch (e) {
+      showToast(e.message || "Не удалось активировать", "error");
+    }
+  });
+
+  document.getElementById("licenseDeactivateBtn")?.addEventListener("click", async () => {
+    if (!confirm("Снять локальный ключ? Лимиты Free применятся сразу (если trial истёк).")) return;
+    const res = await api("/api/license/deactivate", { method: "POST", body: "{}" });
+    applyEntitlements(res.entitlements);
+    showToast("Ключ снят", "ok");
+  });
+
+  const downloadExport = async (path, filename) => {
+    try {
+      const res = await fetch(path);
+      if (res.status === 402) {
+        const raw = await res.text();
+        let message = "Нужен Pro";
+        try {
+          const parsed = JSON.parse(raw);
+          message = parsed?.detail?.message || message;
+          if (parsed?.detail?.entitlements) applyEntitlements(parsed.detail.entitlements);
+        } catch (_) {}
+        showPaywall(message);
+        return;
+      }
+      if (!res.ok) throw new Error("export failed");
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      showToast(e.message || "Экспорт не удался", "error");
+    }
+  };
+  document.getElementById("exportJsonBtn")?.addEventListener("click", () => {
+    downloadExport("/api/export/json", "deskline-export.json");
+  });
+  document.getElementById("exportCsvBtn")?.addEventListener("click", () => {
+    downloadExport("/api/export/csv", "deskline-trends.csv");
+  });
+
+  document.getElementById("onboardDoneBtn")?.addEventListener("click", async () => {
+    await api("/api/onboarding/complete", { method: "POST", body: JSON.stringify({ done: true }) });
+    const modal = document.getElementById("onboardModal");
+    if (modal) modal.hidden = true;
+  });
+
+  document.getElementById("paywallCloseBtn")?.addEventListener("click", () => {
+    const modal = document.getElementById("paywallModal");
+    if (modal) modal.hidden = true;
+  });
 }
 
 async function boot() {
@@ -2578,6 +2711,7 @@ async function boot() {
     splash.classList.add("is-done");
   }
   wireUi();
+  await maybeShowOnboarding().catch(() => {});
   ensureSelectedDay();
   await refreshCompanyPanel().catch(() => {});
   const hashTab = (location.hash || "").replace(/^#/, "");

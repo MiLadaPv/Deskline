@@ -18,7 +18,7 @@ def test_smoke_init(tmp_path: Path, monkeypatch):
     assert (data / "screenshots").is_dir()
 
     cfg = load_config()
-    assert cfg["screenshots_enabled"] is True
+    assert cfg["screenshots_enabled"] is False
     assert cfg["screenshot_retention_days"] == 7
     assert cfg["idle_after_sec"] == 180.0
     cfg["paused"] = True

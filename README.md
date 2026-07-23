@@ -1,82 +1,43 @@
 # Deskline
 
-Local-first Windows productivity tracker. Your activity stays on your PC — no cloud, no Telegram, no hidden agents.
+Local-first Windows productivity tracker by **AndalusGames**. Activity stays on your PC.
 
-## What it does
+## Plans
 
-- Tracks which apps you use and for how long
-- Infers sites from browser window titles
-- Optional screenshots (interval + app switch)
-- Daily focus report on a local dashboard
-- System tray: **Recording** / **Paused**
+| | **Free** | **Pro** |
+|--|----------|---------|
+| Tracking, focus reports, tray | Yes | Yes |
+| History | 14 days | Unlimited |
+| Projects | Up to 3 | Unlimited |
+| Screenshots | No | Yes |
+| Export JSON/CSV | No | Yes |
+| Company LAN hub | Later (**Team**) | Later (**Team**) |
 
-## Desktop app (default)
+14-day **Pro trial** starts on first launch. Buy via Lemon Squeezy and paste the license key in Settings. See [docs/LEMON_SQUEEZY.md](docs/LEMON_SQUEEZY.md).
 
-Deskline’s UI is a local dashboard. The **normal launch** opens it in a **native Windows window** (Tauri), not in Chrome/Edge.
+## Desktop app
 
 ```bat
 Deskline.bat
 ```
 
-Or:
+Or: `powershell -ExecutionPolicy Bypass -File scripts\run_desktop.ps1`
 
-```bat
-powershell -ExecutionPolicy Bypass -File scripts\run_desktop.ps1
-```
-
-First run may compile the desktop shell (`npm` + Rust). After `npm run build` in `deskline-desktop`, double-click uses the built `.exe` (faster).
-
-Tracker still runs in Python on `127.0.0.1:8787`. Tray “Open dashboard” can open the browser if you need it.
-
-Release build (NSIS/MSI):
-
-```bat
-cd /d D:\Projects\Deskline\deskline-desktop
-npm run build
-```
-
-Details: [deskline-desktop/README.md](deskline-desktop/README.md)
+Dashboard: http://127.0.0.1:8787 · Marketing: http://127.0.0.1:8787/welcome
 
 ## Privacy
 
-- Data directory: `%LOCALAPPDATA%\Deskline`
-- Dashboard binds to `127.0.0.1:8787` only
-- Autostart is off by default and uses a normal Run key named `Deskline`
+- Data: `%LOCALAPPDATA%\Deskline`
+- No activity cloud sync; license validation only when activating Pro
+- Autostart off by default (`Deskline` Run key)
 
-## Install (normal Windows installer)
-
-Run this file:
-
-**`D:\Projects\Deskline\release\DesklineSetup-0.1.0.exe`**
-
-It installs like a regular Windows program (wizard, Start Menu, desktop shortcut, uninstall from Settings).
-
-To rebuild the installer later:
+## Installer
 
 ```bat
 build_installer.bat
 ```
 
-## Alternative: script install (developers)
-
-Double-click **`install.bat`** if you prefer the Python/venv installer.
-
-## Run without installer
-
-```bat
-cd /d D:\Projects\Deskline
-python -m pip install -r requirements.txt
-Deskline.bat
-```
-
-Or: `start.bat` / `python -m deskline`
-
-Dashboard: http://127.0.0.1:8787
-
-## Controls
-
-- Tray menu: Open dashboard / Pause / Resume / Quit
-- Dashboard Settings: screenshot interval, autostart, clear local data
+Produces `release\DesklineSetup-0.5.0.exe` (publisher AndalusGames). Sign before public release: [docs/SIGNING.md](docs/SIGNING.md). Publish checklist: [docs/PUBLISH_CHECKLIST.md](docs/PUBLISH_CHECKLIST.md).
 
 ## Develop / test
 
@@ -88,4 +49,4 @@ python -m pytest -q
 
 - Browser extension (later)
 - Keylogging / clipboard / mic
-- Remote sync or stealth persistence
+- Stealth remote sync

@@ -357,7 +357,31 @@
         </label>
         <p class="hint settings-hint">Компактное окно с текущей задачей и временем записи (как в Time Doctor). Можно закрыть — снова включите здесь или из трея.</p>
 
+        <h3 class="subhead">Тариф и лицензия</h3>
+        <div class="license-box" id="licenseBox">
+          <p class="plan-badge" id="planBadge">…</p>
+          <p class="hint" id="planDetail"></p>
+          <label>
+            Ключ Pro / Team
+            <input type="text" id="licenseKeyInput" placeholder="XXXX-XXXX-XXXX" autocomplete="off" spellcheck="false" />
+          </label>
+          <div class="inline-actions">
+            <button type="button" class="btn primary" id="licenseActivateBtn">Активировать</button>
+            <button type="button" class="btn" id="licenseDeactivateBtn">Снять ключ</button>
+            <a class="btn" id="checkoutAnnual" href="/welcome#pricing" target="_blank" rel="noopener">Купить Pro</a>
+          </div>
+          <p class="hint">Оплата через Lemon Squeezy. После покупки вставьте ключ сюда. Trial Pro — 14 дней с первого запуска.</p>
+        </div>
+
+        <h3 class="subhead">Данные</h3>
+        <div class="inline-actions">
+          <button type="button" class="btn" id="exportJsonBtn">Экспорт JSON (Pro)</button>
+          <button type="button" class="btn" id="exportCsvBtn">Экспорт CSV (Pro)</button>
+        </div>
+        <p class="hint">Экспорт — Pro. Очистка данных — внизу страницы настроек.</p>
+
         <h3 class="subhead">Компания (LAN hub)</h3>
+        <p class="hint" id="teamUpsellHint">Режим компании входит в будущий тариф Team. На Free/Pro кнопка ниже заблокирована.</p>
         <label class="check">
           <input type="checkbox" name="company_mode" id="companyModeToggle" />
           Режим компании — принимать данные сотрудников по сети
@@ -431,11 +455,37 @@
 
   <div class="toast-region" id="toastRegion" aria-live="polite" aria-atomic="true"></div>
 
+  <div class="onboard-modal" id="onboardModal" hidden>
+    <div class="onboard-card" role="dialog" aria-labelledby="onboardTitle">
+      <h2 id="onboardTitle">Добро пожаловать в Deskline</h2>
+      <ol class="onboard-steps">
+        <li>Данные остаются на этом ПК (%LOCALAPPDATA%\Deskline).</li>
+        <li>14 дней Pro trial: скриншоты, полная история, экспорт.</li>
+        <li>Потом Free навсегда или ключ Pro из Lemon Squeezy.</li>
+      </ol>
+      <p class="hint">Это не кейлоггер. Пауза — в трее. Privacy: <a href="/privacy">/privacy</a>.</p>
+      <button type="button" class="btn primary" id="onboardDoneBtn">Понятно, начать</button>
+    </div>
+  </div>
+
+  <div class="paywall-modal" id="paywallModal" hidden>
+    <div class="onboard-card" role="dialog" aria-labelledby="paywallTitle">
+      <h2 id="paywallTitle">Нужен Deskline Pro</h2>
+      <p id="paywallMessage">Эта функция доступна в Pro.</p>
+      <div class="inline-actions">
+        <a class="btn primary" href="/welcome#pricing" target="_blank" rel="noopener">Тарифы</a>
+        <button type="button" class="btn" id="paywallCloseBtn">Закрыть</button>
+      </div>
+    </div>
+  </div>
+
   <footer class="foot">
     <div class="foot-brand">
       <span id="appVersion">Deskline v{{ version }}</span>
+      <span class="plan-chip" id="planChip">Free</span>
       <span class="foot-copy">© {{ copyright_year }} {{ company_name }}</span>
       <nav class="foot-links" aria-label="О компании">
+        <a href="/welcome">Тарифы</a>
         <a href="/about">О программе</a>
         <a href="/privacy">Конфиденциальность</a>
         <a href="/terms">Условия</a>

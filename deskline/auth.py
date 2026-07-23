@@ -193,6 +193,7 @@ def is_public_path(path: str) -> bool:
         return True
     if path in {
         "/login",
+        "/welcome",
         "/about",
         "/privacy",
         "/terms",
@@ -201,6 +202,7 @@ def is_public_path(path: str) -> bool:
         "/api/auth/login",
         "/api/auth/setup",
         "/api/auth/recover",
+        "/api/license/status",
         "/favicon.ico",
     }:
         return True

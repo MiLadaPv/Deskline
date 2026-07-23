@@ -15,7 +15,7 @@ from deskline.db import Database
 
 def main() -> int:
     print("version", __version__)
-    if not __version__.startswith("0.4."):
+    if not (__version__.startswith("0.4.") or __version__.startswith("0.5.")):
         print("unexpected version", __version__, file=sys.stderr)
         return 1
     db = Database(DB_PATH)

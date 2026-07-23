@@ -50,7 +50,7 @@ DEFAULT_CONFIG: dict[str, Any] = {
     "blur_screenshots": False,
     "screenshot_interval_sec": 300,
     "screenshot_on_app_switch": True,
-    "screenshots_enabled": True,
+    "screenshots_enabled": False,
     "screenshot_retention_days": 7,
     # Empty = default under AppData\Local\Deskline\screenshots
     "screenshots_dir": "",
@@ -73,6 +73,9 @@ DEFAULT_CONFIG: dict[str, Any] = {
     # Agent → hub push (member PC)
     "hub_url": "",
     "hub_ingest_token": "",
+    # Freemium / trial
+    "first_run_at": "",
+    "onboarding_done": False,
 }
 
 

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import webbrowser
 from datetime import date, datetime, timedelta
 from pathlib import Path
@@ -43,6 +44,14 @@ from deskline.config import (
     save_config,
 )
 from deskline.db import Database, ProjectNameExists, parse_iso_datetime
+from deskline.entitlements import (
+    FREE_HISTORY_DAYS,
+    FREE_MAX_PROJECTS,
+    ensure_first_run,
+    entitlements_public_dict,
+    resolve_entitlements,
+)
+from deskline.license_client import activate_license, current_license, deactivate_local
 from deskline.tracker import Tracker
 
 
@@ -106,6 +115,14 @@ class IngestSessionItem(BaseModel):
 class IngestBody(BaseModel):
     hostname: str | None = Field(default=None, max_length=120)
     sessions: list[IngestSessionItem] = Field(default_factory=list, max_length=500)
+
+
+class LicenseActivateBody(BaseModel):
+    key: str = Field(min_length=4, max_length=200)
+
+
+class OnboardingBody(BaseModel):
+    done: bool = True
 
 
 def _validate_screenshots_dir(raw: str) -> str:
@@ -222,6 +239,59 @@ class AuthMiddleware(BaseHTTPMiddleware):
         return await call_next(request)
 
 
+def _load_entitlements():
+    cfg = load_config()
+    stamped = ensure_first_run(cfg)
+    if stamped.get("first_run_at") != cfg.get("first_run_at"):
+        cfg = save_config(stamped)
+    return resolve_entitlements(cfg, current_license()), cfg
+
+
+def _pro_required(feature: str) -> None:
+    ent, _ = _load_entitlements()
+    if ent.is_pro:
+        return
+    raise HTTPException(
+        status_code=402,
+        detail={
+            "code": "pro_required",
+            "feature": feature,
+            "message": "Доступно в Deskline Pro",
+            "entitlements": entitlements_public_dict(ent),
+        },
+    )
+
+
+def _team_required(feature: str) -> None:
+    ent, _ = _load_entitlements()
+    if ent.is_team:
+        return
+    raise HTTPException(
+        status_code=402,
+        detail={
+            "code": "team_required",
+            "feature": feature,
+            "message": "Режим компании будет в Deskline Team",
+            "entitlements": entitlements_public_dict(ent),
+        },
+    )
+
+
+def _assert_day_allowed(day: date) -> None:
+    ent, _ = _load_entitlements()
+    if ent.day_allowed(day):
+        return
+    raise HTTPException(
+        status_code=402,
+        detail={
+            "code": "history_limit",
+            "feature": "history",
+            "message": f"На Free доступны последние {FREE_HISTORY_DAYS} дней",
+            "entitlements": entitlements_public_dict(ent),
+        },
+    )
+
+
 def create_app(tracker: Tracker, db: Database | None = None) -> FastAPI:
     db = db or tracker.db
     app = FastAPI(title=APP_NAME, version=__version__)
@@ -252,6 +322,14 @@ def create_app(tracker: Tracker, db: Database | None = None) -> FastAPI:
         return templates.TemplateResponse(
             request,
             "login.html",
+            brand_template_context(),
+        )
+
+    @app.get("/welcome", response_class=HTMLResponse)
+    def welcome_page(request: Request) -> HTMLResponse:
+        return templates.TemplateResponse(
+            request,
+            "welcome.html",
             brand_template_context(),
         )
 
@@ -370,6 +448,8 @@ def create_app(tracker: Tracker, db: Database | None = None) -> FastAPI:
         st = tracker.status()
         st["version"] = __version__
         st["app"] = APP_NAME
+        ent, _ = _load_entitlements()
+        st["entitlements"] = entitlements_public_dict(ent)
         return st
 
     @app.get("/api/summary/today")
@@ -394,6 +474,8 @@ def create_app(tracker: Tracker, db: Database | None = None) -> FastAPI:
         employee_id: int | None = None,
     ) -> dict[str, Any]:
         start, end = _range(from_ts, to)
+        _assert_day_allowed(start.date())
+        _assert_day_allowed(end.date())
         return db.summary_range(
             start, end, project_id=project_id, task_id=task_id, employee_id=employee_id
         )
@@ -405,7 +487,9 @@ def create_app(tracker: Tracker, db: Database | None = None) -> FastAPI:
         task_id: int | None = None,
         employee_id: int | None = None,
     ) -> list[dict[str, Any]]:
-        days = max(1, min(int(days), 31))
+        ent, _ = _load_entitlements()
+        max_days = ent.history_days or 31
+        days = max(1, min(int(days), min(31, max_days)))
         return db.daily_trends(
             days=days, project_id=project_id, task_id=task_id, employee_id=employee_id
         )
@@ -425,6 +509,7 @@ def create_app(tracker: Tracker, db: Database | None = None) -> FastAPI:
             target = date.fromisoformat(day)
         except ValueError as exc:
             raise HTTPException(400, "Invalid day; use YYYY-MM-DD") from exc
+        _assert_day_allowed(target)
         return db.timeline_for_day(target, employee_id=employee_id)
 
     @app.get("/api/projects")
@@ -433,6 +518,19 @@ def create_app(tracker: Tracker, db: Database | None = None) -> FastAPI:
 
     @app.post("/api/projects")
     def create_project(body: ProjectCreate) -> dict[str, Any]:
+        ent, _ = _load_entitlements()
+        if ent.max_projects is not None:
+            active = [p for p in db.list_projects(include_archived=False) if not p.get("archived")]
+            if len(active) >= ent.max_projects:
+                raise HTTPException(
+                    status_code=402,
+                    detail={
+                        "code": "project_limit",
+                        "feature": "projects",
+                        "message": f"На Free — до {FREE_MAX_PROJECTS} проектов. Оформите Pro.",
+                        "entitlements": entitlements_public_dict(ent),
+                    },
+                )
         try:
             return db.create_project(body.name, body.color)
         except ProjectNameExists as exc:
@@ -503,6 +601,7 @@ def create_app(tracker: Tracker, db: Database | None = None) -> FastAPI:
         task_id: int | None = None,
     ) -> list[dict[str, Any]]:
         start, end = _range(from_ts, to)
+        _assert_day_allowed(start.date())
         return db.apps_range(start, end, project_id=project_id, task_id=task_id)
 
     @app.get("/api/sites")
@@ -513,6 +612,7 @@ def create_app(tracker: Tracker, db: Database | None = None) -> FastAPI:
         task_id: int | None = None,
     ) -> list[dict[str, Any]]:
         start, end = _range(from_ts, to)
+        _assert_day_allowed(start.date())
         return db.sites_range(start, end, project_id=project_id, task_id=task_id)
 
     @app.get("/api/activities")
@@ -527,7 +627,9 @@ def create_app(tracker: Tracker, db: Database | None = None) -> FastAPI:
 
     @app.get("/api/screenshots")
     def screenshots(day: str | None = None) -> list[dict[str, Any]]:
+        _pro_required("screenshots")
         d = date.fromisoformat(day) if day else date.today()
+        _assert_day_allowed(d)
         rows = db.screenshots_for_date(d)
         for row in rows:
             p = Path(row["path"])
@@ -581,21 +683,42 @@ def create_app(tracker: Tracker, db: Database | None = None) -> FastAPI:
 
     @app.get("/api/settings")
     def get_settings() -> dict[str, Any]:
-        cfg = load_config()
+        ent, cfg = _load_entitlements()
         storage = screenshots_storage_info()
         return {
             **cfg,
             "screenshots_path": storage["path"],
             "screenshots_storage": storage,
             "screenshots_dir_effective": str(get_screenshots_dir(cfg)),
+            "entitlements": entitlements_public_dict(ent),
         }
 
     @app.put("/api/settings")
     def put_settings(body: SettingsUpdate) -> dict[str, Any]:
-        cfg = load_config()
+        ent, cfg = _load_entitlements()
         data = body.model_dump(exclude_none=True)
         if "screenshots_dir" in data:
             data["screenshots_dir"] = _validate_screenshots_dir(str(data["screenshots_dir"]))
+        if data.get("screenshots_enabled") and not ent.screenshots:
+            raise HTTPException(
+                status_code=402,
+                detail={
+                    "code": "pro_required",
+                    "feature": "screenshots",
+                    "message": "Скриншоты доступны в Pro / trial",
+                    "entitlements": entitlements_public_dict(ent),
+                },
+            )
+        if data.get("company_mode") and not ent.company_hub:
+            raise HTTPException(
+                status_code=402,
+                detail={
+                    "code": "team_required",
+                    "feature": "company_hub",
+                    "message": "LAN hub будет в Deskline Team",
+                    "entitlements": entitlements_public_dict(ent),
+                },
+            )
         if "company_mode" in data:
             if data["company_mode"]:
                 data.setdefault("listen_host", "0.0.0.0")
@@ -618,17 +741,19 @@ def create_app(tracker: Tracker, db: Database | None = None) -> FastAPI:
         if "autostart" in data:
             _set_autostart(bool(saved.get("autostart")))
         storage = screenshots_storage_info()
+        ent2, _ = _load_entitlements()
         return {
             **saved,
             "screenshots_path": storage["path"],
             "screenshots_storage": storage,
             "screenshots_dir_effective": str(get_screenshots_dir(saved)),
             "restart_required_for_bind": True,
+            "entitlements": entitlements_public_dict(ent2),
         }
 
     @app.get("/api/company")
     def company_status() -> dict[str, Any]:
-        cfg = load_config()
+        ent, cfg = _load_entitlements()
         employees = db.list_employees()
         return {
             "company_mode": bool(cfg.get("company_mode")),
@@ -640,6 +765,8 @@ def create_app(tracker: Tracker, db: Database | None = None) -> FastAPI:
             "devices": db.list_devices(),
             "hub_url": cfg.get("hub_url") or "",
             "has_hub_token": bool(str(cfg.get("hub_ingest_token") or "").strip()),
+            "entitlements": entitlements_public_dict(ent),
+            "team_locked": not ent.company_hub,
         }
 
     @app.get("/api/company/team")
@@ -649,6 +776,7 @@ def create_app(tracker: Tracker, db: Database | None = None) -> FastAPI:
         project_id: int | None = None,
         task_id: int | None = None,
     ) -> list[dict[str, Any]]:
+        _team_required("company_hub")
         start, end = _range(from_ts, to)
         return db.team_summary(start, end, project_id=project_id, task_id=task_id)
 
@@ -659,6 +787,7 @@ def create_app(tracker: Tracker, db: Database | None = None) -> FastAPI:
         project_id: int | None = None,
         task_id: int | None = None,
     ) -> dict[str, Any]:
+        _team_required("company_hub")
         start, end = _range(from_ts, to)
         summary = db.summary_range(start, end, project_id=project_id, task_id=task_id)
         summary["team"] = db.team_summary(start, end, project_id=project_id, task_id=task_id)
@@ -666,10 +795,12 @@ def create_app(tracker: Tracker, db: Database | None = None) -> FastAPI:
 
     @app.post("/api/company/employees")
     def company_create_employee(body: EmployeeCreate) -> dict[str, Any]:
+        _team_required("company_hub")
         return db.create_employee(body.display_name, role=body.role)
 
     @app.put("/api/company/employees/{employee_id}")
     def company_update_employee(employee_id: int, body: EmployeeUpdate) -> dict[str, Any]:
+        _team_required("company_hub")
         row = db.update_employee(
             employee_id,
             display_name=body.display_name,
@@ -682,6 +813,7 @@ def create_app(tracker: Tracker, db: Database | None = None) -> FastAPI:
 
     @app.post("/api/company/employees/{employee_id}/token")
     def company_rotate_token(employee_id: int) -> dict[str, Any]:
+        _team_required("company_hub")
         row = db.rotate_employee_token(employee_id)
         if not row:
             raise HTTPException(404, "Employee not found")
@@ -708,9 +840,94 @@ def create_app(tracker: Tracker, db: Database | None = None) -> FastAPI:
 
     @app.post("/api/screenshots/purge")
     def purge_screenshots() -> dict[str, Any]:
+        _pro_required("screenshots")
         result = tracker.purge_old_screenshots()
         storage = screenshots_storage_info()
         return {**result, "screenshots_storage": storage}
+
+    @app.get("/api/license/status")
+    def license_status() -> dict[str, Any]:
+        ent, cfg = _load_entitlements()
+        return {
+            "entitlements": entitlements_public_dict(ent),
+            "onboarding_done": bool(cfg.get("onboarding_done")),
+            "first_run_at": cfg.get("first_run_at") or "",
+            "version": __version__,
+        }
+
+    @app.post("/api/license/activate")
+    def license_activate(body: LicenseActivateBody) -> dict[str, Any]:
+        try:
+            activate_license(body.key)
+        except ValueError as exc:
+            raise HTTPException(400, str(exc)) from exc
+        ent, _ = _load_entitlements()
+        return {"ok": True, "entitlements": entitlements_public_dict(ent)}
+
+    @app.post("/api/license/deactivate")
+    def license_deactivate() -> dict[str, Any]:
+        deactivate_local()
+        ent, _ = _load_entitlements()
+        return {"ok": True, "entitlements": entitlements_public_dict(ent)}
+
+    @app.post("/api/onboarding/complete")
+    def onboarding_complete(body: OnboardingBody) -> dict[str, Any]:
+        cfg = load_config()
+        cfg = ensure_first_run(cfg)
+        cfg["onboarding_done"] = bool(body.done)
+        save_config(cfg)
+        return {"ok": True, "onboarding_done": True}
+
+    @app.get("/api/export/json")
+    def export_json() -> Response:
+        _pro_required("export")
+        payload = {
+            "app": APP_NAME,
+            "version": __version__,
+            "exported_at": datetime.now().astimezone().isoformat(),
+            "config": {k: v for k, v in load_config().items() if k not in {"hub_ingest_token"}},
+            "projects": db.list_projects(include_archived=True),
+            "tasks": db.list_tasks(None),
+            "trends": db.daily_trends(days=31),
+        }
+        raw = json.dumps(payload, ensure_ascii=False, indent=2)
+        return Response(
+            content=raw,
+            media_type="application/json",
+            headers={"Content-Disposition": 'attachment; filename="deskline-export.json"'},
+        )
+
+    @app.get("/api/export/csv")
+    def export_csv() -> Response:
+        _pro_required("export")
+        import csv
+        import io
+
+        rows = db.daily_trends(days=31)
+        buf = io.StringIO()
+        writer = csv.writer(buf)
+        writer.writerow(
+            ["day", "total_sec", "active_sec", "idle_sec", "focus_pct", "productive_sec", "neutral_sec", "distracting_sec"]
+        )
+        for r in rows:
+            cats = r.get("by_category") or {}
+            writer.writerow(
+                [
+                    r.get("day"),
+                    int(r.get("total_sec") or 0),
+                    int(r.get("active_sec") or 0),
+                    int(r.get("idle_sec") or 0),
+                    r.get("focus_pct") or 0,
+                    int(cats.get("productive") or 0),
+                    int(cats.get("neutral") or 0),
+                    int(cats.get("distracting") or 0),
+                ]
+            )
+        return Response(
+            content=buf.getvalue(),
+            media_type="text/csv; charset=utf-8",
+            headers={"Content-Disposition": 'attachment; filename="deskline-trends.csv"'},
+        )
 
     @app.put("/api/rules/{key}")
     def put_rule(key: str, body: RuleUpdate) -> dict[str, str]:

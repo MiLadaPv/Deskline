@@ -1,0 +1,14 @@
+DESKLINE SOFTWARE LICENSE AGREEMENT (EULA)
+
+Copyright (c) AndalusGames. All rights reserved.
+
+By installing or using Deskline you agree to the Terms of Use and Privacy Policy
+shown in the application (/terms and /privacy) and on the product pages of
+AndalusGames.
+
+Deskline is licensed, not sold. You may use the software on devices you control
+for lawful productivity tracking. Redistribution, reverse engineering, or
+misrepresenting Deskline as your own product is prohibited.
+
+THE SOFTWARE IS PROVIDED "AS IS" WITHOUT WARRANTY OF ANY KIND.
+Support: milanochka.llc@gmail.com

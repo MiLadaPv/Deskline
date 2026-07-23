@@ -57,7 +57,11 @@ def test_default_employee_and_backfill(tmp_path: Path, monkeypatch):
 
 
 def test_team_summary_and_ingest(tmp_path: Path, monkeypatch):
+    monkeypatch.setenv("DESKLINE_LICENSE_DEV", "1")
+    monkeypatch.setattr("deskline.license_store.LICENSE_PATH", tmp_path / "license.json")
     client, db = _auth_client(tmp_path, monkeypatch)
+    act = client.post("/api/license/activate", json={"key": "DESKLINE-TEAM-DEV"})
+    assert act.status_code == 200, act.text
     created = client.post(
         "/api/company/employees",
         json={"display_name": "Anna", "role": "member"},
