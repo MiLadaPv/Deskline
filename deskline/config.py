@@ -65,6 +65,14 @@ DEFAULT_CONFIG: dict[str, Any] = {
     "work_chat_keywords": [],
     "current_project_id": None,
     "current_task_id": None,
+    # Company / LAN hub
+    "company_mode": False,
+    "company_display_name": "",
+    "listen_host": "127.0.0.1",
+    "local_employee_id": None,
+    # Agent → hub push (member PC)
+    "hub_url": "",
+    "hub_ingest_token": "",
 }
 
 

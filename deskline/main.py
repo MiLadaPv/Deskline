@@ -134,6 +134,11 @@ def main(argv: list[str] | None = None) -> int:
 
     ensure_data_dirs()
     purge_placeholder_icons()
+    cfg = load_config()
+    # Prefer config listen_host when CLI still has the default localhost bind.
+    listen_host = args.host
+    if args.host == HOST:
+        listen_host = str(cfg.get("listen_host") or HOST)
     db = Database()
     tracker = Tracker(db)
     tracker.start()
@@ -152,7 +157,7 @@ def main(argv: list[str] | None = None) -> int:
     app = create_app(tracker, db)
     config = uvicorn.Config(
         app,
-        host=args.host,
+        host=listen_host,
         port=args.port,
         log_level="info",
         access_log=False,

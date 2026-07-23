@@ -9,6 +9,7 @@ from deskline.capture import capture_screenshot
 from deskline.classify import extract_site_from_title, normalize_category, resolve_activity
 from deskline.config import load_config, save_config
 from deskline.db import Database, parse_iso_datetime
+from deskline.hub_client import push_sessions_to_hub
 from deskline.idle import is_idle, seconds_since_last_input
 from deskline.notify import ask_still_working, notify, still_working_body
 from deskline.power import DEFAULT_SLEEP_GAP_SEC, is_sleep_gap
@@ -251,6 +252,19 @@ class Tracker:
                     task_id = int(task_id) if task_id is not None else None
                 except (TypeError, ValueError):
                     task_id = None
+                employee_id = cfg.get("local_employee_id")
+                try:
+                    employee_id = int(employee_id) if employee_id is not None else None
+                except (TypeError, ValueError):
+                    employee_id = None
+                if employee_id is None:
+                    employee_id = self.db.ensure_default_employee()
+                    cfg["local_employee_id"] = employee_id
+                    save_config(cfg)
+                import socket
+
+                hostname = socket.gethostname() or "pc"
+                ingest_key = f"{hostname}:local:{int(now * 1000)}"
                 self._current_session_id = self.db.start_session(
                     app_name=win.app_name,
                     window_title=win.window_title,
@@ -262,6 +276,8 @@ class Tracker:
                     app_path=win.app_path,
                     project_id=project_id,
                     task_id=task_id,
+                    employee_id=employee_id,
+                    ingest_key=ingest_key,
                     started_at=datetime.fromtimestamp(now).astimezone(),
                 )
                 self._session_started_at = now
@@ -307,7 +323,9 @@ class Tracker:
         """Close session at last awake moment; reset idle/prompt state. Do not pause."""
         if self._current_session_id is not None:
             ended = datetime.fromtimestamp(prev_tick).astimezone()
-            self.db.end_session(self._current_session_id, ended_at=ended)
+            sid = self._current_session_id
+            self.db.end_session(sid, ended_at=ended)
+            self._push_session_to_hub(sid)
             self._current_session_id = None
         self._session_started_at = None
         # Force a new session on the next focus sample
@@ -388,10 +406,32 @@ class Tracker:
 
     def _close_current_unlocked(self) -> None:
         if self._current_session_id is not None:
-            self.db.end_session(self._current_session_id)
+            sid = self._current_session_id
+            self.db.end_session(sid)
+            self._push_session_to_hub(sid)
         self._current_session_id = None
         self._session_started_at = None
         self._current_key = None
         self._current_label = None
         self._current_app_path = None
         self._distracting_since = None
+
+    def _push_session_to_hub(self, session_id: int) -> None:
+        cfg = load_config()
+        hub_url = str(cfg.get("hub_url") or "").strip()
+        token = str(cfg.get("hub_ingest_token") or "").strip()
+        if not hub_url or not token:
+            return
+        payload = self.db.get_session_payload(session_id)
+        if not payload or not payload.get("ended_at"):
+            return
+        if not payload.get("ingest_key"):
+            import socket
+
+            payload["ingest_key"] = f"{socket.gethostname()}:local:{session_id}"
+        threading.Thread(
+            target=push_sessions_to_hub,
+            args=(hub_url, token, [payload]),
+            daemon=True,
+            name="deskline-hub-push",
+        ).start()

@@ -255,26 +255,104 @@ function renderKpis(summary) {
   const el = document.getElementById("kpiStrip");
   if (!el) return;
   const total = summary.total_sec || 0;
-  const idlePct = total ? Math.round(((summary.idle_sec || 0) / total) * 100) : 0;
-  const unprodPct = total
-    ? Math.round(((summary.by_category?.distracting || 0) / total) * 100)
-    : 0;
+  const by = summary.by_category || {};
+  const productive = by.productive || 0;
+  const distracting = by.distracting || 0;
+  const idle = summary.idle_sec || 0;
+  const active = summary.active_sec || 0;
   const items = [
-    { label: "Всего", value: fmtDur(total), sub: "за день" },
-    { label: "Активно", value: fmtDur(summary.active_sec), sub: `${summary.activity_pct ?? 0}%` },
-    { label: "Без ввода", value: `${idlePct}%`, sub: fmtDur(summary.idle_sec) },
-    { label: "Фокус", value: `${summary.focus_pct ?? 0}%`, sub: fmtDur(summary.focus_sec) },
-    { label: "Отвлечения", value: `${unprodPct}%`, sub: fmtDur(summary.by_category?.distracting || 0) },
+    { label: "Productive time", value: fmtDur(productive), sec: productive, tone: "productive" },
+    { label: "Unproductive time", value: fmtDur(distracting), sec: distracting, tone: "distracting" },
+    { label: "Idle", value: fmtDur(idle), sec: idle, tone: "idle" },
+    { label: "Active", value: fmtDur(active), sec: active, tone: "active" },
+    { label: "Focus", value: `${summary.focus_pct ?? 0}%`, sec: summary.focus_sec || 0, tone: "productive" },
+    { label: "Всего", value: fmtDur(total), sec: total, tone: "neutral" },
   ];
+  const max = Math.max(...items.map((it) => it.sec), 1);
   el.innerHTML = items
-    .map(
-      (it) => `<div class="kpi-card">
+    .map((it) => {
+      const pct = Math.max(2, Math.round((it.sec / max) * 100));
+      return `<div class="kpi-card kpi-metric">
         <span class="kpi-label">${it.label}</span>
         <strong class="kpi-value">${it.value}</strong>
-        <span class="kpi-sub">${it.sub}</span>
-      </div>`
-    )
+        <div class="kpi-mini-bar"><span class="${it.tone}" style="width:${pct}%"></span></div>
+      </div>`;
+    })
     .join("");
+}
+
+function renderTeamGauges(team) {
+  const el = document.getElementById("teamGauges");
+  if (!el) return;
+  const rows = team || [];
+  if (!rows.length) {
+    el.innerHTML = `<p class="hint">Пока нет данных по людям.</p>`;
+    return;
+  }
+  el.innerHTML = rows
+    .map((m) => {
+      const pct = Math.max(0, Math.min(100, Math.round(Number(m.focus_pct) || 0)));
+      const color = m.color || "#1f6b56";
+      const name = escapeHtml(m.display_name || "—");
+      const initials = escapeHtml(m.initials || "?");
+      const c = 2 * Math.PI * 15.9155;
+      const dash = (pct / 100) * c;
+      const selected = String(m.id) === String(filterEmployeeId) ? " is-selected" : "";
+      return `<button type="button" class="team-gauge${selected}" data-employee-id="${m.id}" title="${name}: ${pct}%">
+        <div class="team-gauge-ring" style="--c:${color}">
+          <svg viewBox="0 0 36 36" aria-hidden="true">
+            <circle class="gauge-track" cx="18" cy="18" r="15.9155" fill="none" stroke-width="3"/>
+            <circle class="gauge-value" cx="18" cy="18" r="15.9155" fill="none" stroke="${color}" stroke-width="3"
+              stroke-linecap="round" stroke-dasharray="${dash.toFixed(2)} ${(c - dash).toFixed(2)}" transform="rotate(-90 18 18)"/>
+          </svg>
+          <span class="team-gauge-pct">${pct}%</span>
+        </div>
+        <span class="team-avatar" style="background:${color}">${initials}</span>
+        <span class="team-name">${name}</span>
+      </button>`;
+    })
+    .join("");
+  el.querySelectorAll("[data-employee-id]").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      const id = btn.getAttribute("data-employee-id") || "";
+      filterEmployeeId = filterEmployeeId === id ? "" : id;
+      const sel = document.getElementById("filterEmployeeToday");
+      if (sel) sel.value = filterEmployeeId;
+      lastSummaryKey = "";
+      await refreshSummary();
+    });
+  });
+}
+
+function renderTodayTimelineStrip(rows, summary) {
+  const el = document.getElementById("todayTimelineStrip");
+  const meta = document.getElementById("todayTimelineMeta");
+  if (!el) return;
+  const list = rows || [];
+  if (!list.length) {
+    el.innerHTML = `<p class="hint">Пока нет сессий за сегодня.</p>`;
+    if (meta) meta.textContent = "";
+    return;
+  }
+  const startMs = Math.min(...list.map((r) => new Date(r.started_at).getTime()));
+  const endMs = Math.max(...list.map((r) => new Date(r.ended_at || Date.now()).getTime()));
+  const span = Math.max(endMs - startMs, 1);
+  if (meta) {
+    meta.textContent = `${fmtDur(summary?.total_sec || 0)} · ${fmtClock(new Date(startMs).toISOString())} – ${fmtClock(new Date(endMs).toISOString())}`;
+  }
+  el.innerHTML =
+    `<div class="today-strip-track">` +
+    list
+      .map((r) => {
+        const a = new Date(r.started_at).getTime();
+        const b = new Date(r.ended_at || Date.now()).getTime();
+        const left = ((a - startMs) / span) * 100;
+        const width = Math.max(0.4, ((b - a) / span) * 100);
+        const cat = categoryClass(r.category);
+        return `<span class="today-strip-seg ${cat}" style="left:${left}%;width:${width}%" title="${escapeHtml(r.name || "")}: ${fmtDur(r.sec)}"></span>`;
+      })
+      .join("") +
+    `</div>`;
 }
 
 function renderProdStack(byCategory, total) {
@@ -509,6 +587,8 @@ function renderProdDaysChart(trends) {
     .map((r) => {
       const total = r.total_sec || 0;
       const cats = r.by_category || {};
+      const d = new Date(`${r.day}T12:00:00`);
+      const isWeekend = d.getDay() === 0 || d.getDay() === 6;
       const segs = ["productive", "neutral", "distracting"]
         .map((k) => {
           const sec = cats[k] || 0;
@@ -518,7 +598,7 @@ function renderProdDaysChart(trends) {
             : "";
         })
         .join("");
-      return `<div class="prod-day-col" title="${r.day}: фокус ${r.focus_pct}%">
+      return `<div class="prod-day-col${isWeekend ? " is-weekend" : ""}" title="${r.day}: фокус ${r.focus_pct}%">
         <div class="prod-day-stack">${total ? segs : `<span class="stack-seg empty" style="height:4%"></span>`}</div>
         <span class="hours-label">${weekdayShort(r.day)}</span>
         <span class="hours-val">${Math.round(r.focus_pct || 0)}%</span>
@@ -528,8 +608,8 @@ function renderProdDaysChart(trends) {
 }
 
 async function refreshTrends() {
-  const q = filterProjectId ? `&project_id=${encodeURIComponent(filterProjectId)}` : "";
-  const trends = await api(`/api/trends?days=7${q}`);
+  const q = `?days=7${filterProjectId ? `&project_id=${encodeURIComponent(filterProjectId)}` : ""}${employeeQuerySuffix()}`;
+  const trends = await api(`/api/trends${q}`);
   renderHoursChart(trends);
   renderProdDaysChart(trends);
 }
@@ -777,6 +857,9 @@ let projectCache = [];
 let taskCache = [];
 let filterProjectId = "";
 let filterTaskId = "";
+let filterEmployeeId = "";
+let companyMode = false;
+let companyEmployees = [];
 let selectedProjectId = "";
 let usagePeriod = "today";
 let projectsReportPeriod = "today";
@@ -799,12 +882,24 @@ function periodBounds(period) {
   return { from: start.toISOString(), to: end.toISOString() };
 }
 
-function periodQuery(period, projectId = "", taskId = "") {
+function periodQuery(period, projectId = "", taskId = "", employeeId = "") {
   const { from, to } = periodBounds(period);
   const parts = [`from=${encodeURIComponent(from)}`, `to=${encodeURIComponent(to)}`];
   if (projectId) parts.push(`project_id=${encodeURIComponent(projectId)}`);
   if (taskId) parts.push(`task_id=${encodeURIComponent(taskId)}`);
+  if (employeeId) parts.push(`employee_id=${encodeURIComponent(employeeId)}`);
   return parts.join("&");
+}
+
+function employeeQuerySuffix() {
+  return filterEmployeeId ? `&employee_id=${encodeURIComponent(filterEmployeeId)}` : "";
+}
+
+function summaryQuery() {
+  const parts = [];
+  if (filterProjectId) parts.push(`project_id=${encodeURIComponent(filterProjectId)}`);
+  if (filterEmployeeId) parts.push(`employee_id=${encodeURIComponent(filterEmployeeId)}`);
+  return parts.length ? `?${parts.join("&")}` : "";
 }
 
 async function setFocus(projectId, taskId) {
@@ -1135,9 +1230,15 @@ async function refreshProjects() {
 }
 
 async function refreshSummary() {
-  const q = filterProjectId ? `?project_id=${encodeURIComponent(filterProjectId)}` : "";
-  const summary = await api(`/api/summary/today${q}`);
-  const key = summaryKey(summary) + `|p:${filterProjectId}`;
+  const q = summaryQuery();
+  const { from, to } = periodBounds("today");
+  const teamQ = `from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}${filterProjectId ? `&project_id=${encodeURIComponent(filterProjectId)}` : ""}`;
+  const [summary, team, timelineRows] = await Promise.all([
+    api(`/api/summary/today${q}`),
+    api(`/api/company/team?${teamQ}`).catch(() => []),
+    api(`/api/timeline/today${q}`).catch(() => []),
+  ]);
+  const key = summaryKey(summary) + `|p:${filterProjectId}|e:${filterEmployeeId}`;
   if (key === lastSummaryKey) return;
   lastSummaryKey = key;
 
@@ -1151,7 +1252,9 @@ async function refreshSummary() {
   if (activitySub) {
     activitySub.textContent = `${fmtDur(summary.active_sec)} активно · ${fmtDur(summary.idle_sec)} без ввода`;
   }
+  renderTeamGauges(team);
   renderKpis(summary);
+  renderTodayTimelineStrip(timelineRows, summary);
   renderPieChart(
     document.getElementById("catPie"),
     categoryPieSlices(summary.by_category || {}),
@@ -1173,7 +1276,7 @@ async function refreshSummary() {
 }
 
 async function refreshUsageReport() {
-  const q = periodQuery(usagePeriod, filterProjectId, filterTaskId);
+  const q = periodQuery(usagePeriod, filterProjectId, filterTaskId, filterEmployeeId);
   const summary = await api(`/api/summary?${q}`);
   const total = summary.total_sec || 0;
   renderUsageList(
@@ -1357,9 +1460,101 @@ async function loadSettings() {
     const kw = cfg.work_chat_keywords || [];
     form.work_chat_keywords.value = Array.isArray(kw) ? kw.join(", ") : "";
   }
+  if (form.company_mode) form.company_mode.checked = !!cfg.company_mode;
+  if (form.company_display_name) {
+    form.company_display_name.value = cfg.company_display_name || "";
+  }
+  if (form.listen_host) form.listen_host.value = cfg.listen_host || "127.0.0.1";
+  if (form.hub_url) form.hub_url.value = cfg.hub_url || "";
+  if (form.hub_ingest_token) {
+    form.hub_ingest_token.value = cfg.hub_ingest_token || "";
+  }
+  companyMode = !!cfg.company_mode;
+  updateCompanyUiVisibility();
+  await refreshCompanyPanel();
   updateStorageHint(cfg);
   const workToggle = document.getElementById("workModeToggle");
   if (workToggle) workToggle.checked = !!cfg.work_mode;
+}
+
+function updateCompanyUiVisibility() {
+  const wrap = document.getElementById("filterEmployeeWrap");
+  const hub = document.getElementById("companyHubPanel");
+  const whoCap = document.getElementById("whoCaption");
+  if (wrap) wrap.hidden = !companyMode;
+  if (hub) hub.hidden = !companyMode;
+  if (whoCap) {
+    whoCap.textContent = companyMode ? "Highest % productive · команда" : "Highest % productive";
+  }
+}
+
+function fillEmployeeFilter(employees) {
+  const sel = document.getElementById("filterEmployeeToday");
+  if (!sel) return;
+  const keep = filterEmployeeId;
+  sel.innerHTML =
+    `<option value="">Вся команда</option>` +
+    (employees || [])
+      .filter((e) => e.active !== false)
+      .map(
+        (e) =>
+          `<option value="${e.id}">${escapeHtml(e.display_name || "—")}</option>`
+      )
+      .join("");
+  sel.value = keep || "";
+  if (sel.value !== keep) filterEmployeeId = sel.value || "";
+}
+
+async function refreshCompanyPanel() {
+  let data;
+  try {
+    data = await api("/api/company");
+  } catch {
+    return;
+  }
+  companyMode = !!data.company_mode;
+  companyEmployees = data.employees || [];
+  updateCompanyUiVisibility();
+  fillEmployeeFilter(companyEmployees);
+  const list = document.getElementById("companyEmployeeList");
+  if (list) {
+    list.innerHTML = (data.employees || [])
+      .map((e) => {
+        const active = e.active ? "" : " (выкл)";
+        return `<li class="company-employee">
+          <div>
+            <strong>${escapeHtml(e.display_name)}</strong>
+            <span class="muted">${escapeHtml(e.role)}${active}</span>
+          </div>
+          <div class="company-employee-actions">
+            <button type="button" class="btn tiny" data-rotate-token="${e.id}">Токен</button>
+            <button type="button" class="btn tiny" data-toggle-emp="${e.id}" data-active="${e.active ? "1" : "0"}">${e.active ? "Выкл" : "Вкл"}</button>
+          </div>
+        </li>`;
+      })
+      .join("");
+  }
+  const devices = document.getElementById("companyDeviceList");
+  if (devices) {
+    const rows = data.devices || [];
+    devices.innerHTML = rows.length
+      ? rows
+          .map(
+            (d) =>
+              `<li><strong>${escapeHtml(d.hostname)}</strong> · ${escapeHtml(d.employee_name || "")} · ${escapeHtml(d.last_seen_at || "")}</li>`
+          )
+          .join("")
+      : `<li class="hint">Пока нет устройств</li>`;
+  }
+}
+
+async function showEmployeeToken(employeeId) {
+  const row = await api(`/api/company/employees/${employeeId}/token`, { method: "POST", body: "{}" });
+  const hint = document.getElementById("companyTokenHint");
+  if (hint && row.ingest_token) {
+    hint.hidden = false;
+    hint.textContent = `Токен для ${row.display_name}: ${row.ingest_token} — сохраните сейчас, повторно не покажется.`;
+  }
 }
 
 function summaryKey(summary) {
@@ -1396,10 +1591,11 @@ async function refreshTimeline() {
   renderDayWeekStrip();
   try {
     const { from, to } = dayQueryBounds(selectedDayIso);
-    const q = `day=${encodeURIComponent(selectedDayIso)}`;
+    const emp = filterEmployeeId ? `&employee_id=${encodeURIComponent(filterEmployeeId)}` : "";
+    const q = `day=${encodeURIComponent(selectedDayIso)}${emp}`;
     const [rowsRes, summaryRes] = await Promise.allSettled([
       api(`/api/timeline?${q}`),
-      api(`/api/summary?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`),
+      api(`/api/summary?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}${emp}`),
     ]);
     const rows = rowsRes.status === "fulfilled" ? rowsRes.value || [] : [];
     const summary = summaryRes.status === "fulfilled" ? summaryRes.value || {} : {};
@@ -1623,6 +1819,17 @@ function wireUi() {
       lastSummaryKey = "";
       await refreshSummary();
       await refreshUsageReport();
+    });
+  }
+
+  const filterEmployee = document.getElementById("filterEmployeeToday");
+  if (filterEmployee) {
+    filterEmployee.addEventListener("change", async () => {
+      filterEmployeeId = filterEmployee.value || "";
+      lastSummaryKey = "";
+      await refreshSummary();
+      await refreshUsageReport();
+      await refreshTimeline();
     });
   }
 
@@ -1913,6 +2120,11 @@ function wireUi() {
       show_mini_tracker: form.show_mini_tracker ? form.show_mini_tracker.checked : true,
       work_mode: form.work_mode ? form.work_mode.checked : false,
       work_chat_keywords: keywords,
+      company_mode: form.company_mode ? form.company_mode.checked : false,
+      company_display_name: form.company_display_name ? form.company_display_name.value.trim() : "",
+      listen_host: form.listen_host ? form.listen_host.value : "127.0.0.1",
+      hub_url: form.hub_url ? form.hub_url.value.trim() : "",
+      hub_ingest_token: form.hub_ingest_token ? form.hub_ingest_token.value.trim() : "",
     };
     try {
       const saved = await api("/api/settings", { method: "PUT", body: JSON.stringify(body) });
@@ -1920,12 +2132,16 @@ function wireUi() {
       if (form.screenshots_dir) {
         form.screenshots_dir.value = saved.screenshots_dir || "";
       }
+      companyMode = !!saved.company_mode;
+      updateCompanyUiVisibility();
+      await refreshCompanyPanel();
       updateStorageHint(saved);
       lastSummaryKey = "";
       lastStatusKey = "";
       await refreshSummary();
       await refreshStatus();
-      const msg = `Сохранено · интервал ${saved.screenshot_interval_sec} сек`;
+      const bindNote = saved.listen_host === "0.0.0.0" ? " · перезапустите для LAN" : "";
+      const msg = `Сохранено · интервал ${saved.screenshot_interval_sec} сек${bindNote}`;
       setSaveStatus(status, `✓ ${msg}`, "is-ok");
       showToast(msg, "ok");
       if (submit) {
@@ -1949,6 +2165,62 @@ function wireUi() {
         submit.disabled = false;
         submit.classList.remove("is-busy", "is-saved");
         submit.textContent = defaultLabel;
+      }
+    }
+  });
+
+  const addEmpBtn = document.getElementById("addEmployeeBtn");
+  if (addEmpBtn) {
+    addEmpBtn.addEventListener("click", async () => {
+      const input = document.getElementById("newEmployeeName");
+      const name = (input?.value || "").trim();
+      if (!name) return;
+      try {
+        const row = await api("/api/company/employees", {
+          method: "POST",
+          body: JSON.stringify({ display_name: name, role: "member" }),
+        });
+        if (input) input.value = "";
+        const hint = document.getElementById("companyTokenHint");
+        if (hint && row.ingest_token) {
+          hint.hidden = false;
+          hint.textContent = `Токен для ${row.display_name}: ${row.ingest_token}`;
+        }
+        await refreshCompanyPanel();
+        lastSummaryKey = "";
+        await refreshSummary();
+      } catch (err) {
+        showToast(err?.message || "Не удалось добавить сотрудника", "error");
+      }
+    });
+  }
+
+  document.body.addEventListener("click", async (ev) => {
+    const rotate = ev.target.closest?.("[data-rotate-token]");
+    if (rotate) {
+      ev.preventDefault();
+      try {
+        await showEmployeeToken(rotate.getAttribute("data-rotate-token"));
+      } catch (err) {
+        showToast(err?.message || "Не удалось выдать токен", "error");
+      }
+      return;
+    }
+    const toggle = ev.target.closest?.("[data-toggle-emp]");
+    if (toggle) {
+      ev.preventDefault();
+      const id = toggle.getAttribute("data-toggle-emp");
+      const active = toggle.getAttribute("data-active") === "1";
+      try {
+        await api(`/api/company/employees/${id}`, {
+          method: "PUT",
+          body: JSON.stringify({ active: !active }),
+        });
+        await refreshCompanyPanel();
+        lastSummaryKey = "";
+        await refreshSummary();
+      } catch (err) {
+        showToast(err?.message || "Не удалось обновить сотрудника", "error");
       }
     }
   });
@@ -2009,6 +2281,7 @@ async function boot() {
   }
   wireUi();
   ensureSelectedDay();
+  await refreshCompanyPanel().catch(() => {});
   const hashTab = (location.hash || "").replace(/^#/, "");
   const known = ["today", "day", "usage", "projects", "ratings", "shots", "settings"];
   if (known.includes(hashTab)) {

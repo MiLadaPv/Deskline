@@ -84,15 +84,52 @@
     <section id="panel-today" class="panel active">
       <div class="panel-head">
         <h2>Сегодня</h2>
-        <label class="filter-inline">
-          Фильтр проекта
-          <select id="filterProjectToday">
-            <option value="">Все</option>
-          </select>
-        </label>
+        <div class="filter-bar">
+          <label class="filter-inline" id="filterEmployeeWrap" hidden>
+            Сотрудник
+            <select id="filterEmployeeToday">
+              <option value="">Вся команда</option>
+            </select>
+          </label>
+          <label class="filter-inline">
+            Фильтр проекта
+            <select id="filterProjectToday">
+              <option value="">Все</option>
+            </select>
+          </label>
+        </div>
       </div>
 
-      <div class="kpi-strip" id="kpiStrip" aria-label="Сводка за день"></div>
+      <div class="report-block" id="whoBlock">
+        <div class="report-block-head">
+          <h3 class="subhead">Команда</h3>
+          <span class="report-caption" id="whoCaption">Highest % productive</span>
+        </div>
+        <div class="team-gauges" id="teamGauges" aria-label="Фокус по людям"></div>
+      </div>
+
+      <div class="report-block">
+        <div class="report-block-head">
+          <h3 class="subhead">Метрики дня</h3>
+        </div>
+        <div class="kpi-strip kpi-strip-metric" id="kpiStrip" aria-label="Сводка за день"></div>
+      </div>
+
+      <div class="report-block">
+        <div class="report-block-head">
+          <h3 class="subhead">Лента</h3>
+          <span class="report-caption" id="todayTimelineMeta"></span>
+        </div>
+        <div class="today-timeline-strip" id="todayTimelineStrip" aria-label="Лента дня"></div>
+      </div>
+
+      <div class="report-block">
+        <div class="report-block-head">
+          <h3 class="subhead">Продуктивность</h3>
+          <span class="report-caption">по дням недели</span>
+        </div>
+        <div class="prod-days-chart prod-days-chart-wide" id="prodDaysChart"></div>
+      </div>
 
       <div class="charts-grid pies-grid">
         <div class="chart-card">
@@ -112,10 +149,6 @@
         <div class="chart-card">
           <h3 class="subhead">Часы за неделю</h3>
           <div class="hours-chart" id="hoursChart"></div>
-        </div>
-        <div class="chart-card">
-          <h3 class="subhead">Фокус по дням</h3>
-          <div class="prod-days-chart" id="prodDaysChart"></div>
         </div>
       </div>
 
@@ -286,12 +319,52 @@
           Мини-трекер поверх окон
         </label>
         <p class="hint settings-hint">Компактное окно с текущей задачей и временем записи (как в Time Doctor). Можно закрыть — снова включите здесь или из трея.</p>
+
+        <h3 class="subhead">Компания (LAN hub)</h3>
+        <label class="check">
+          <input type="checkbox" name="company_mode" id="companyModeToggle" />
+          Режим компании — принимать данные сотрудников по сети
+        </label>
+        <label>
+          Название компании
+          <input type="text" name="company_display_name" placeholder="AndalusGames" maxlength="120" />
+        </label>
+        <label>
+          Слушать на
+          <select name="listen_host">
+            <option value="127.0.0.1">Только этот ПК (127.0.0.1)</option>
+            <option value="0.0.0.0">Локальная сеть (0.0.0.0)</option>
+          </select>
+        </label>
+        <p class="hint">После смены адреса прослушивания перезапустите Deskline.</p>
+
+        <div id="companyHubPanel" class="company-panel" hidden>
+          <div class="company-add-row">
+            <input type="text" id="newEmployeeName" placeholder="Имя сотрудника" maxlength="120" />
+            <button type="button" class="btn" id="addEmployeeBtn">Добавить</button>
+          </div>
+          <ul class="company-employee-list" id="companyEmployeeList"></ul>
+          <p class="hint" id="companyTokenHint" hidden></p>
+          <h4 class="subhead">Устройства</h4>
+          <ul class="company-device-list" id="companyDeviceList"></ul>
+        </div>
+
+        <h3 class="subhead">Агент → hub (этот ПК — сотрудник)</h3>
+        <label>
+          URL hub
+          <input type="url" name="hub_url" placeholder="http://192.168.1.10:8787" spellcheck="false" />
+        </label>
+        <label>
+          Ingest-токен
+          <input type="password" name="hub_ingest_token" placeholder="токен сотрудника" autocomplete="off" spellcheck="false" />
+        </label>
+        <p class="hint">На ПК сотрудника укажите адрес hub и токен из карточки сотрудника. Трекинг остаётся локальным, закрытые сессии уходят на hub.</p>
+
         <div class="settings-save-row">
           <button type="submit" class="btn primary" id="settingsSaveBtn">Сохранить</button>
           <p class="save-status" id="settingsSaveStatus" role="status" aria-live="polite" hidden></p>
         </div>
-      </form>
-      <form id="passwordForm" class="settings-form">
+      </form>      <form id="passwordForm" class="settings-form">
         <h3 class="subhead">Пароль входа</h3>
         <label>
           Текущий пароль

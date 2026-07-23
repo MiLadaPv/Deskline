@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import socket
 import sqlite3
 from contextlib import contextmanager
 from dataclasses import dataclass
@@ -14,6 +15,12 @@ from deskline.classify import (
     normalize_category,
     resolve_activity,
     site_for_activity_label,
+)
+from deskline.company_tokens import (
+    EMPLOYEE_COLORS,
+    hash_ingest_token,
+    initials_from_name,
+    new_ingest_token,
 )
 from deskline.config import DB_PATH, ensure_data_dirs, get_screenshots_dir
 from deskline.icons import (
@@ -76,6 +83,7 @@ class SessionRow:
     idle_sec: float = 0.0
     project_id: int | None = None
     task_id: int | None = None
+    employee_id: int | None = None
 
 
 class Database:
@@ -155,6 +163,27 @@ class Database:
                     created_at TEXT NOT NULL,
                     FOREIGN KEY(project_id) REFERENCES projects(id) ON DELETE CASCADE
                 );
+
+                CREATE TABLE IF NOT EXISTS employees (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    display_name TEXT NOT NULL,
+                    initials TEXT NOT NULL DEFAULT '?',
+                    color TEXT NOT NULL DEFAULT '#1f6b56',
+                    role TEXT NOT NULL DEFAULT 'member',
+                    active INTEGER NOT NULL DEFAULT 1,
+                    ingest_token_hash TEXT,
+                    created_at TEXT NOT NULL
+                );
+                CREATE INDEX IF NOT EXISTS idx_employees_token ON employees(ingest_token_hash);
+
+                CREATE TABLE IF NOT EXISTS devices (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    employee_id INTEGER NOT NULL,
+                    hostname TEXT NOT NULL,
+                    last_seen_at TEXT,
+                    FOREIGN KEY(employee_id) REFERENCES employees(id) ON DELETE CASCADE,
+                    UNIQUE(employee_id, hostname)
+                );
                 """
             )
             cols = {r[1] for r in conn.execute("PRAGMA table_info(sessions)").fetchall()}
@@ -166,9 +195,19 @@ class Database:
                 ("idle_sec", "REAL NOT NULL DEFAULT 0"),
                 ("project_id", "INTEGER"),
                 ("task_id", "INTEGER"),
+                ("employee_id", "INTEGER"),
+                ("ingest_key", "TEXT"),
             ):
                 if col not in cols:
                     conn.execute(f"ALTER TABLE sessions ADD COLUMN {col} {decl}")
+            shot_cols = {r[1] for r in conn.execute("PRAGMA table_info(screenshots)").fetchall()}
+            if "employee_id" not in shot_cols:
+                conn.execute("ALTER TABLE screenshots ADD COLUMN employee_id INTEGER")
+            conn.execute(
+                "CREATE UNIQUE INDEX IF NOT EXISTS idx_sessions_ingest_key "
+                "ON sessions(ingest_key) WHERE ingest_key IS NOT NULL"
+            )
+        self.ensure_default_employee()
 
     def get_app_rules(self) -> dict[str, str]:
         with self.connect() as conn:
@@ -223,6 +262,8 @@ class Database:
         app_path: str | None = None,
         project_id: int | None = None,
         task_id: int | None = None,
+        employee_id: int | None = None,
+        ingest_key: str | None = None,
     ) -> int:
         started = started_at or _utcnow()
         with self.connect() as conn:
@@ -231,9 +272,9 @@ class Database:
                 INSERT INTO sessions(
                     app_name, window_title, url_hint, started_at, category,
                     display_name, activity_kind, activity_label, app_path,
-                    project_id, task_id
+                    project_id, task_id, employee_id, ingest_key
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     app_name,
@@ -247,6 +288,8 @@ class Database:
                     app_path,
                     project_id,
                     task_id,
+                    employee_id,
+                    ingest_key,
                 ),
             )
             return int(cur.lastrowid)
@@ -305,6 +348,7 @@ class Database:
             idle_sec=float(row["idle_sec"] or 0) if "idle_sec" in keys else 0.0,
             project_id=int(row["project_id"]) if "project_id" in keys and row["project_id"] is not None else None,
             task_id=int(row["task_id"]) if "task_id" in keys and row["task_id"] is not None else None,
+            employee_id=int(row["employee_id"]) if "employee_id" in keys and row["employee_id"] is not None else None,
         )
 
     def add_idle_seconds(self, session_id: int, seconds: float) -> None:
@@ -347,6 +391,9 @@ class Database:
             project_id = int(row["project_id"])
         if "task_id" in keys and row["task_id"] is not None:
             task_id = int(row["task_id"])
+        employee_id = None
+        if "employee_id" in keys and row["employee_id"] is not None:
+            employee_id = int(row["employee_id"])
         return {
             "app_name": app,
             "app_path": app_path,
@@ -358,6 +405,7 @@ class Database:
             "hidden": hidden,
             "project_id": project_id,
             "task_id": task_id,
+            "employee_id": employee_id,
         }
 
     def summary_for_day(
@@ -365,17 +413,21 @@ class Database:
         day: date | None = None,
         project_id: int | None = None,
         task_id: int | None = None,
+        employee_id: int | None = None,
     ) -> dict[str, Any]:
         day = day or date.today()
         start = datetime.combine(day, datetime.min.time()).astimezone()
         end = start + timedelta(days=1)
-        return self.summary_range(start, end, project_id=project_id, task_id=task_id)
+        return self.summary_range(
+            start, end, project_id=project_id, task_id=task_id, employee_id=employee_id
+        )
 
     def daily_trends(
         self,
         days: int = 7,
         project_id: int | None = None,
         task_id: int | None = None,
+        employee_id: int | None = None,
     ) -> list[dict[str, Any]]:
         """Time Doctor–style Hours Tracked + productivity mix per day."""
         days = max(1, min(int(days), 31))
@@ -383,7 +435,9 @@ class Database:
         out: list[dict[str, Any]] = []
         for i in range(days - 1, -1, -1):
             day = today - timedelta(days=i)
-            s = self.summary_for_day(day, project_id=project_id, task_id=task_id)
+            s = self.summary_for_day(
+                day, project_id=project_id, task_id=task_id, employee_id=employee_id
+            )
             by_cat = s.get("by_category") or {}
             total = float(s.get("total_sec") or 0)
             productive = float(by_cat.get("productive") or 0)
@@ -415,6 +469,7 @@ class Database:
         end: datetime,
         project_id: int | None = None,
         task_id: int | None = None,
+        employee_id: int | None = None,
     ) -> dict[str, Any]:
         from deskline.config import load_config
 
@@ -470,6 +525,8 @@ class Database:
             if project_id is not None and meta.get("project_id") != project_id:
                 continue
             if task_id is not None and meta.get("task_id") != task_id:
+                continue
+            if employee_id is not None and meta.get("employee_id") != employee_id:
                 continue
             tracked += dur
             # Scale idle to the overlapping segment (TD: idle is orthogonal to category)
@@ -633,8 +690,11 @@ class Database:
         end: datetime,
         project_id: int | None = None,
         task_id: int | None = None,
+        employee_id: int | None = None,
     ) -> list[dict[str, Any]]:
-        return self.summary_range(start, end, project_id=project_id, task_id=task_id)["by_app"]
+        return self.summary_range(
+            start, end, project_id=project_id, task_id=task_id, employee_id=employee_id
+        )["by_app"]
 
     def sites_range(
         self,
@@ -642,8 +702,11 @@ class Database:
         end: datetime,
         project_id: int | None = None,
         task_id: int | None = None,
+        employee_id: int | None = None,
     ) -> list[dict[str, Any]]:
-        return self.summary_range(start, end, project_id=project_id, task_id=task_id)["by_site"]
+        return self.summary_range(
+            start, end, project_id=project_id, task_id=task_id, employee_id=employee_id
+        )["by_site"]
 
     def activities_range(
         self,
@@ -651,10 +714,15 @@ class Database:
         end: datetime,
         project_id: int | None = None,
         task_id: int | None = None,
+        employee_id: int | None = None,
     ) -> list[dict[str, Any]]:
-        return self.summary_range(start, end, project_id=project_id, task_id=task_id)["by_activity"]
+        return self.summary_range(
+            start, end, project_id=project_id, task_id=task_id, employee_id=employee_id
+        )["by_activity"]
 
-    def timeline_for_day(self, day: date | None = None) -> list[dict[str, Any]]:
+    def timeline_for_day(
+        self, day: date | None = None, employee_id: int | None = None
+    ) -> list[dict[str, Any]]:
         """Chronological session segments for a day (merged consecutive same activity)."""
         from deskline.config import load_config
 
@@ -688,6 +756,8 @@ class Database:
             meta = self._enrich(row, work_mode=work_mode, work_chat_keywords=keywords)
             if meta["hidden"]:
                 continue
+            if employee_id is not None and meta.get("employee_id") != employee_id:
+                continue
             full_span = max(0.0, (e - s).total_seconds()) or dur
             idle_full = float(row["idle_sec"] or 0) if "idle_sec" in keys else 0.0
             idle_part = min(dur, idle_full * (dur / full_span) if full_span else 0.0)
@@ -705,6 +775,7 @@ class Database:
                     "category": normalize_category(meta["category"]),
                     "site": site,
                     "project_id": meta.get("project_id"),
+                    "employee_id": meta.get("employee_id"),
                     "icon_url": icon,
                 }
             )
@@ -974,3 +1045,331 @@ class Database:
             for path in shots_dir.iterdir():
                 if path.is_file():
                     delete_screenshot_file(path)
+
+    def _employee_row(self, row: sqlite3.Row) -> dict[str, Any]:
+        return {
+            "id": int(row["id"]),
+            "display_name": row["display_name"],
+            "initials": row["initials"],
+            "color": row["color"],
+            "role": row["role"],
+            "active": bool(row["active"]),
+            "has_token": bool(row["ingest_token_hash"]),
+            "created_at": row["created_at"],
+        }
+
+    def ensure_default_employee(self) -> int:
+        """Create local owner employee and backfill sessions without employee_id."""
+        hostname = socket.gethostname() or "PC"
+        with self.connect() as conn:
+            row = conn.execute(
+                "SELECT id FROM employees WHERE role='admin' ORDER BY id ASC LIMIT 1"
+            ).fetchone()
+            if row:
+                eid = int(row["id"])
+            else:
+                token = new_ingest_token()
+                cur = conn.execute(
+                    """
+                    INSERT INTO employees(
+                        display_name, initials, color, role, active,
+                        ingest_token_hash, created_at
+                    ) VALUES (?, ?, ?, 'admin', 1, ?, ?)
+                    """,
+                    (
+                        "Я",
+                        initials_from_name("Я"),
+                        EMPLOYEE_COLORS[0],
+                        hash_ingest_token(token),
+                        _iso(_utcnow()),
+                    ),
+                )
+                eid = int(cur.lastrowid)
+            conn.execute(
+                "UPDATE sessions SET employee_id=? WHERE employee_id IS NULL",
+                (eid,),
+            )
+            conn.execute(
+                "UPDATE screenshots SET employee_id=? WHERE employee_id IS NULL",
+                (eid,),
+            )
+            conn.execute(
+                """
+                INSERT INTO devices(employee_id, hostname, last_seen_at)
+                VALUES (?, ?, ?)
+                ON CONFLICT(employee_id, hostname) DO UPDATE SET last_seen_at=excluded.last_seen_at
+                """,
+                (eid, hostname, _iso(_utcnow())),
+            )
+        return eid
+
+    def list_employees(self, *, active_only: bool = False) -> list[dict[str, Any]]:
+        self.ensure_default_employee()
+        q = "SELECT * FROM employees"
+        if active_only:
+            q += " WHERE active=1"
+        q += " ORDER BY role='admin' DESC, display_name COLLATE NOCASE"
+        with self.connect() as conn:
+            rows = conn.execute(q).fetchall()
+        return [self._employee_row(r) for r in rows]
+
+    def get_employee(self, employee_id: int) -> dict[str, Any] | None:
+        with self.connect() as conn:
+            row = conn.execute(
+                "SELECT * FROM employees WHERE id=?", (employee_id,)
+            ).fetchone()
+        return self._employee_row(row) if row else None
+
+    def create_employee(self, display_name: str, *, role: str = "member") -> dict[str, Any]:
+        name = (display_name or "").strip() or "Сотрудник"
+        role = "admin" if role == "admin" else "member"
+        token = new_ingest_token()
+        with self.connect() as conn:
+            count = conn.execute("SELECT COUNT(*) AS c FROM employees").fetchone()["c"]
+            color = EMPLOYEE_COLORS[int(count) % len(EMPLOYEE_COLORS)]
+            cur = conn.execute(
+                """
+                INSERT INTO employees(
+                    display_name, initials, color, role, active,
+                    ingest_token_hash, created_at
+                ) VALUES (?, ?, ?, ?, 1, ?, ?)
+                """,
+                (
+                    name,
+                    initials_from_name(name),
+                    color,
+                    role,
+                    hash_ingest_token(token),
+                    _iso(_utcnow()),
+                ),
+            )
+            eid = int(cur.lastrowid)
+            row = conn.execute("SELECT * FROM employees WHERE id=?", (eid,)).fetchone()
+        out = self._employee_row(row)
+        out["ingest_token"] = token
+        return out
+
+    def update_employee(
+        self,
+        employee_id: int,
+        *,
+        display_name: str | None = None,
+        active: bool | None = None,
+        role: str | None = None,
+    ) -> dict[str, Any] | None:
+        with self.connect() as conn:
+            row = conn.execute(
+                "SELECT * FROM employees WHERE id=?", (employee_id,)
+            ).fetchone()
+            if not row:
+                return None
+            name = display_name.strip() if display_name is not None else row["display_name"]
+            initials = initials_from_name(name) if display_name is not None else row["initials"]
+            new_active = int(active) if active is not None else row["active"]
+            new_role = row["role"]
+            if role is not None:
+                new_role = "admin" if role == "admin" else "member"
+            conn.execute(
+                """
+                UPDATE employees
+                SET display_name=?, initials=?, active=?, role=?
+                WHERE id=?
+                """,
+                (name, initials, new_active, new_role, employee_id),
+            )
+            row = conn.execute(
+                "SELECT * FROM employees WHERE id=?", (employee_id,)
+            ).fetchone()
+        return self._employee_row(row)
+
+    def rotate_employee_token(self, employee_id: int) -> dict[str, Any] | None:
+        token = new_ingest_token()
+        with self.connect() as conn:
+            row = conn.execute(
+                "SELECT id FROM employees WHERE id=?", (employee_id,)
+            ).fetchone()
+            if not row:
+                return None
+            conn.execute(
+                "UPDATE employees SET ingest_token_hash=? WHERE id=?",
+                (hash_ingest_token(token), employee_id),
+            )
+            row = conn.execute(
+                "SELECT * FROM employees WHERE id=?", (employee_id,)
+            ).fetchone()
+        out = self._employee_row(row)
+        out["ingest_token"] = token
+        return out
+
+    def find_employee_by_token(self, token: str) -> dict[str, Any] | None:
+        digest = hash_ingest_token(token)
+        with self.connect() as conn:
+            row = conn.execute(
+                "SELECT * FROM employees WHERE ingest_token_hash=? AND active=1",
+                (digest,),
+            ).fetchone()
+        return self._employee_row(row) if row else None
+
+    def touch_device(self, employee_id: int, hostname: str) -> None:
+        host = (hostname or "").strip() or "unknown"
+        with self.connect() as conn:
+            conn.execute(
+                """
+                INSERT INTO devices(employee_id, hostname, last_seen_at)
+                VALUES (?, ?, ?)
+                ON CONFLICT(employee_id, hostname) DO UPDATE SET last_seen_at=excluded.last_seen_at
+                """,
+                (employee_id, host, _iso(_utcnow())),
+            )
+
+    def list_devices(self, employee_id: int | None = None) -> list[dict[str, Any]]:
+        with self.connect() as conn:
+            if employee_id is None:
+                rows = conn.execute(
+                    """
+                    SELECT d.*, e.display_name AS employee_name
+                    FROM devices d
+                    JOIN employees e ON e.id = d.employee_id
+                    ORDER BY d.last_seen_at DESC
+                    """
+                ).fetchall()
+            else:
+                rows = conn.execute(
+                    """
+                    SELECT d.*, e.display_name AS employee_name
+                    FROM devices d
+                    JOIN employees e ON e.id = d.employee_id
+                    WHERE d.employee_id=?
+                    ORDER BY d.last_seen_at DESC
+                    """,
+                    (employee_id,),
+                ).fetchall()
+        return [
+            {
+                "id": int(r["id"]),
+                "employee_id": int(r["employee_id"]),
+                "employee_name": r["employee_name"],
+                "hostname": r["hostname"],
+                "last_seen_at": r["last_seen_at"],
+            }
+            for r in rows
+        ]
+
+    def get_session_payload(self, session_id: int) -> dict[str, Any] | None:
+        with self.connect() as conn:
+            row = conn.execute("SELECT * FROM sessions WHERE id=?", (session_id,)).fetchone()
+        if not row:
+            return None
+        keys = set(row.keys())
+        return {
+            "app_name": row["app_name"],
+            "window_title": row["window_title"],
+            "url_hint": row["url_hint"],
+            "started_at": row["started_at"],
+            "ended_at": row["ended_at"],
+            "duration_sec": float(row["duration_sec"] or 0),
+            "category": row["category"],
+            "display_name": row["display_name"] if "display_name" in keys else None,
+            "activity_kind": row["activity_kind"] if "activity_kind" in keys else None,
+            "activity_label": row["activity_label"] if "activity_label" in keys else None,
+            "app_path": row["app_path"] if "app_path" in keys else None,
+            "idle_sec": float(row["idle_sec"] or 0) if "idle_sec" in keys else 0.0,
+            "project_id": int(row["project_id"])
+            if "project_id" in keys and row["project_id"] is not None
+            else None,
+            "task_id": int(row["task_id"])
+            if "task_id" in keys and row["task_id"] is not None
+            else None,
+            "ingest_key": row["ingest_key"] if "ingest_key" in keys else None,
+        }
+
+    def ingest_sessions(
+        self, employee_id: int, sessions: list[dict[str, Any]], *, hostname: str | None = None
+    ) -> dict[str, Any]:
+        inserted = 0
+        skipped = 0
+        with self.connect() as conn:
+            for item in sessions:
+                ingest_key = str(item.get("ingest_key") or "").strip() or None
+                if ingest_key:
+                    exists = conn.execute(
+                        "SELECT id FROM sessions WHERE ingest_key=?", (ingest_key,)
+                    ).fetchone()
+                    if exists:
+                        skipped += 1
+                        continue
+                started = item.get("started_at")
+                ended = item.get("ended_at")
+                if not started:
+                    skipped += 1
+                    continue
+                try:
+                    duration = float(item.get("duration_sec") or 0)
+                except (TypeError, ValueError):
+                    duration = 0.0
+                try:
+                    idle = float(item.get("idle_sec") or 0)
+                except (TypeError, ValueError):
+                    idle = 0.0
+                conn.execute(
+                    """
+                    INSERT INTO sessions(
+                        app_name, window_title, url_hint, started_at, ended_at,
+                        duration_sec, category, display_name, activity_kind,
+                        activity_label, app_path, idle_sec, project_id, task_id,
+                        employee_id, ingest_key
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        str(item.get("app_name") or "unknown.exe"),
+                        str(item.get("window_title") or ""),
+                        item.get("url_hint"),
+                        str(started),
+                        str(ended) if ended else None,
+                        max(0.0, duration),
+                        normalize_category(str(item.get("category") or "neutral")),
+                        item.get("display_name"),
+                        item.get("activity_kind"),
+                        item.get("activity_label"),
+                        item.get("app_path"),
+                        max(0.0, idle),
+                        item.get("project_id"),
+                        item.get("task_id"),
+                        employee_id,
+                        ingest_key,
+                    ),
+                )
+                inserted += 1
+        if hostname:
+            self.touch_device(employee_id, hostname)
+        else:
+            self.touch_device(employee_id, "remote")
+        return {"inserted": inserted, "skipped": skipped}
+
+    def team_summary(
+        self,
+        start: datetime,
+        end: datetime,
+        *,
+        project_id: int | None = None,
+        task_id: int | None = None,
+    ) -> list[dict[str, Any]]:
+        out: list[dict[str, Any]] = []
+        for emp in self.list_employees(active_only=True):
+            s = self.summary_range(
+                start, end, project_id=project_id, task_id=task_id, employee_id=emp["id"]
+            )
+            out.append(
+                {
+                    **emp,
+                    "focus_pct": s.get("focus_pct") or 0,
+                    "activity_pct": s.get("activity_pct") or 0,
+                    "total_sec": s.get("total_sec") or 0,
+                    "focus_sec": s.get("focus_sec") or 0,
+                    "idle_sec": s.get("idle_sec") or 0,
+                    "active_sec": s.get("active_sec") or 0,
+                    "by_category": s.get("by_category") or {},
+                }
+            )
+        out.sort(key=lambda r: float(r.get("focus_pct") or 0), reverse=True)
+        return out

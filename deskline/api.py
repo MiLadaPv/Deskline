@@ -67,6 +67,45 @@ class SettingsUpdate(BaseModel):
     current_project_id: int | None = None
     current_task_id: int | None = None
     show_mini_tracker: bool | None = None
+    company_mode: bool | None = None
+    company_display_name: str | None = Field(default=None, max_length=120)
+    listen_host: str | None = Field(default=None, max_length=64)
+    hub_url: str | None = Field(default=None, max_length=300)
+    hub_ingest_token: str | None = Field(default=None, max_length=200)
+
+
+class EmployeeCreate(BaseModel):
+    display_name: str = Field(min_length=1, max_length=120)
+    role: str = Field(default="member", pattern="^(admin|member)$")
+
+
+class EmployeeUpdate(BaseModel):
+    display_name: str | None = Field(default=None, min_length=1, max_length=120)
+    active: bool | None = None
+    role: str | None = Field(default=None, pattern="^(admin|member)$")
+
+
+class IngestSessionItem(BaseModel):
+    app_name: str = Field(min_length=1, max_length=260)
+    window_title: str = ""
+    url_hint: str | None = None
+    started_at: str
+    ended_at: str | None = None
+    duration_sec: float = 0
+    category: str = "neutral"
+    display_name: str | None = None
+    activity_kind: str | None = None
+    activity_label: str | None = None
+    app_path: str | None = None
+    idle_sec: float = 0
+    project_id: int | None = None
+    task_id: int | None = None
+    ingest_key: str | None = None
+
+
+class IngestBody(BaseModel):
+    hostname: str | None = Field(default=None, max_length=120)
+    sessions: list[IngestSessionItem] = Field(default_factory=list, max_length=500)
 
 
 def _validate_screenshots_dir(raw: str) -> str:
@@ -337,8 +376,14 @@ def create_app(tracker: Tracker, db: Database | None = None) -> FastAPI:
     def summary_today(
         project_id: int | None = None,
         task_id: int | None = None,
+        employee_id: int | None = None,
     ) -> dict[str, Any]:
-        return db.summary_for_day(date.today(), project_id=project_id, task_id=task_id)
+        return db.summary_for_day(
+            date.today(),
+            project_id=project_id,
+            task_id=task_id,
+            employee_id=employee_id,
+        )
 
     @app.get("/api/summary")
     def summary_range_api(
@@ -346,34 +391,41 @@ def create_app(tracker: Tracker, db: Database | None = None) -> FastAPI:
         to: str | None = None,
         project_id: int | None = None,
         task_id: int | None = None,
+        employee_id: int | None = None,
     ) -> dict[str, Any]:
         start, end = _range(from_ts, to)
-        return db.summary_range(start, end, project_id=project_id, task_id=task_id)
+        return db.summary_range(
+            start, end, project_id=project_id, task_id=task_id, employee_id=employee_id
+        )
 
     @app.get("/api/trends")
     def trends(
         days: int = 7,
         project_id: int | None = None,
         task_id: int | None = None,
+        employee_id: int | None = None,
     ) -> list[dict[str, Any]]:
         days = max(1, min(int(days), 31))
-        return db.daily_trends(days=days, project_id=project_id, task_id=task_id)
+        return db.daily_trends(
+            days=days, project_id=project_id, task_id=task_id, employee_id=employee_id
+        )
 
     @app.get("/api/timeline/today")
-    def timeline_today() -> list[dict[str, Any]]:
-        return db.timeline_for_day(date.today())
+    def timeline_today(employee_id: int | None = None) -> list[dict[str, Any]]:
+        return db.timeline_for_day(date.today(), employee_id=employee_id)
 
     @app.get("/api/timeline")
     def timeline(
         day: str | None = Query(default=None, description="YYYY-MM-DD local calendar day"),
+        employee_id: int | None = None,
     ) -> list[dict[str, Any]]:
         if not day:
-            return db.timeline_for_day(date.today())
+            return db.timeline_for_day(date.today(), employee_id=employee_id)
         try:
             target = date.fromisoformat(day)
         except ValueError as exc:
             raise HTTPException(400, "Invalid day; use YYYY-MM-DD") from exc
-        return db.timeline_for_day(target)
+        return db.timeline_for_day(target, employee_id=employee_id)
 
     @app.get("/api/projects")
     def projects(include_archived: bool = False) -> list[dict[str, Any]]:
@@ -544,6 +596,21 @@ def create_app(tracker: Tracker, db: Database | None = None) -> FastAPI:
         data = body.model_dump(exclude_none=True)
         if "screenshots_dir" in data:
             data["screenshots_dir"] = _validate_screenshots_dir(str(data["screenshots_dir"]))
+        if "company_mode" in data:
+            if data["company_mode"]:
+                data.setdefault("listen_host", "0.0.0.0")
+                if not str(data.get("company_display_name") or cfg.get("company_display_name") or "").strip():
+                    data["company_display_name"] = "Команда"
+                db.ensure_default_employee()
+            elif "listen_host" not in data:
+                data["listen_host"] = "127.0.0.1"
+        if "listen_host" in data:
+            host = str(data["listen_host"] or "").strip() or "127.0.0.1"
+            if host not in {"127.0.0.1", "0.0.0.0", "localhost"}:
+                raise HTTPException(400, "listen_host: используйте 127.0.0.1 или 0.0.0.0")
+            data["listen_host"] = "127.0.0.1" if host == "localhost" else host
+        if "hub_url" in data:
+            data["hub_url"] = str(data["hub_url"] or "").strip().rstrip("/")
         cfg.update(data)
         saved = save_config(cfg)
         ensure_screenshots_dir(saved)
@@ -556,7 +623,88 @@ def create_app(tracker: Tracker, db: Database | None = None) -> FastAPI:
             "screenshots_path": storage["path"],
             "screenshots_storage": storage,
             "screenshots_dir_effective": str(get_screenshots_dir(saved)),
+            "restart_required_for_bind": True,
         }
+
+    @app.get("/api/company")
+    def company_status() -> dict[str, Any]:
+        cfg = load_config()
+        employees = db.list_employees()
+        return {
+            "company_mode": bool(cfg.get("company_mode")),
+            "company_display_name": cfg.get("company_display_name") or "",
+            "listen_host": cfg.get("listen_host") or HOST,
+            "port": PORT,
+            "local_employee_id": cfg.get("local_employee_id"),
+            "employees": employees,
+            "devices": db.list_devices(),
+            "hub_url": cfg.get("hub_url") or "",
+            "has_hub_token": bool(str(cfg.get("hub_ingest_token") or "").strip()),
+        }
+
+    @app.get("/api/company/team")
+    def company_team(
+        from_ts: str | None = Query(default=None, alias="from"),
+        to: str | None = None,
+        project_id: int | None = None,
+        task_id: int | None = None,
+    ) -> list[dict[str, Any]]:
+        start, end = _range(from_ts, to)
+        return db.team_summary(start, end, project_id=project_id, task_id=task_id)
+
+    @app.get("/api/company/summary")
+    def company_summary(
+        from_ts: str | None = Query(default=None, alias="from"),
+        to: str | None = None,
+        project_id: int | None = None,
+        task_id: int | None = None,
+    ) -> dict[str, Any]:
+        start, end = _range(from_ts, to)
+        summary = db.summary_range(start, end, project_id=project_id, task_id=task_id)
+        summary["team"] = db.team_summary(start, end, project_id=project_id, task_id=task_id)
+        return summary
+
+    @app.post("/api/company/employees")
+    def company_create_employee(body: EmployeeCreate) -> dict[str, Any]:
+        return db.create_employee(body.display_name, role=body.role)
+
+    @app.put("/api/company/employees/{employee_id}")
+    def company_update_employee(employee_id: int, body: EmployeeUpdate) -> dict[str, Any]:
+        row = db.update_employee(
+            employee_id,
+            display_name=body.display_name,
+            active=body.active,
+            role=body.role,
+        )
+        if not row:
+            raise HTTPException(404, "Employee not found")
+        return row
+
+    @app.post("/api/company/employees/{employee_id}/token")
+    def company_rotate_token(employee_id: int) -> dict[str, Any]:
+        row = db.rotate_employee_token(employee_id)
+        if not row:
+            raise HTTPException(404, "Employee not found")
+        return row
+
+    @app.post("/api/ingest/sessions")
+    def ingest_sessions(request: Request, body: IngestBody) -> dict[str, Any]:
+        auth = request.headers.get("Authorization") or ""
+        token = ""
+        if auth.lower().startswith("bearer "):
+            token = auth[7:].strip()
+        if not token:
+            token = (request.headers.get("X-Deskline-Token") or "").strip()
+        if not token:
+            raise HTTPException(401, "Missing ingest token")
+        emp = db.find_employee_by_token(token)
+        if not emp:
+            raise HTTPException(401, "Invalid ingest token")
+        sessions = [item.model_dump() for item in body.sessions]
+        result = db.ingest_sessions(
+            int(emp["id"]), sessions, hostname=body.hostname
+        )
+        return {"ok": True, "employee_id": emp["id"], **result}
 
     @app.post("/api/screenshots/purge")
     def purge_screenshots() -> dict[str, Any]:

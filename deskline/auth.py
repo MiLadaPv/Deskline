@@ -189,6 +189,8 @@ def validate_session_token(token: str | None) -> bool:
 def is_public_path(path: str) -> bool:
     if path.startswith("/static/"):
         return True
+    if path.startswith("/api/ingest"):
+        return True
     if path in {
         "/login",
         "/about",
