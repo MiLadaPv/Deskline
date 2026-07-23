@@ -12,18 +12,22 @@
 <body>
   <div class="atmosphere" aria-hidden="true"></div>
   <div class="boot-splash" id="appSplash" aria-hidden="true">
-    <div class="logo-mark logo-anim" style="width:72px;height:72px;color:var(--accent)">
-      <svg viewBox="0 0 64 64" fill="none" aria-hidden="true">
-        <circle class="logo-ring" cx="32" cy="32" r="27" stroke="currentColor" stroke-width="4"/>
-        <path class="logo-check" d="M20 33 L29 42 L46 23" stroke="currentColor" stroke-width="4.2" stroke-linecap="round" stroke-linejoin="round"/>
-      </svg>
-    </div>
+    {% with anim=true, size=80 %}
+      {% include "partials/logo_mark.html" %}
+    {% endwith %}
     <p class="boot-splash-title">Deskline</p>
   </div>
   <header class="top">
     <div class="brand-block">
-      <p class="eyebrow">Локально · приватно · Windows</p>
-      <h1 class="brand">Deskline</h1>
+      <div class="brand-lockup">
+        {% with anim=true, soft=true, size=64 %}
+          {% include "partials/logo_mark.html" %}
+        {% endwith %}
+        <div class="brand-lockup-text">
+          <p class="eyebrow">Локально · приватно · Windows</p>
+          <h1 class="brand brand-lockup-name">Deskline</h1>
+        </div>
+      </div>
       <p class="tagline">Куда уходят часы — без отправки данных в облако.</p>
     </div>
     <div class="hero-actions">

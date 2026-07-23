@@ -51,10 +51,14 @@ def test_login_template_has_launch_and_forgot():
     from deskline.config import WEB_ROOT
 
     html = (WEB_ROOT / "templates" / "login.html").read_text(encoding="utf-8")
+    logo = (WEB_ROOT / "templates" / "partials" / "logo_mark.html").read_text(encoding="utf-8")
     assert "launch-hero" in html
     assert "Забыли пароль?" in html
     assert "recoverForm" in html
-    assert "logo-anim" in html
+    assert "brand-lockup" in html
+    assert "partials/logo_mark.html" in html
+    assert "logo-anim" in logo
+    assert "logo-dayline" in logo
     assert "preview-gauge" in html
     assert "preview-donut" not in html or "preview-gauge" in html
     assert "Кто в фокусе" in html

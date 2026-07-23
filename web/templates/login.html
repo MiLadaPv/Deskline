@@ -13,27 +13,21 @@
   <div class="atmosphere" aria-hidden="true"></div>
 
   <div class="boot-splash" id="bootSplash" aria-hidden="true">
-    <div class="logo-mark logo-anim" style="width:72px;height:72px;color:var(--accent)">
-      <svg viewBox="0 0 64 64" fill="none" aria-hidden="true">
-        <circle class="logo-ring" cx="32" cy="32" r="27" stroke="currentColor" stroke-width="4"/>
-        <path class="logo-check" d="M20 33 L29 42 L46 23" stroke="currentColor" stroke-width="4.2" stroke-linecap="round" stroke-linejoin="round"/>
-      </svg>
-    </div>
+    {% with anim=true, size=80 %}
+      {% include "partials/logo_mark.html" %}
+    {% endwith %}
     <p class="boot-splash-title">Deskline</p>
   </div>
 
   <div class="launch">
     <section class="launch-hero" aria-label="О Deskline">
-      <div class="launch-brand">
-        <span class="logo-mark logo-anim logo-anim-soft" style="width:40px;height:40px;color:var(--accent)">
-          <svg viewBox="0 0 64 64" fill="none" aria-hidden="true">
-            <circle class="logo-ring" cx="32" cy="32" r="27" stroke="currentColor" stroke-width="4"/>
-            <path class="logo-check" d="M20 33 L29 42 L46 23" stroke="currentColor" stroke-width="4.2" stroke-linecap="round" stroke-linejoin="round"/>
-          </svg>
-        </span>
-        <div>
-          <strong>Deskline</strong>
-          <span>by {{ company_name }}</span>
+      <div class="launch-brand brand-lockup">
+        {% with anim=true, soft=true, size=56 %}
+          {% include "partials/logo_mark.html" %}
+        {% endwith %}
+        <div class="brand-lockup-text">
+          <strong class="brand-lockup-name">Deskline</strong>
+          <span class="brand-lockup-sub">by {{ company_name }}</span>
         </div>
       </div>
       <h1>Верни контроль над своим рабочим днём</h1>
@@ -125,8 +119,16 @@
 
     <section class="launch-panel">
       <div class="login-card launch-card" id="loginPanel">
-        <p class="eyebrow">Deskline</p>
-        <h2 id="loginTitle">Вход</h2>
+        <div class="brand-lockup">
+          {% with anim=true, soft=true, size=52 %}
+            {% include "partials/logo_mark.html" %}
+          {% endwith %}
+          <div class="brand-lockup-text">
+            <p class="brand-lockup-name">Deskline</p>
+            <p class="brand-lockup-sub">by {{ company_name }}</p>
+          </div>
+        </div>
+        <h2 class="login-section-title" id="loginTitle">Вход</h2>
         <p class="tagline" id="loginHint">Введите пароль, чтобы открыть дашборд.</p>
 
         <form id="loginForm" class="login-form">

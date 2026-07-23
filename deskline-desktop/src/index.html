@@ -37,19 +37,42 @@
       .logo svg {
         width: 100%;
         height: 100%;
+        overflow: visible;
       }
-      .logo-ring {
-        stroke-dasharray: 170;
-        stroke-dashoffset: 170;
-        animation: ring 0.95s ease forwards;
+      .logo-d-stem,
+      .logo-d-arc {
+        stroke-dasharray: 90;
+        stroke-dashoffset: 90;
+        animation: draw 0.7s cubic-bezier(0.22, 1, 0.36, 1) forwards;
       }
-      .logo-check {
-        stroke-dasharray: 48;
-        stroke-dashoffset: 48;
-        animation: check 0.55s ease 0.4s forwards;
+      .logo-d-arc { animation-delay: 0.12s; }
+      .logo-dayline {
+        stroke-dasharray: 72;
+        stroke-dashoffset: 72;
+        animation: draw 0.85s cubic-bezier(0.22, 1, 0.36, 1) 0.28s forwards;
       }
-      @keyframes ring { to { stroke-dashoffset: 0; } }
-      @keyframes check { to { stroke-dashoffset: 0; } }
+      .logo-now {
+        transform-box: fill-box;
+        transform-origin: center;
+        opacity: 0;
+        animation:
+          now-in 0.35s ease 0.85s forwards,
+          now-pulse 2.4s ease-in-out 1.2s infinite;
+      }
+      .logo-tile {
+        opacity: 0;
+        animation: tile-in 0.45s ease 0.05s forwards;
+      }
+      @keyframes draw { to { stroke-dashoffset: 0; } }
+      @keyframes tile-in { from { opacity: 0; } to { opacity: 1; } }
+      @keyframes now-in {
+        from { opacity: 0; transform: scale(0.4); }
+        to { opacity: 1; transform: scale(1); }
+      }
+      @keyframes now-pulse {
+        0%, 100% { transform: scale(1); opacity: 1; }
+        50% { transform: scale(1.22); opacity: 0.85; }
+      }
       h1 {
         margin: 0 0 0.4rem;
         font-weight: 650;
@@ -66,8 +89,11 @@
       <div>
         <div class="logo" aria-hidden="true">
           <svg viewBox="0 0 64 64" fill="none">
-            <circle class="logo-ring" cx="32" cy="32" r="27" stroke="currentColor" stroke-width="4"/>
-            <path class="logo-check" d="M20 33 L29 42 L46 23" stroke="currentColor" stroke-width="4.2" stroke-linecap="round" stroke-linejoin="round"/>
+            <rect class="logo-tile" x="4" y="4" width="56" height="56" rx="16" fill="currentColor" fill-opacity="0.1"/>
+            <path class="logo-d-stem" d="M20 18v28" stroke="currentColor" stroke-width="4.5" stroke-linecap="round"/>
+            <path class="logo-d-arc" d="M20 18h10c9.5 0 16 6.2 16 14s-6.5 14-16 14H20" stroke="currentColor" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round"/>
+            <path class="logo-dayline" d="M14 34h12c3 0 5-2.5 8-6s6-6 9-6 5 2.2 7 5 3.5 5 6 5h4" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/>
+            <circle class="logo-now" cx="43" cy="22" r="3.2" fill="currentColor"/>
           </svg>
         </div>
         <h1>Deskline</h1>

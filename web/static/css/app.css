@@ -93,6 +93,53 @@ html, body {
   letter-spacing: -0.03em;
 }
 
+.brand-lockup {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  color: var(--ink);
+}
+
+.brand-lockup .logo-mark {
+  flex-shrink: 0;
+  color: var(--accent);
+}
+
+.brand-lockup-text {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.brand-lockup-name {
+  margin: 0;
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: clamp(1.85rem, 3.2vw, 2.35rem);
+  line-height: 1;
+  letter-spacing: -0.03em;
+  color: var(--ink);
+}
+
+.brand-lockup-sub {
+  margin: 0;
+  font-size: 0.82rem;
+  color: var(--ink-soft);
+}
+
+.brand-block .brand-lockup {
+  margin-bottom: 4px;
+}
+
+.brand-block .brand-lockup-name {
+  font-size: clamp(2.6rem, 6vw, 4.4rem);
+}
+
+.brand-block .logo-mark {
+  width: 64px;
+  height: 64px;
+}
+
 .tagline {
   margin: 14px 0 0;
   max-width: 34ch;
@@ -1053,12 +1100,26 @@ main {
   animation: rise 0.25s ease;
 }
 
-.login-card .eyebrow {
-  margin: 0 0 8px;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  font-size: 0.75rem;
-  color: var(--ink-soft);
+.login-card .brand-lockup {
+  margin: 0 0 18px;
+}
+
+.login-card .brand-lockup-name {
+  font-size: clamp(1.9rem, 4vw, 2.25rem);
+}
+
+.login-card .logo-mark {
+  width: 52px;
+  height: 52px;
+}
+
+.login-card .login-section-title {
+  margin: 0 0 6px;
+  font-family: var(--display);
+  font-size: 1.35rem;
+  font-weight: 700;
+  line-height: 1.2;
+  color: var(--ink);
 }
 
 .login-card h1 {
@@ -2013,31 +2074,82 @@ main {
   height: 100%;
   display: block;
   color: inherit;
+  overflow: visible;
 }
 
-.logo-anim .logo-ring {
-  stroke-dasharray: 170;
-  stroke-dashoffset: 170;
-  animation: logo-ring 0.9s ease forwards;
+.logo-anim .logo-d-stem,
+.logo-anim .logo-d-arc {
+  stroke-dasharray: 90;
+  stroke-dashoffset: 90;
+  animation: logo-draw 0.7s cubic-bezier(0.22, 1, 0.36, 1) forwards;
 }
 
-.logo-anim .logo-check {
-  stroke-dasharray: 48;
-  stroke-dashoffset: 48;
-  animation: logo-check 0.55s ease 0.45s forwards;
+.logo-anim .logo-d-arc {
+  animation-delay: 0.12s;
 }
 
-.logo-anim-soft .logo-ring,
-.logo-anim-soft .logo-check {
-  animation-duration: 1.1s;
+.logo-anim .logo-dayline {
+  stroke-dasharray: 72;
+  stroke-dashoffset: 72;
+  animation: logo-draw 0.85s cubic-bezier(0.22, 1, 0.36, 1) 0.28s forwards;
 }
 
-@keyframes logo-ring {
+.logo-anim .logo-now {
+  transform-box: fill-box;
+  transform-origin: center;
+  opacity: 0;
+  animation:
+    logo-now-in 0.35s ease 0.85s forwards,
+    logo-now-pulse 2.4s ease-in-out 1.2s infinite;
+}
+
+.logo-anim .logo-tile {
+  opacity: 0;
+  animation: logo-tile-in 0.45s ease 0.05s forwards;
+}
+
+.logo-anim-soft .logo-d-stem,
+.logo-anim-soft .logo-d-arc,
+.logo-anim-soft .logo-dayline {
+  animation-duration: 1.05s;
+}
+
+.logo-mark:hover .logo-now,
+.brand-lockup:hover .logo-now {
+  animation: logo-now-pulse 1.4s ease-in-out infinite;
+  opacity: 1;
+}
+
+@keyframes logo-draw {
   to { stroke-dashoffset: 0; }
 }
 
-@keyframes logo-check {
-  to { stroke-dashoffset: 0; }
+@keyframes logo-tile-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes logo-now-in {
+  from {
+    opacity: 0;
+    transform: scale(0.4);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes logo-now-pulse {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.22);
+    opacity: 0.85;
+  }
 }
 
 .launch {
@@ -2068,13 +2180,26 @@ main {
 
 .launch-brand {
   display: flex;
-  gap: 12px;
+  gap: 14px;
   align-items: center;
+}
+
+.launch-brand .logo-mark {
+  width: 56px;
+  height: 56px;
+}
+
+.launch-brand .brand-lockup-name {
+  font-size: clamp(1.75rem, 3vw, 2.1rem);
 }
 
 .launch-brand strong {
   display: block;
-  font-size: 1.05rem;
+  font-family: var(--display);
+  font-size: clamp(1.75rem, 3vw, 2.1rem);
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  line-height: 1;
 }
 
 .launch-brand span {

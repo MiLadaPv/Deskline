@@ -1,4 +1,8 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none" aria-hidden="true">
-  <circle class="logo-ring" cx="32" cy="32" r="27" stroke="currentColor" stroke-width="4"/>
-  <path class="logo-check" d="M20 33 L29 42 L46 23" stroke="currentColor" stroke-width="4.2" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- Dayline D: desk day ribbon through a focus D -->
+  <rect class="logo-tile" x="4" y="4" width="56" height="56" rx="16" fill="currentColor" fill-opacity="0.1"/>
+  <path class="logo-d-stem" d="M20 18v28" stroke="currentColor" stroke-width="4.5" stroke-linecap="round"/>
+  <path class="logo-d-arc" d="M20 18h10c9.5 0 16 6.2 16 14s-6.5 14-16 14H20" stroke="currentColor" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round"/>
+  <path class="logo-dayline" d="M14 34h12c3 0 5-2.5 8-6s6-6 9-6 5 2.2 7 5 3.5 5 6 5h4" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle class="logo-now" cx="43" cy="22" r="3.2" fill="currentColor"/>
 </svg>
