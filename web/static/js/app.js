@@ -703,16 +703,17 @@ function renderPieChart(el, slices, total, emptyText) {
     .join("");
   const primary = usable[0];
   const primaryPct = Math.round((primary.sec / total) * 100);
+  const glowId = `donutGlow-${Math.random().toString(36).slice(2, 9)}`;
   el.innerHTML = `<div class="pie-layout">
     <div class="donut-wrap" role="group" aria-label="Диаграмма">
       <svg class="donut-svg" viewBox="0 0 220 220" width="220" height="220">
         <defs>
-          <filter id="donutGlow" x="-20%" y="-20%" width="140%" height="140%">
+          <filter id="${glowId}" x="-20%" y="-20%" width="140%" height="140%">
             <feDropShadow dx="0" dy="6" stdDeviation="6" flood-color="#15241f" flood-opacity="0.12"/>
           </filter>
         </defs>
         <circle class="donut-track" cx="110" cy="110" r="77" fill="none"/>
-        <g class="donut-segs" filter="url(#donutGlow)">${paths}</g>
+        <g class="donut-segs" filter="url(#${glowId})">${paths}</g>
       </svg>
       <div class="donut-center">
         <strong>${primaryPct}%</strong>
