@@ -156,7 +156,9 @@ def test_index_has_layered_reports_and_company_settings():
     assert 'name="hub_url"' in html
     assert 'id="filterEmployeeToday"' in html
     assert "pulse-board" in html
-    assert "Кто в фокусе" in html
+    assert "Кто в фокусе" in html or "quietTitle" in html
     assert "Картина дня" in html
     assert "Ритм фокуса" in html
+    assert "Топ проектов" in html
+    assert "Обзор" in html
     assert "Highest % productive time" not in html

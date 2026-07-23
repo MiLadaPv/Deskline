@@ -251,37 +251,127 @@ function renderBars(byCategory, total, { animate = true } = {}) {
   });
 }
 
-function renderKpis(summary) {
+function renderKpis(summary, team) {
   const el = document.getElementById("kpiStrip");
   if (!el) return;
   const total = summary.total_sec || 0;
   const by = summary.by_category || {};
   const productive = by.productive || 0;
   const distracting = by.distracting || 0;
-  const neutral = by.neutral || 0;
   const idle = summary.idle_sec || 0;
-  const active = summary.active_sec || 0;
+  const activePeople = (team || []).filter((m) => (m.total_sec || 0) > 60).length;
   const pctOf = (sec) => (total ? Math.round((sec / total) * 100) : 0);
   const items = [
+    { label: "Всего учтено", value: fmtDur(total), pct: null, tone: "tracked" },
     { label: "В фокусе", value: fmtDur(productive), pct: pctOf(productive), tone: "productive" },
     { label: "Отвлечения", value: fmtDur(distracting), pct: pctOf(distracting), tone: "distracting" },
-    { label: "Нейтрально", value: fmtDur(neutral), pct: pctOf(neutral), tone: "neutral" },
     { label: "Без ввода", value: fmtDur(idle), pct: pctOf(idle), tone: "idle" },
-    { label: "Активно", value: fmtDur(active), pct: pctOf(active), tone: "active" },
-    { label: "Всего", value: fmtDur(total), pct: total ? 100 : 0, tone: "tracked" },
+    {
+      label: companyMode ? "Активные люди" : "Активность",
+      value: companyMode ? String(activePeople || 0) : `${summary.activity_pct ?? 0}%`,
+      pct: companyMode ? null : summary.activity_pct ?? 0,
+      tone: "active",
+    },
   ];
   el.innerHTML = items
+    .map((it) => {
+      const meter =
+        it.pct == null
+          ? ""
+          : `<div class="pulse-ov-meter"><em>${it.pct}%</em><span><i style="width:${Math.max(it.pct, it.pct ? 3 : 0)}%"></i></span></div>`;
+      return `<article class="pulse-ov-card ${it.tone}">
+        <span class="pulse-ov-label">${it.label}</span>
+        <strong class="pulse-ov-value">${it.value}</strong>
+        ${meter}
+      </article>`;
+    })
+    .join("");
+}
+
+function renderTopProjectsPulse(summary) {
+  const el = document.getElementById("topProjectsPulse");
+  if (!el) return;
+  const byProj = summary.by_project || [];
+  const named = byProj
+    .map((row) => {
+      const p = (projectCache || []).find((x) => String(x.id) === String(row.project_id));
+      return {
+        id: row.project_id,
+        name: p?.name || (row.project_id == null ? "Без проекта" : `Проект #${row.project_id}`),
+        color: p?.color || "#1f6b56",
+        sec: row.sec || 0,
+      };
+    })
+    .filter((r) => r.sec >= 30)
+    .slice(0, 5);
+  if (!named.length) {
+    el.innerHTML = `<p class="hint">Пока нет времени по проектам. Выберите проект в шапке.</p>`;
+    return;
+  }
+  const total = named.reduce((s, r) => s + r.sec, 0) || 1;
+  const cx = 60;
+  const cy = 60;
+  let angle = 0;
+  const paths = named
+    .map((r) => {
+      const sweep = (r.sec / total) * 360;
+      const d = donutSegmentPath(cx, cy, 52, 34, angle, angle + sweep);
+      angle += sweep;
+      return d ? `<path d="${d}" fill="${r.color}" stroke="#fff" stroke-width="1.5"/>` : "";
+    })
+    .join("");
+  const legend = named
     .map(
-      (it) => `<div class="pulse-stat ${it.tone}">
-        <span class="pulse-stat-label">${it.label}</span>
-        <strong class="pulse-stat-value">${it.value}</strong>
-        <div class="pulse-stat-foot">
-          <em>${it.pct}%</em>
-          <div class="pulse-stat-meter"><span style="width:${Math.max(it.pct, it.pct ? 4 : 0)}%"></span></div>
-        </div>
-      </div>`
+      (r) =>
+        `<li><i style="background:${r.color}"></i><span>${escapeHtml(r.name)}</span><b>${fmtDur(r.sec)}</b></li>`
     )
     .join("");
+  el.innerHTML = `<div class="pulse-proj-layout">
+    <ul class="pulse-proj-legend">${legend}</ul>
+    <div class="pulse-proj-donut">
+      <svg viewBox="0 0 120 120" width="150" height="150" aria-hidden="true">
+        <circle cx="60" cy="60" r="43" fill="none" stroke="rgba(31,107,86,0.08)" stroke-width="16"/>
+        ${paths}
+      </svg>
+      <div class="donut-center">
+        <strong>${fmtDur(total)}</strong>
+        <span>всего</span>
+      </div>
+    </div>
+  </div>`;
+}
+
+function renderQuietPeople(team) {
+  const quiet = document.getElementById("quietList");
+  const gauges = document.getElementById("teamGauges");
+  const title = document.getElementById("quietTitle");
+  if (!quiet || !gauges) return;
+  const idlePeople = (team || []).filter((m) => !(m.total_sec > 60));
+  const active = (team || []).filter((m) => m.total_sec > 60);
+  if (companyMode && idlePeople.length) {
+    title.textContent = "Ещё не трекали";
+    quiet.hidden = false;
+    gauges.hidden = active.length === 0;
+    quiet.innerHTML = idlePeople
+      .map(
+        (m) => `<div class="pulse-quiet-row">
+          <span class="team-avatar" style="background:${m.color || "#1f6b56"}">${escapeHtml(m.initials || "?")}</span>
+          <div>
+            <strong>${escapeHtml(m.display_name || "—")}</strong>
+            <em>Сегодня тишина</em>
+          </div>
+        </div>`
+      )
+      .join("");
+    if (active.length) renderTeamGauges(active);
+    else gauges.innerHTML = "";
+  } else {
+    title.textContent = "Кто в фокусе";
+    quiet.hidden = true;
+    quiet.innerHTML = "";
+    gauges.hidden = false;
+    renderTeamGauges(team);
+  }
 }
 
 function renderTeamGauges(team) {
@@ -597,18 +687,41 @@ function renderHoursChart(trends) {
   const el = document.getElementById("hoursChart");
   if (!el) return;
   const rows = trends || [];
-  const max = Math.max(...rows.map((r) => r.active_sec || r.total_sec || 0), 1);
-  el.innerHTML = rows
-    .map((r) => {
-      const sec = r.active_sec || 0;
-      const h = Math.max(2, Math.round((sec / max) * 100));
-      return `<div class="hours-col" title="${r.day}: ${fmtDur(sec)} активно">
-        <div class="hours-bar-wrap"><div class="hours-bar" style="height:${h}%"></div></div>
-        <span class="hours-label">${weekdayShort(r.day)}</span>
-        <span class="hours-val">${fmtDur(sec)}</span>
-      </div>`;
+  const aside = document.getElementById("hoursTrendAside");
+  if (aside) aside.textContent = `${rows.length || 7} дн.`;
+  if (!rows.length) {
+    el.innerHTML = `<p class="hint">Пока нет тренда по часам.</p>`;
+    return;
+  }
+  const vals = rows.map((r) => Number(r.active_sec || r.total_sec || 0));
+  const max = Math.max(...vals, 1);
+  const w = 320;
+  const h = 140;
+  const padX = 12;
+  const padY = 16;
+  const pts = vals.map((v, i) => {
+    const x = padX + (i * (w - padX * 2)) / Math.max(vals.length - 1, 1);
+    const y = h - padY - (v / max) * (h - padY * 2);
+    return [x, y];
+  });
+  const poly = pts.map(([x, y]) => `${x.toFixed(1)},${y.toFixed(1)}`).join(" ");
+  const dots = pts
+    .map(([x, y], i) => {
+      const label = new Date(`${rows[i].day}T12:00:00`).toLocaleDateString("ru-RU", {
+        weekday: "narrow",
+      });
+      return `<g>
+        <circle cx="${x}" cy="${y}" r="4" class="hours-dot"/>
+        <text x="${x}" y="${h - 2}" text-anchor="middle" class="hours-axis">${label}</text>
+      </g>`;
     })
     .join("");
+  const maxH = Math.round(max / 3600);
+  el.innerHTML = `<svg class="hours-line-svg" viewBox="0 0 ${w} ${h}" role="img" aria-label="Часы за неделю">
+    <text x="${w - 4}" y="14" text-anchor="end" class="hours-axis">${maxH}ч</text>
+    <polyline class="hours-line-path" fill="none" points="${poly}"/>
+    ${dots}
+  </svg>`;
 }
 
 function renderProdDaysChart(trends) {
@@ -1300,8 +1413,9 @@ async function refreshSummary() {
   if (activitySub) {
     activitySub.textContent = `${fmtDur(summary.active_sec)} активно · ${fmtDur(summary.idle_sec)} без ввода`;
   }
-  renderTeamGauges(team);
-  renderKpis(summary);
+  renderQuietPeople(team);
+  renderKpis(summary, team);
+  renderTopProjectsPulse(summary);
   renderTodayTimelineStrip(timelineRows, summary);
   renderPieChart(
     document.getElementById("catPie"),

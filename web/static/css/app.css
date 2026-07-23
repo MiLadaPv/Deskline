@@ -2357,8 +2357,204 @@ main {
 /* Deskline Pulse board — own report language */
 .pulse-board {
   display: grid;
-  gap: 16px;
+  gap: 14px;
   margin: 6px 0 22px;
+}
+
+.pulse-section-label {
+  margin: 8px 0 0;
+  font-size: 0.78rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+  font-weight: 700;
+}
+
+.pulse-overview {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.pulse-ov-card {
+  background: #fff;
+  border: 1px solid rgba(31, 107, 86, 0.1);
+  border-radius: 16px;
+  padding: 14px 14px 12px;
+  box-shadow: 0 10px 24px rgba(21, 36, 31, 0.04);
+  min-width: 0;
+}
+
+.pulse-ov-label {
+  display: block;
+  color: var(--ink-soft);
+  font-size: 0.74rem;
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+
+.pulse-ov-value {
+  display: block;
+  font-size: 1.2rem;
+  font-weight: 750;
+  color: var(--ink);
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+
+.pulse-ov-meter {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.pulse-ov-meter em {
+  font-style: normal;
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: var(--ink-soft);
+  min-width: 2em;
+}
+
+.pulse-ov-meter span {
+  flex: 1;
+  height: 5px;
+  border-radius: 999px;
+  background: rgba(21, 36, 31, 0.08);
+  overflow: hidden;
+}
+
+.pulse-ov-meter i {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+}
+
+.pulse-ov-card.distracting .pulse-ov-meter i { background: #b45309; }
+.pulse-ov-card.idle .pulse-ov-meter i { background: #9a3412; }
+.pulse-ov-card.active .pulse-ov-meter i { background: #0f766e; }
+.pulse-ov-card.tracked .pulse-ov-meter i { background: #365314; }
+
+.pulse-split {
+  display: grid;
+  grid-template-columns: 1.1fr 0.9fr;
+  gap: 12px;
+}
+
+.pulse-proj-layout {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 14px;
+  align-items: center;
+}
+
+.pulse-proj-legend {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.pulse-proj-legend li {
+  display: grid;
+  grid-template-columns: 10px 1fr auto;
+  gap: 8px;
+  align-items: center;
+  font-size: 0.82rem;
+}
+
+.pulse-proj-legend i {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.pulse-proj-legend b {
+  color: var(--ink-soft);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.pulse-proj-donut {
+  position: relative;
+  width: 150px;
+  height: 150px;
+}
+
+.pulse-proj-donut .donut-center {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-content: center;
+  text-align: center;
+  pointer-events: none;
+}
+
+.pulse-proj-donut .donut-center strong {
+  font-size: 0.95rem;
+  color: var(--ink);
+}
+
+.pulse-proj-donut .donut-center span {
+  font-size: 0.7rem;
+  color: var(--ink-soft);
+}
+
+.pulse-quiet {
+  display: grid;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.pulse-quiet-row {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  padding: 8px 10px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.7);
+  border: 1px solid rgba(31, 107, 86, 0.08);
+}
+
+.pulse-quiet-row strong {
+  display: block;
+  font-size: 0.86rem;
+}
+
+.pulse-quiet-row em {
+  font-style: normal;
+  font-size: 0.74rem;
+  color: var(--ink-soft);
+}
+
+.hours-line {
+  min-height: 150px;
+}
+
+.hours-line-svg {
+  width: 100%;
+  height: 150px;
+  display: block;
+}
+
+.hours-line-path {
+  stroke: var(--accent);
+  stroke-width: 3;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+
+.hours-dot {
+  fill: #fff;
+  stroke: var(--accent);
+  stroke-width: 2.5;
+}
+
+.hours-axis {
+  fill: var(--ink-soft);
+  font-size: 10px;
 }
 
 .pulse-panel {
@@ -2794,6 +2990,15 @@ main {
   font-size: 0.78rem;
 }
 
+@media (max-width: 980px) {
+  .pulse-overview {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  .pulse-split {
+    grid-template-columns: 1fr;
+  }
+}
+
 @media (max-width: 900px) {
   .kpi-strip-metric {
     grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -2801,6 +3006,9 @@ main {
 }
 
 @media (max-width: 560px) {
+  .pulse-overview {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
   .kpi-strip-metric {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
