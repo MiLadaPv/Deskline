@@ -115,14 +115,9 @@
     </section>
 
     <section id="panel-day" class="panel">
-      <div class="panel-head">
+      <div class="panel-head panel-head-day">
         <h2>По часам</h2>
-        <div class="day-nav" role="group" aria-label="Выбор дня">
-          <button type="button" class="btn day-nav-btn" id="dayPrev" aria-label="Предыдущий день">‹</button>
-          <input type="date" id="dayDate" aria-label="Дата" />
-          <button type="button" class="btn day-nav-btn" id="dayNext" aria-label="Следующий день">›</button>
-          <button type="button" class="btn" id="dayTodayBtn">Сегодня</button>
-        </div>
+        <div class="day-nav" id="dayNav" aria-label="Выбор дня"></div>
       </div>
       <div class="kpi-strip" id="dayKpiStrip" aria-label="Сводка за выбранный день"></div>
       <div class="charts-grid pies-grid">

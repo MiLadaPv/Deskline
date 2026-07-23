@@ -44,18 +44,36 @@ const KIND_COLORS = [
 let lastSummaryKey = "";
 let lastStatusKey = "";
 let lastBarsKey = "";
-let selectedDayIso = localDayIso(new Date());
+/** @type {string} YYYY-MM-DD — always defaults to today */
+let selectedDayIso = "";
 
-function localDayIso(d) {
+function localDayIso(d = new Date()) {
   const y = d.getFullYear();
   const m = String(d.getMonth() + 1).padStart(2, "0");
   const day = String(d.getDate()).padStart(2, "0");
   return `${y}-${m}-${day}`;
 }
 
+function ensureSelectedDay() {
+  const today = localDayIso();
+  if (!selectedDayIso || !/^\d{4}-\d{2}-\d{2}$/.test(selectedDayIso)) {
+    selectedDayIso = today;
+  }
+  if (selectedDayIso > today) selectedDayIso = today;
+  return selectedDayIso;
+}
+
 function shiftDayIso(iso, deltaDays) {
   const d = new Date(`${iso}T12:00:00`);
   d.setDate(d.getDate() + deltaDays);
+  return localDayIso(d);
+}
+
+function startOfWeekMonday(iso) {
+  const d = new Date(`${iso}T12:00:00`);
+  const dow = d.getDay(); // 0=Sun … 6=Sat
+  const delta = dow === 0 ? -6 : 1 - dow;
+  d.setDate(d.getDate() + delta);
   return localDayIso(d);
 }
 
@@ -74,6 +92,51 @@ function formatDayTitle(isoDay) {
     month: "long",
     year: "numeric",
   });
+}
+
+function renderDayWeekStrip() {
+  const el = document.getElementById("dayNav");
+  if (!el) return;
+  ensureSelectedDay();
+  const today = localDayIso();
+  const weekStart = startOfWeekMonday(selectedDayIso);
+  const chips = [];
+  for (let i = 0; i < 7; i++) {
+    const iso = shiftDayIso(weekStart, i);
+    const d = new Date(`${iso}T12:00:00`);
+    const wd = d.toLocaleDateString("ru-RU", { weekday: "short" });
+    const num = String(d.getDate());
+    const future = iso > today;
+    const active = iso === selectedDayIso;
+    const isToday = iso === today;
+    chips.push(`<button type="button"
+      class="day-chip${active ? " is-active" : ""}${isToday ? " is-today" : ""}"
+      data-pick-day="${iso}"
+      ${future ? "disabled" : ""}
+      aria-pressed="${active ? "true" : "false"}"
+      aria-label="${escapeHtml(formatDayTitle(iso))}">
+      <span class="day-chip-wd">${escapeHtml(wd)}</span>
+      <span class="day-chip-num">${num}</span>
+    </button>`);
+  }
+  const monthLabel = new Date(`${selectedDayIso}T12:00:00`).toLocaleDateString("ru-RU", {
+    month: "long",
+    year: "numeric",
+  });
+  const canGoNext =
+    shiftDayIso(weekStart, 7) <= today || selectedDayIso < today;
+  el.innerHTML = `
+    <div class="day-week-toolbar">
+      <button type="button" class="btn day-nav-btn" data-shift-week="-7" aria-label="Предыдущая неделя">‹</button>
+      <div class="day-week-meta">
+        <strong class="day-week-month">${escapeHtml(monthLabel)}</strong>
+        <span class="day-week-current">${escapeHtml(formatDayTitle(selectedDayIso))}</span>
+      </div>
+      <button type="button" class="btn day-nav-btn" data-shift-week="7" aria-label="Следующая неделя" ${canGoNext ? "" : "disabled"}>›</button>
+      <button type="button" class="btn ${selectedDayIso === today ? "" : "primary"}" data-go-today ${selectedDayIso === today ? "disabled" : ""}>Сегодня</button>
+    </div>
+    <div class="day-week-strip" role="listbox" aria-label="Дни недели">${chips.join("")}</div>
+  `;
 }
 
 async function api(path, opts = {}) {
@@ -1298,64 +1361,90 @@ function fmtClock(iso) {
 }
 
 function syncDayDateInput() {
-  const input = document.getElementById("dayDate");
-  if (input) input.value = selectedDayIso;
-  const todayBtn = document.getElementById("dayTodayBtn");
-  if (todayBtn) {
-    todayBtn.disabled = selectedDayIso === localDayIso(new Date());
-  }
+  renderDayWeekStrip();
 }
 
 async function refreshTimeline() {
-  syncDayDateInput();
-  const { from, to } = dayQueryBounds(selectedDayIso);
-  const q = `day=${encodeURIComponent(selectedDayIso)}`;
-  const [rows, summary] = await Promise.all([
-    api(`/api/timeline?${q}`),
-    api(`/api/summary?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`),
-  ]);
-  renderDayGantt(rows || []);
-  renderDayKpis(summary || {});
-  renderPieChart(
-    document.getElementById("dayCatPie"),
-    categoryPieSlices(summary.by_category || {}),
-    summary.total_sec || 0,
-    "Нет данных за этот день."
-  );
-  renderPieChart(
-    document.getElementById("dayKindPie"),
-    kindPieSlices(summary.by_kind || {}),
-    summary.total_sec || 0,
-    "Нет типов занятий за этот день."
-  );
+  ensureSelectedDay();
+  renderDayWeekStrip();
+  try {
+    const { from, to } = dayQueryBounds(selectedDayIso);
+    const q = `day=${encodeURIComponent(selectedDayIso)}`;
+    const [rowsRes, summaryRes] = await Promise.allSettled([
+      api(`/api/timeline?${q}`),
+      api(`/api/summary?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`),
+    ]);
+    const rows = rowsRes.status === "fulfilled" ? rowsRes.value || [] : [];
+    const summary = summaryRes.status === "fulfilled" ? summaryRes.value || {} : {};
+    if (rowsRes.status !== "fulfilled") {
+      console.error(rowsRes.reason);
+      showToast("Не удалось загрузить ленту дня", "error");
+    }
 
-  const el = document.getElementById("timelineList");
-  if (!el) return;
-  if (!rows.length) {
-    el.innerHTML = `<li><span class="timeline-time">—</span><span class="rank-icon">•</span><span class="rank-name">Пока нет сессий</span><span class="rank-meta"></span></li>`;
-    return;
+    renderDayGantt(rows);
+    renderDayKpis(summary);
+    const total = summary.total_sec || 0;
+    renderPieChart(
+      document.getElementById("dayCatPie"),
+      categoryPieSlices(summary.by_category || {}),
+      total,
+      "Нет данных за этот день."
+    );
+    renderPieChart(
+      document.getElementById("dayKindPie"),
+      kindPieSlices(summary.by_kind || {}),
+      total,
+      "Нет типов занятий за этот день."
+    );
+
+    const el = document.getElementById("timelineList");
+    if (!el) return;
+    if (!rows.length) {
+      el.innerHTML = `<li><span class="timeline-time">—</span><span class="rank-icon">•</span><span class="rank-name">Пока нет сессий</span><span class="rank-meta"></span></li>`;
+      return;
+    }
+    el.innerHTML = rows
+      .map((r) => {
+        const icon = r.icon_url
+          ? iconImgHtml(r.icon_url)
+          : `<span class="rank-icon">•</span>`;
+        const idle =
+          r.idle_sec >= 60
+            ? `<span class="timeline-idle">idle ${fmtDur(r.idle_sec)}</span>`
+            : "";
+        const cat = categoryClass(r.category);
+        return `<li class="timeline-cat-${cat}">
+          <span class="timeline-time">${fmtClock(r.started_at)}</span>
+          ${icon}
+          <span>
+            <span class="rank-name">${escapeHtml(r.name)}</span>
+            ${idle}
+          </span>
+          <span class="rank-meta">${fmtDur(r.sec)}</span>
+        </li>`;
+      })
+      .join("");
+  } catch (err) {
+    console.error(err);
+    showToast(err?.message || "Не удалось загрузить день", "error");
   }
-  el.innerHTML = rows
-    .map((r) => {
-      const icon = r.icon_url
-        ? iconImgHtml(r.icon_url)
-        : `<span class="rank-icon">•</span>`;
-      const idle =
-        r.idle_sec >= 60
-          ? `<span class="timeline-idle">idle ${fmtDur(r.idle_sec)}</span>`
-          : "";
-      const cat = categoryClass(r.category);
-      return `<li class="timeline-cat-${cat}">
-        <span class="timeline-time">${fmtClock(r.started_at)}</span>
-        ${icon}
-        <span>
-          <span class="rank-name">${escapeHtml(r.name)}</span>
-          ${idle}
-        </span>
-        <span class="rank-meta">${fmtDur(r.sec)}</span>
-      </li>`;
-    })
-    .join("");
+}
+
+function selectDay(iso) {
+  const today = localDayIso();
+  let next = iso || today;
+  if (next > today) next = today;
+  selectedDayIso = next;
+  return refreshTimeline();
+}
+
+function shiftSelectedWeek(deltaDays) {
+  ensureSelectedDay();
+  const today = localDayIso();
+  let next = shiftDayIso(selectedDayIso, deltaDays);
+  if (next > today) next = today;
+  selectedDayIso = next;
+  return refreshTimeline();
 }
 
 async function refreshRatings() {
@@ -1396,7 +1485,10 @@ function wireUi() {
       setActiveTab(tab.dataset.tab);
       if (tab.dataset.tab === "shots") refreshShots();
       if (tab.dataset.tab === "settings") loadSettings();
-      if (tab.dataset.tab === "day") refreshTimeline();
+      if (tab.dataset.tab === "day") {
+        ensureSelectedDay();
+        refreshTimeline().catch(() => {});
+      }
       if (tab.dataset.tab === "ratings") refreshRatings();
       if (tab.dataset.tab === "projects") refreshProjects();
       if (tab.dataset.tab === "usage") refreshUsageReport();
@@ -1408,7 +1500,10 @@ function wireUi() {
     const known = ["today", "day", "usage", "projects", "ratings", "shots", "settings"];
     if (!known.includes(name)) return;
     setActiveTab(name, { syncHash: false });
-    if (name === "day") refreshTimeline().catch(() => {});
+    if (name === "day") {
+      ensureSelectedDay();
+      refreshTimeline().catch(() => {});
+    }
     if (name === "usage") refreshUsageReport().catch(() => {});
     if (name === "projects") refreshProjects().catch(() => {});
     if (name === "ratings") refreshRatings().catch(() => {});
@@ -1416,38 +1511,25 @@ function wireUi() {
     if (name === "settings") loadSettings().catch(() => {});
   });
 
-  const dayDate = document.getElementById("dayDate");
-  const dayPrev = document.getElementById("dayPrev");
-  const dayNext = document.getElementById("dayNext");
-  const dayTodayBtn = document.getElementById("dayTodayBtn");
-  if (dayDate) {
-    dayDate.value = selectedDayIso;
-    dayDate.max = localDayIso(new Date());
-    dayDate.addEventListener("change", () => {
-      if (!dayDate.value) return;
-      selectedDayIso = dayDate.value;
-      refreshTimeline().catch(() => {});
-    });
-  }
-  if (dayPrev) {
-    dayPrev.addEventListener("click", () => {
-      selectedDayIso = shiftDayIso(selectedDayIso, -1);
-      refreshTimeline().catch(() => {});
-    });
-  }
-  if (dayNext) {
-    dayNext.addEventListener("click", () => {
-      const tomorrow = shiftDayIso(selectedDayIso, 1);
-      const today = localDayIso(new Date());
-      if (tomorrow > today) return;
-      selectedDayIso = tomorrow;
-      refreshTimeline().catch(() => {});
-    });
-  }
-  if (dayTodayBtn) {
-    dayTodayBtn.addEventListener("click", () => {
-      selectedDayIso = localDayIso(new Date());
-      refreshTimeline().catch(() => {});
+  const dayPanel = document.getElementById("panel-day");
+  if (dayPanel) {
+    dayPanel.addEventListener("click", (ev) => {
+      const pick = ev.target.closest("[data-pick-day]");
+      if (pick && !pick.disabled) {
+        ev.preventDefault();
+        selectDay(pick.dataset.pickDay).catch(() => {});
+        return;
+      }
+      const shift = ev.target.closest("[data-shift-week]");
+      if (shift && !shift.disabled) {
+        ev.preventDefault();
+        shiftSelectedWeek(Number(shift.dataset.shiftWeek) || 0).catch(() => {});
+        return;
+      }
+      if (ev.target.closest("[data-go-today]")) {
+        ev.preventDefault();
+        selectDay(localDayIso()).catch(() => {});
+      }
     });
   }
 
@@ -1890,6 +1972,7 @@ function wireUi() {
 
 async function boot() {
   wireUi();
+  ensureSelectedDay();
   const hashTab = (location.hash || "").replace(/^#/, "");
   const known = ["today", "day", "usage", "projects", "ratings", "shots", "settings"];
   if (known.includes(hashTab)) {
@@ -1911,7 +1994,7 @@ async function boot() {
     refreshStatus().catch(() => {});
     refreshUsageReport().catch(() => {});
     if (document.getElementById("panel-day")?.classList.contains("active")) {
-      if (selectedDayIso === localDayIso(new Date())) {
+      if (selectedDayIso === localDayIso()) {
         refreshTimeline().catch(() => {});
       }
     }

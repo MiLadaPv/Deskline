@@ -44,8 +44,7 @@ def test_index_has_day_nav_and_pies():
     from deskline.config import WEB_ROOT
 
     html = (WEB_ROOT / "templates" / "index.html").read_text(encoding="utf-8")
-    assert 'id="dayDate"' in html
-    assert 'id="dayPrev"' in html
+    assert 'id="dayNav"' in html
     assert 'id="catPie"' in html
     assert 'id="kindPie"' in html
     assert 'id="dayCatPie"' in html
