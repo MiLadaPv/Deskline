@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-label="Deskline Soft Seal">
+  <title>13 · Soft Seal</title>
+  <circle cx="64" cy="64" r="52" fill="#e8f3ee"/>
+  <circle cx="64" cy="64" r="40" fill="none" stroke="#1f6b56" stroke-width="5" stroke-dasharray="86 160" stroke-linecap="round" transform="rotate(-90 64 64)"/>
+  <path d="M48 42v44h12c14 0 24-10 24-22S74 42 60 42H48z" fill="none" stroke="#1f6b56" stroke-width="7" stroke-linejoin="round"/>
+  <circle cx="78" cy="50" r="4.5" fill="#1f6b56"/>
+</svg>

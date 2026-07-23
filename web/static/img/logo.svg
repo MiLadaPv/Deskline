@@ -1,8 +1,8 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none" aria-hidden="true">
-  <!-- Dayline D: desk day ribbon through a focus D -->
-  <rect class="logo-tile" x="4" y="4" width="56" height="56" rx="16" fill="currentColor" fill-opacity="0.1"/>
-  <path class="logo-d-stem" d="M20 18v28" stroke="currentColor" stroke-width="4.5" stroke-linecap="round"/>
-  <path class="logo-d-arc" d="M20 18h10c9.5 0 16 6.2 16 14s-6.5 14-16 14H20" stroke="currentColor" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round"/>
-  <path class="logo-dayline" d="M14 34h12c3 0 5-2.5 8-6s6-6 9-6 5 2.2 7 5 3.5 5 6 5h4" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/>
-  <circle class="logo-now" cx="43" cy="22" r="3.2" fill="currentColor"/>
+  <!-- Default mark = 08 Classic Solid (app-ready). Replace after final pick. -->
+  <rect class="logo-tile" x="4" y="4" width="56" height="56" rx="14" fill="currentColor"/>
+  <path class="logo-d-stem" d="M20 18v28" stroke="#f4faf7" stroke-width="4.5" stroke-linecap="round"/>
+  <path class="logo-d-arc" d="M20 18h10c9 0 15 6.2 15 14s-6 14-15 14H20" stroke="#f4faf7" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round"/>
+  <path class="logo-dayline" d="M15 34h9c2.5 0 4.2-2.5 7-6s5.5-6 8.5-6 4.5 2 6.5 4.8S50 34 53 34" stroke="#f4faf7" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle class="logo-now" cx="40" cy="22" r="2.8" fill="#f4faf7"/>
 </svg>

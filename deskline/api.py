@@ -344,6 +344,14 @@ def create_app(tracker: Tracker, db: Database | None = None) -> FastAPI:
             brand_template_context(),
         )
 
+    @app.get("/logos", response_class=HTMLResponse)
+    def logos_page(request: Request) -> HTMLResponse:
+        return templates.TemplateResponse(
+            request,
+            "logos.html",
+            brand_template_context(),
+        )
+
     @app.get("/about", response_class=HTMLResponse)
     def about_page(request: Request) -> HTMLResponse:
         return templates.TemplateResponse(

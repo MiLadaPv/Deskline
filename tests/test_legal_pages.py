@@ -30,10 +30,26 @@ def test_brand_template_context_fields():
 
 
 def test_legal_paths_are_public():
-    for path in ("/about", "/privacy", "/terms", "/login", "/static/css/app.css"):
+    for path in ("/about", "/privacy", "/terms", "/login", "/welcome", "/logos", "/static/css/app.css"):
         assert is_public_path(path)
     assert not is_public_path("/")
     assert not is_public_path("/api/settings")
+
+
+def test_logo_gallery_assets_exist():
+    logos = WEB_ROOT / "static" / "img" / "logos"
+    assert logos.is_dir()
+    needed = [
+        "01-pulse-d.svg",
+        "08-classic-solid.svg",
+        "12-lockup.svg",
+        "14-dual-peak.svg",
+    ]
+    for name in needed:
+        assert (logos / name).is_file(), name
+    page = (WEB_ROOT / "templates" / "logos.html").read_text(encoding="utf-8")
+    assert "01-pulse-d.svg" in page
+    assert "Галерея" in page or "Логотипы" in page
 
 
 def test_legal_templates_exist_and_mention_company():

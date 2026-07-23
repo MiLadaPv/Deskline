@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-label="Deskline Stroke DL">
+  <title>06 · Stroke DL</title>
+  <rect x="8" y="8" width="112" height="112" rx="32" fill="#f7fbf9"/>
+  <!-- Continuous D into L baseline -->
+  <path d="M40 34v60h8c18 0 32-13 32-30S66 34 48 34H40
+           M48 94h42" stroke="#1f6b56" stroke-width="9" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+</svg>

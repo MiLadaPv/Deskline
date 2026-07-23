@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-label="Deskline Split Dayline">
+  <title>10 · Split Dayline</title>
+  <defs>
+    <clipPath id="tile">
+      <rect x="8" y="8" width="112" height="112" rx="32"/>
+    </clipPath>
+  </defs>
+  <g clip-path="url(#tile)">
+    <path d="M8 8h112v112H8z" fill="#1f6b56"/>
+    <path d="M8 8l112 112V8H8z" fill="#cfe8df"/>
+    <path d="M18 78c20-2 30-36 46-36s24 34 46 36" stroke="#15241f" stroke-width="7" stroke-linecap="round" fill="none"/>
+    <circle cx="64" cy="42" r="6" fill="#15241f"/>
+  </g>
+</svg>

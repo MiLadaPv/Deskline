@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-label="Deskline Negative D">
+  <title>03 · Negative D</title>
+  <rect x="8" y="8" width="112" height="112" rx="32" fill="#1f6b56"/>
+  <path d="M42 34v60h18c18.5 0 32-13.2 32-30S78.5 34 60 34H42z" fill="#f4faf7"/>
+  <circle cx="86" cy="48" r="5.5" fill="#f4faf7"/>
+</svg>

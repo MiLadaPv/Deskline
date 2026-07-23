@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-label="Deskline Window">
+  <title>07 · Focus Window</title>
+  <rect x="8" y="8" width="112" height="112" rx="32" fill="#e8f3ee"/>
+  <rect x="34" y="36" width="60" height="56" rx="10" fill="#fff" stroke="#1f6b56" stroke-width="5"/>
+  <path d="M34 50h60" stroke="#1f6b56" stroke-width="4"/>
+  <circle cx="44" cy="43" r="2.8" fill="#1f6b56" fill-opacity="0.45"/>
+  <circle cx="53" cy="43" r="2.8" fill="#1f6b56" fill-opacity="0.45"/>
+  <path d="M46 78h8l6-14 7 20 5-10h10" stroke="#1f6b56" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+</svg>

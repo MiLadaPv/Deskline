@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-label="Deskline Layers">
+  <title>05 · Desk Layers</title>
+  <rect x="8" y="8" width="112" height="112" rx="32" fill="#eef6f2"/>
+  <path d="M28 86h72" stroke="#1f6b56" stroke-opacity="0.28" stroke-width="6" stroke-linecap="round"/>
+  <path d="M28 72h72" stroke="#1f6b56" stroke-opacity="0.5" stroke-width="6" stroke-linecap="round"/>
+  <path d="M28 58h20c8 0 14-16 24-16s16 16 24 16h4" stroke="#1f6b56" stroke-width="7" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+  <circle cx="72" cy="42" r="5.5" fill="#1f6b56"/>
+</svg>
