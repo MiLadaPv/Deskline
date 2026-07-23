@@ -191,6 +191,8 @@ def is_public_path(path: str) -> bool:
         return True
     if path.startswith("/api/ingest"):
         return True
+    if path.startswith("/api/extension/"):
+        return True
     if path in {
         "/login",
         "/welcome",

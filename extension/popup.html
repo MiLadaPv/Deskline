@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Deskline</title>
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+  <body>
+    <header>
+      <div class="brand">Deskline</div>
+      <div id="statusBadge" class="badge">…</div>
+    </header>
+    <p id="currentHost" class="muted">No active tab</p>
+    <p class="stat"><span id="todayTime">0m</span> today (browser)</p>
+    <div class="actions">
+      <button id="toggleBtn" type="button">Pause</button>
+      <a id="desktopCta" class="cta" href="download.html" target="_blank" rel="noreferrer"
+        >Get Desktop</a
+      >
+    </div>
+    <p id="desktopHint" class="hint muted"></p>
+    <script src="popup.js"></script>
+  </body>
+</html>

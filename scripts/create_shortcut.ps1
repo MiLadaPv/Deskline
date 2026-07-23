@@ -23,7 +23,6 @@ function New-DesklineShortcut {
     if ($dir -and -not (Test-Path -LiteralPath $dir)) {
       New-Item -ItemType Directory -Path $dir -Force | Out-Null
     }
-    # Remove broken/empty shortcuts so Save can recreate them cleanly
     if (Test-Path -LiteralPath $Path) {
       Remove-Item -LiteralPath $Path -Force -ErrorAction SilentlyContinue
     }
@@ -40,7 +39,7 @@ function New-DesklineShortcut {
       $s.WorkingDirectory = $InstallRoot
       $s.WindowStyle = 7
     }
-    $s.Description = 'Deskline — локальный трекер времени'
+    $s.Description = 'Deskline local productivity tracker'
     if ($Icon -and (Test-Path -LiteralPath $Icon)) {
       $s.IconLocation = "$Icon,0"
     }
@@ -59,10 +58,19 @@ $desktopCandidates = New-Object System.Collections.Generic.List[string]
 foreach ($p in @(
   (Join-Path $env:USERPROFILE 'Desktop'),
   (Join-Path $env:USERPROFILE 'OneDrive\Desktop'),
-  (Join-Path $env:USERPROFILE 'OneDrive\Рабочий стол'),
   [Environment]::GetFolderPath('Desktop')
 )) {
   if ($p -and (Test-Path -LiteralPath $p)) { [void]$desktopCandidates.Add($p) }
+}
+
+$od = Join-Path $env:USERPROFILE 'OneDrive'
+if (Test-Path -LiteralPath $od) {
+  Get-ChildItem -LiteralPath $od -Directory -ErrorAction SilentlyContinue | ForEach-Object {
+    $looksDesktop = $_.Name -like '*Desktop*' -or $_.Name -like '*desk*'
+    if ($looksDesktop) {
+      [void]$desktopCandidates.Add($_.FullName)
+    }
+  }
 }
 
 $desktopCandidates = $desktopCandidates | Select-Object -Unique
@@ -80,5 +88,6 @@ New-DesklineShortcut -Path (Join-Path $startMenu 'Deskline.lnk') -Icon $icon | O
 if (-not $ok) {
   Write-Warning 'Desktop shortcut was not created. Use Start Menu -> Deskline.'
 } else {
-  Write-Host 'Done. Double-click Deskline on the desktop to open the app window.'
+  Write-Host 'Done. Double-click Deskline - opens deskline-desktop.exe (native window).'
+  Write-Host 'If the shell is missing, re-run install.bat after: cd deskline-desktop && npm run build'
 }

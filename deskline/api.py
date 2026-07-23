@@ -125,6 +125,17 @@ class OnboardingBody(BaseModel):
     done: bool = True
 
 
+class ExtensionEventBody(BaseModel):
+    """Browser-extension tab heartbeat / closed segment."""
+
+    url: str = Field(default="", max_length=2000)
+    title: str = Field(default="", max_length=500)
+    host: str | None = Field(default=None, max_length=260)
+    started_at: str | None = None
+    ended_at: str | None = None
+    duration_sec: float = Field(default=0, ge=0, le=86_400)
+
+
 def _validate_screenshots_dir(raw: str) -> str:
     value = (raw or "").strip()
     if not value:
@@ -442,6 +453,67 @@ def create_app(tracker: Tracker, db: Database | None = None) -> FastAPI:
             # that also listen on :8787 (e.g. legacy Deskline.exe).
             "edition": "local-python",
         }
+
+    @app.get("/api/extension/status")
+    def extension_status() -> dict[str, Any]:
+        """Public probe for the Chrome extension (desktop available?)."""
+        st = tracker.status()
+        return {
+            "ok": True,
+            "app": APP_NAME,
+            "version": __version__,
+            "desktop": True,
+            "recording": bool(st.get("recording")),
+            "paused": bool(st.get("paused")),
+            "download_hint": "Install Deskline Desktop for full app + screenshot tracking.",
+        }
+
+    @app.post("/api/extension/event")
+    def extension_event(body: ExtensionEventBody) -> dict[str, Any]:
+        """Accept a browser tab segment from the Chrome extension when Desktop is running."""
+        from urllib.parse import urlparse
+
+        from deskline.classify import resolve_activity
+
+        host = (body.host or "").strip().lower()
+        if not host and body.url:
+            try:
+                host = (urlparse(body.url).hostname or "").lower()
+            except Exception:
+                host = ""
+        title = (body.title or host or "Browser").strip()[:500]
+        url_hint = host or None
+        user_apps = db.get_app_rules()
+        user_sites = db.get_site_rules()
+        meta = resolve_activity("chrome.exe", title, url_hint, user_apps, user_sites)
+        started = parse_iso_datetime(body.started_at) if body.started_at else None
+        ended = parse_iso_datetime(body.ended_at) if body.ended_at else None
+        duration = float(body.duration_sec or 0)
+        if duration <= 0 and started and ended:
+            duration = max(0.0, (ended - started).total_seconds())
+        if duration < 1.0:
+            return {"ok": True, "ignored": True, "reason": "too_short"}
+        sid = db.start_session(
+            app_name="chrome.exe",
+            window_title=title,
+            url_hint=url_hint,
+            category=meta.get("category") or "neutral",
+            started_at=started,
+            display_name=meta.get("display_name"),
+            activity_kind=meta.get("activity_kind") or "site",
+            activity_label=meta.get("activity_label") or host or title,
+            app_path=None,
+            ingest_key=f"extension:{host}:{body.started_at or ''}",
+        )
+        if ended is not None:
+            db.end_session(sid, ended_at=ended)
+        elif duration > 0 and started is not None:
+            from datetime import timedelta
+
+            db.end_session(sid, ended_at=started + timedelta(seconds=duration))
+        else:
+            db.end_session(sid)
+        return {"ok": True, "session_id": sid}
 
     @app.get("/api/status")
     def status() -> dict[str, Any]:

@@ -2,6 +2,7 @@
 <#
 .SYNOPSIS
   User-level installer for Deskline (no admin required).
+  Installs Python backend + native Tauri shell; desktop shortcut launches deskline-desktop.exe only.
 #>
 $ErrorActionPreference = 'Stop'
 
@@ -16,6 +17,8 @@ $VenvPythonw = Join-Path $InstallRoot 'venv\Scripts\pythonw.exe'
 $LauncherBat = Join-Path $InstallRoot 'Deskline.bat'
 $LauncherVbs = Join-Path $InstallRoot 'Deskline.vbs'
 $UninstallPs1 = Join-Path $InstallRoot 'uninstall.ps1'
+$DesktopExeName = 'deskline-desktop.exe'
+$DesktopExeDst = Join-Path $InstallRoot $DesktopExeName
 
 Write-Host "Installing Deskline to $InstallRoot"
 
@@ -51,6 +54,33 @@ Copy-Item (Join-Path $ProjectRoot 'requirements.txt') (Join-Path $InstallRoot 'r
 Copy-Item (Join-Path $ProjectRoot 'pyproject.toml') (Join-Path $InstallRoot 'pyproject.toml') -Force
 Copy-Item (Join-Path $ProjectRoot 'README.md') (Join-Path $InstallRoot 'README.md') -Force
 
+# Native desktop shell (required for shortcuts)
+$desktopCandidates = @(
+  (Join-Path $ProjectRoot 'deskline-desktop\src-tauri\target\release\deskline-desktop.exe'),
+  (Join-Path $ProjectRoot 'deskline-desktop\src-tauri\target\debug\deskline-desktop.exe'),
+  $DesktopExeDst
+) | Where-Object { $_ -and (Test-Path $_) } | Select-Object -Unique
+
+$desktopSrc = $desktopCandidates | Select-Object -First 1
+if (-not $desktopSrc) {
+  Write-Warning @"
+deskline-desktop.exe was not found.
+Build it first:
+  cd deskline-desktop
+  npm install
+  npm run build
+Then re-run this installer.
+"@
+  throw "Missing $DesktopExeName — build the Tauri shell before install."
+}
+
+if ($desktopSrc -ne $DesktopExeDst) {
+  Copy-Item $desktopSrc $DesktopExeDst -Force
+  Write-Host "Copied desktop shell: $DesktopExeDst"
+} else {
+  Write-Host "Desktop shell already in place: $DesktopExeDst"
+}
+
 if (-not (Test-Path $VenvPython)) {
   Write-Host 'Creating virtual environment...'
   & $python -m venv (Join-Path $InstallRoot 'venv')
@@ -61,27 +91,23 @@ Write-Host 'Installing dependencies...'
 & $VenvPython -m pip install -r (Join-Path $InstallRoot 'requirements.txt') -q
 & $VenvPython -m pip install -e $InstallRoot -q
 
-# Console launcher — prefer native desktop window, else tray without browser
+# Console launcher — desktop exe only (no silent tray fallback)
 @"
 @echo off
 cd /d "%~dp0"
-set "PYTHONPATH=%~dp0"
-set "PYTHONNOUSERSITE=1"
-if exist "%~dp0deskline-desktop.exe" (
-  start "" "%~dp0deskline-desktop.exe"
-  exit /b 0
+if not exist "%~dp0deskline-desktop.exe" (
+  echo Deskline desktop shell is missing: deskline-desktop.exe
+  echo Re-run install.bat after building deskline-desktop ^(npm run build^).
+  pause
+  exit /b 1
 )
-if exist "%~dp0venv\Scripts\pythonw.exe" (
-  start "" "%~dp0venv\Scripts\pythonw.exe" -m deskline --no-browser
-) else (
-  start "" "%~dp0venv\Scripts\python.exe" -m deskline --no-browser
-)
+start "" "%~dp0deskline-desktop.exe"
 "@ | Set-Content -Path $LauncherBat -Encoding ASCII
 
-# Silent VBS launcher (no console flash) — desktop exe first
+# Silent VBS launcher — desktop exe only; MessageBox if missing
 @"
 Set sh = CreateObject("WScript.Shell")
-Dim fso, root, exe, desktopExe
+Dim fso, root, desktopExe
 Set fso = CreateObject("Scripting.FileSystemObject")
 root = fso.GetParentFolderName(WScript.ScriptFullName)
 sh.CurrentDirectory = root
@@ -90,20 +116,17 @@ If fso.FileExists(desktopExe) Then
   sh.Run """" & desktopExe & """", 1, False
   WScript.Quit 0
 End If
-sh.Environment("PROCESS")("PYTHONPATH") = root
-sh.Environment("PROCESS")("PYTHONNOUSERSITE") = "1"
-exe = root & "\venv\Scripts\pythonw.exe"
-If fso.FileExists(exe) = False Then
-  exe = root & "\venv\Scripts\python.exe"
-End If
-sh.Run """" & exe & """ -m deskline --no-browser", 0, False
+MsgBox "Deskline desktop shell is missing:" & vbCrLf & desktopExe & vbCrLf & vbCrLf & _
+  "Re-run install.bat after building deskline-desktop (npm run build)." & vbCrLf & _
+  "Log: %LOCALAPPDATA%\Deskline\desktop.log", 16, "Deskline"
+WScript.Quit 1
 "@ | Set-Content -Path $LauncherVbs -Encoding ASCII
 
 # Bundled uninstaller
 $uninstallContent = @'
 $ErrorActionPreference = "Stop"
 $InstallRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
-Get-Process pythonw,python -ErrorAction SilentlyContinue | Where-Object {
+Get-Process deskline-desktop,pythonw,python -ErrorAction SilentlyContinue | Where-Object {
   $_.Path -and $_.Path.StartsWith($InstallRoot, [System.StringComparison]::OrdinalIgnoreCase)
 } | Stop-Process -Force -ErrorAction SilentlyContinue
 $desktop = [Environment]::GetFolderPath("Desktop")
@@ -128,32 +151,22 @@ function New-Shortcut {
     [string]$Target,
     [string]$WorkDir,
     [string]$Description,
-    [string]$IconPath = $null
+    [string]$IconPath = $null,
+    [string]$Arguments = ''
   )
   try {
     $dir = Split-Path -Parent $Path
-    if ($dir -and -not (Test-Path -LiteralPath $dir)) {
+    if ($dir -and -not (Test-Path $dir)) {
       New-Item -ItemType Directory -Path $dir -Force | Out-Null
-    }
-    if (Test-Path -LiteralPath $Path) {
-      Remove-Item -LiteralPath $Path -Force -ErrorAction SilentlyContinue
     }
     $w = New-Object -ComObject WScript.Shell
     $s = $w.CreateShortcut($Path)
-    $desktopExe = Join-Path $WorkDir 'deskline-desktop.exe'
-    if (Test-Path -LiteralPath $desktopExe) {
-      $s.TargetPath = $desktopExe
-      $s.Arguments = ''
-      $s.WorkingDirectory = $WorkDir
-      $s.WindowStyle = 1
-    } else {
-      $s.TargetPath = 'wscript.exe'
-      $s.Arguments = '"' + $Target + '"'
-      $s.WorkingDirectory = $WorkDir
-      $s.WindowStyle = 7
-    }
+    $s.TargetPath = $Target
+    $s.Arguments = $Arguments
+    $s.WorkingDirectory = $WorkDir
+    $s.WindowStyle = 1
     $s.Description = $Description
-    if ($IconPath -and (Test-Path -LiteralPath $IconPath)) {
+    if ($IconPath -and (Test-Path $IconPath)) {
       $s.IconLocation = "$IconPath,0"
     }
     $s.Save()
@@ -170,20 +183,28 @@ if (Test-Path $iconSrc) {
   Copy-Item $iconSrc $iconDst -Force
 }
 
-$desktopCandidates = @(
+$shortcutDesktops = @(
   (Join-Path $env:USERPROFILE 'Desktop'),
   (Join-Path $env:USERPROFILE 'OneDrive\Desktop'),
-  (Join-Path $env:USERPROFILE 'OneDrive\Рабочий стол'),
   [Environment]::GetFolderPath('Desktop')
 ) | Where-Object { $_ -and (Test-Path $_) } | Select-Object -Unique
 
 $startMenu = Join-Path $env:APPDATA 'Microsoft\Windows\Start Menu\Programs'
 New-Item -ItemType Directory -Path $startMenu -Force | Out-Null
-New-Shortcut -Path (Join-Path $startMenu 'Deskline.lnk') -Target $LauncherVbs -WorkDir $InstallRoot -Description 'Deskline — личный трекер времени' -IconPath $iconDst | Out-Null
+
+# Prefer direct link to native shell (no wscript indirection)
+$shortcutTarget = $DesktopExeDst
+$shortcutArgs = ''
+if (-not (Test-Path $shortcutTarget)) {
+  $shortcutTarget = 'wscript.exe'
+  $shortcutArgs = '"' + $LauncherVbs + '"'
+}
+
+New-Shortcut -Path (Join-Path $startMenu 'Deskline.lnk') -Target $shortcutTarget -Arguments $shortcutArgs -WorkDir $InstallRoot -Description 'Deskline local productivity tracker' -IconPath $iconDst | Out-Null
 
 $desktopOk = $false
-foreach ($desktop in $desktopCandidates) {
-  if (New-Shortcut -Path (Join-Path $desktop 'Deskline.lnk') -Target $LauncherVbs -WorkDir $InstallRoot -Description 'Deskline — личный трекер времени' -IconPath $iconDst) {
+foreach ($desktop in $shortcutDesktops) {
+  if (New-Shortcut -Path (Join-Path $desktop 'Deskline.lnk') -Target $shortcutTarget -Arguments $shortcutArgs -WorkDir $InstallRoot -Description 'Deskline local productivity tracker' -IconPath $iconDst) {
     Write-Host "Desktop shortcut: $desktop\Deskline.lnk"
     $desktopOk = $true
   }
@@ -195,11 +216,7 @@ if (-not $desktopOk) {
 Write-Host ''
 Write-Host 'Deskline installed successfully.'
 Write-Host "  Install dir : $InstallRoot"
+Write-Host "  Desktop exe : $DesktopExeDst"
 Write-Host '  Start Menu  : Deskline'
 Write-Host 'Launching Deskline...'
-$desktopExe = Join-Path $InstallRoot 'deskline-desktop.exe'
-if (Test-Path -LiteralPath $desktopExe) {
-  Start-Process -FilePath $desktopExe -WorkingDirectory $InstallRoot
-} else {
-  Start-Process -FilePath 'wscript.exe' -ArgumentList $LauncherVbs
-}
+Start-Process -FilePath $DesktopExeDst
