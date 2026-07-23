@@ -419,61 +419,131 @@ function renderTeamGauges(team) {
   });
 }
 
+function dayBoundsFromRows(rows, fallbackIso) {
+  let day = fallbackIso || selectedDayIso || null;
+  if (!day && rows && rows.length) {
+    const d = new Date(rows[0].started_at);
+    day = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  }
+  if (!day) {
+    const n = new Date();
+    day = `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, "0")}-${String(n.getDate()).padStart(2, "0")}`;
+  }
+  const dayStart = new Date(`${day}T00:00:00`);
+  const dayEnd = new Date(dayStart.getTime() + 24 * 3600 * 1000);
+  return { day, dayStartMs: dayStart.getTime(), dayEndMs: dayEnd.getTime(), spanMs: 24 * 3600 * 1000 };
+}
+
+function pctOnDay(ms, dayStartMs, spanMs) {
+  return ((ms - dayStartMs) / spanMs) * 100;
+}
+
+function clipToDay(a, b, dayStartMs, dayEndMs) {
+  const start = Math.max(a, dayStartMs);
+  const end = Math.min(b, dayEndMs);
+  if (end <= start) return null;
+  return { start, end };
+}
+
 function renderTodayTimelineStrip(rows, summary) {
   const el = document.getElementById("todayTimelineStrip");
   const meta = document.getElementById("todayTimelineMeta");
   if (!el) return;
   const list = rows || [];
-  if (!list.length) {
-    el.innerHTML = `<p class="hint">Пока нет сессий за сегодня.</p>`;
-    if (meta) meta.textContent = "";
-    return;
-  }
-  const startMs = Math.min(...list.map((r) => new Date(r.started_at).getTime()));
-  const endMs = Math.max(...list.map((r) => new Date(r.ended_at || Date.now()).getTime()));
-  const span = Math.max(endMs - startMs, 1);
-  const startLabel = fmtClock(new Date(startMs).toISOString());
-  const endLabel = fmtClock(new Date(endMs).toISOString());
+  const { dayStartMs, dayEndMs, spanMs } = dayBoundsFromRows(list);
   if (meta) {
     meta.textContent = fmtDur(summary?.total_sec || 0);
   }
-
-  const hours = [];
-  const startH = new Date(startMs);
-  startH.setMinutes(0, 0, 0);
-  for (let t = startH.getTime(); t <= endMs; t += 3600 * 1000) {
-    const left = ((t - startMs) / span) * 100;
-    if (left < -1 || left > 101) continue;
-    hours.push(
-      `<span class="pulse-hour" style="left:${left}%"><b>${fmtClock(new Date(t).toISOString())}</b></span>`
-    );
+  if (!list.length) {
+    el.innerHTML = `
+      <div class="pulse-ribbon-meta">
+        <span>00:00</span>
+        <span class="pulse-ribbon-total">0м</span>
+        <span>24:00</span>
+      </div>
+      <div class="pulse-hour-row">${[0, 3, 6, 9, 12, 15, 18, 21, 24]
+        .map((h) => `<span class="pulse-hour" style="left:${(h / 24) * 100}%"><b>${String(h).padStart(2, "0")}:00</b></span>`)
+        .join("")}</div>
+      <div class="pulse-track pulse-track-day"><div class="pulse-void-hint">Пустой день — пока нет сессий</div></div>
+      <div class="pulse-legend">
+        <span><i class="productive"></i>Фокус</span>
+        <span><i class="neutral"></i>Нейтрально</span>
+        <span><i class="distracting"></i>Отвлечения</span>
+        <span><i class="idle"></i>Простой в сессии</span>
+        <span><i class="void"></i>Пусто / нет трека</span>
+      </div>`;
+    return;
   }
 
-  const segs = list
-    .map((r) => {
-      const a = new Date(r.started_at).getTime();
-      const b = new Date(r.ended_at || Date.now()).getTime();
-      const left = ((a - startMs) / span) * 100;
-      const width = Math.max(0.35, ((b - a) / span) * 100);
-      const idleRatio = r.sec > 0 ? Math.min(1, (r.idle_sec || 0) / r.sec) : 0;
-      const cat = idleRatio >= 0.55 ? "idle" : categoryClass(r.category);
-      return `<span class="pulse-seg ${cat}" style="left:${left}%;width:${width}%" title="${escapeHtml(r.name || "")}: ${fmtDur(r.sec)}"></span>`;
-    })
-    .join("");
+  const hours = [0, 3, 6, 9, 12, 15, 18, 21, 24].map((h) => {
+    const label = h === 24 ? "24:00" : `${String(h).padStart(2, "0")}:00`;
+    return `<span class="pulse-hour" style="left:${(h / 24) * 100}%"><b>${label}</b></span>`;
+  });
+
+  const grid = Array.from({ length: 24 }, (_, h) => {
+    return `<span class="pulse-grid-line" style="left:${(h / 24) * 100}%"></span>`;
+  }).join("");
+
+  const segs = [];
+  for (const r of list) {
+    const a = new Date(r.started_at).getTime();
+    const b = new Date(r.ended_at || Date.now()).getTime();
+    const clipped = clipToDay(a, b, dayStartMs, dayEndMs);
+    if (!clipped) continue;
+    const dur = clipped.end - clipped.start;
+    const idleMs = Math.min(dur, Math.max(0, Number(r.idle_sec || 0) * 1000));
+    const activeMs = Math.max(0, dur - idleMs);
+    const cat = categoryClass(r.category);
+    if (activeMs > 0) {
+      const left = pctOnDay(clipped.start, dayStartMs, spanMs);
+      const width = (activeMs / spanMs) * 100;
+      segs.push(
+        `<span class="pulse-seg ${cat}" style="left:${left}%;width:${Math.max(0.15, width)}%" title="${escapeHtml(r.name || "")}: ${fmtDur(activeMs / 1000)}"></span>`
+      );
+    }
+    if (idleMs > 0) {
+      const idleStart = clipped.start + activeMs;
+      const left = pctOnDay(idleStart, dayStartMs, spanMs);
+      const width = (idleMs / spanMs) * 100;
+      segs.push(
+        `<span class="pulse-seg idle" style="left:${left}%;width:${Math.max(0.15, width)}%" title="Простой: ${fmtDur(idleMs / 1000)}"></span>`
+      );
+    }
+  }
+
+  let nowMark = "";
+  const now = Date.now();
+  if (now >= dayStartMs && now <= dayEndMs) {
+    const left = pctOnDay(now, dayStartMs, spanMs);
+    nowMark = `<span class="pulse-now" style="left:${left}%" title="Сейчас"></span>`;
+  }
+
+  // First/last activity labels (not scale bounds)
+  const first = Math.min(...list.map((r) => new Date(r.started_at).getTime()));
+  const last = Math.max(...list.map((r) => new Date(r.ended_at || Date.now()).getTime()));
 
   el.innerHTML = `
     <div class="pulse-ribbon-meta">
-      <span>с ${startLabel}</span>
+      <span>00:00</span>
       <span class="pulse-ribbon-total">${fmtDur(summary?.total_sec || 0)}</span>
-      <span>до ${endLabel}</span>
+      <span>24:00</span>
+    </div>
+    <div class="pulse-ribbon-sub">
+      <span>первая активность ${fmtClock(new Date(first).toISOString())}</span>
+      <span>последняя ${fmtClock(new Date(last).toISOString())}</span>
     </div>
     <div class="pulse-hour-row">${hours.join("")}</div>
-    <div class="pulse-track">${segs}</div>
+    <div class="pulse-track pulse-track-day">
+      ${grid}
+      ${segs.join("")}
+      ${nowMark}
+    </div>
     <div class="pulse-legend">
       <span><i class="productive"></i>Фокус</span>
       <span><i class="neutral"></i>Нейтрально</span>
       <span><i class="distracting"></i>Отвлечения</span>
-      <span><i class="idle"></i>Простой</span>
+      <span><i class="idle"></i>Простой в сессии</span>
+      <span><i class="void"></i>Пусто / нет трека</span>
     </div>`;
 }
 
@@ -789,75 +859,55 @@ function renderDayGantt(rows) {
     return;
   }
 
-  const parsed = rows.map((r) => ({
-    ...r,
-    startMs: new Date(r.started_at).getTime(),
-    endMs: new Date(r.ended_at || Date.now()).getTime(),
-  }));
-  let minMs = Math.min(...parsed.map((r) => r.startMs));
-  let maxMs = Math.max(...parsed.map((r) => r.endMs));
-  const dayStart = new Date(minMs);
-  dayStart.setHours(0, 0, 0, 0);
-  const dayEnd = new Date(dayStart);
-  dayEnd.setDate(dayEnd.getDate() + 1);
-  // Prefer a workday window; snap to whole hours so labels never go negative.
-  minMs = Math.min(minMs, dayStart.getTime() + 8 * 3600 * 1000);
-  maxMs = Math.max(maxMs, dayStart.getTime() + 19 * 3600 * 1000);
-  const snapMin = new Date(minMs);
-  snapMin.setMinutes(0, 0, 0);
-  minMs = Math.max(dayStart.getTime(), snapMin.getTime());
-  const snapMax = new Date(maxMs);
-  if (
-    snapMax.getMinutes() ||
-    snapMax.getSeconds() ||
-    snapMax.getMilliseconds()
-  ) {
-    snapMax.setHours(snapMax.getHours() + 1, 0, 0, 0);
-  } else {
-    snapMax.setMinutes(0, 0, 0);
-  }
-  maxMs = Math.min(dayEnd.getTime(), snapMax.getTime());
-  if (maxMs <= minMs) maxMs = minMs + 3600 * 1000;
-  const span = maxMs - minMs;
-  const hourCount = Math.max(1, Math.round(span / 3600000));
-
+  const { dayStartMs, dayEndMs, spanMs } = dayBoundsFromRows(rows, selectedDayIso);
+  const hourCount = 24;
   const hours = [];
-  for (let t = minMs; t <= maxMs + 1; t += 3600 * 1000) {
-    if (t > maxMs + 500) break;
-    const left = ((t - minMs) / span) * 100;
-    if (left < -0.1 || left > 100.1) continue;
-    const label = new Date(t).toLocaleTimeString("ru-RU", {
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-    const edge =
-      left < 2 ? " is-start" : left > 98 ? " is-end" : "";
+  for (let h = 0; h <= 24; h += 2) {
+    const left = (h / 24) * 100;
+    const label = h === 24 ? "24:00" : `${String(h).padStart(2, "0")}:00`;
+    const edge = h === 0 ? " is-start" : h === 24 ? " is-end" : "";
     hours.push(
-      `<span class="gantt-hour${edge}" style="left:${Math.min(100, Math.max(0, left))}%">${label}</span>`
+      `<span class="gantt-hour${edge}" style="left:${left}%">${label}</span>`
     );
   }
 
-  const blocks = parsed
-    .map((r) => {
-      const left = ((r.startMs - minMs) / span) * 100;
-      const width = Math.max(0.4, ((r.endMs - r.startMs) / span) * 100);
-      const cat = categoryClass(r.category);
-      const title = `${r.name || ""} · ${fmtClock(r.started_at)}–${fmtClock(r.ended_at)} · ${fmtDur(r.sec)}`;
-      const showLabel = width >= 4.5;
-      const labelHtml = showLabel
-        ? `<span>${escapeHtml(r.name || "")}</span>`
-        : "";
-      return `<div class="gantt-block ${cat}${showLabel ? "" : " is-narrow"}" style="left:${left}%;width:${width}%" title="${escapeHtml(title)}">${labelHtml}</div>`;
-    })
-    .join("");
+  const blocks = [];
+  for (const r of rows) {
+    const a = new Date(r.started_at).getTime();
+    const b = new Date(r.ended_at || Date.now()).getTime();
+    const clipped = clipToDay(a, b, dayStartMs, dayEndMs);
+    if (!clipped) continue;
+    const dur = clipped.end - clipped.start;
+    const idleMs = Math.min(dur, Math.max(0, Number(r.idle_sec || 0) * 1000));
+    const activeMs = Math.max(0, dur - idleMs);
+    const cat = categoryClass(r.category);
+    if (activeMs > 0) {
+      const left = pctOnDay(clipped.start, dayStartMs, spanMs);
+      const width = Math.max(0.15, (activeMs / spanMs) * 100);
+      const title = `${r.name || ""} · ${fmtClock(r.started_at)}–${fmtClock(r.ended_at)} · ${fmtDur(activeMs / 1000)}`;
+      const showLabel = width >= 3.5;
+      blocks.push(
+        `<div class="gantt-block ${cat}${showLabel ? "" : " is-narrow"}" style="left:${left}%;width:${width}%" title="${escapeHtml(title)}">${showLabel ? `<span>${escapeHtml(r.name || "")}</span>` : ""}</div>`
+      );
+    }
+    if (idleMs > 0) {
+      const left = pctOnDay(clipped.start + activeMs, dayStartMs, spanMs);
+      const width = Math.max(0.15, (idleMs / spanMs) * 100);
+      blocks.push(
+        `<div class="gantt-block idle is-narrow" style="left:${left}%;width:${width}%" title="Простой · ${fmtDur(idleMs / 1000)}"></div>`
+      );
+    }
+  }
 
   el.innerHTML = `
     <div class="gantt-scale">${hours.join("")}</div>
-    <div class="gantt-track" style="--gantt-hours:${hourCount}">${blocks}</div>
+    <div class="gantt-track gantt-track-fullday" style="--gantt-hours:${hourCount}">${blocks.join("")}</div>
     <div class="gantt-legend">
       <span class="stack-leg"><i class="productive"></i>Фокус</span>
       <span class="stack-leg"><i class="neutral"></i>Нейтрально</span>
       <span class="stack-leg"><i class="distracting"></i>Отвлечение</span>
+      <span class="stack-leg"><i class="idle"></i>Простой</span>
+      <span class="stack-leg"><i class="void"></i>Пусто</span>
     </div>`;
 }
 
