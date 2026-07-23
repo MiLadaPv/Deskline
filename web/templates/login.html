@@ -9,34 +9,143 @@
   <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="/static/css/app.css?v={{ version }}" />
 </head>
-<body class="login-body">
+<body class="launch-body">
   <div class="atmosphere" aria-hidden="true"></div>
-  <main class="login-card">
-    <p class="eyebrow">Deskline</p>
-    <h1 id="loginTitle">Вход</h1>
-    <p class="tagline" id="loginHint">Введите пароль, чтобы открыть дашборд.</p>
-    <form id="loginForm" class="login-form">
-      <label id="passLabel">
-        Пароль
-        <input type="password" name="password" id="password" autocomplete="current-password" required minlength="4" />
-      </label>
-      <label class="check login-remember">
-        <input type="checkbox" name="remember" id="rememberMe" />
-        Запомнить меня
-      </label>
-      <p class="login-error" id="loginError" hidden></p>
-      <button type="submit" class="btn primary" id="loginSubmit">Войти</button>
-    </form>
-    <p class="login-legal">
-      © {{ copyright_year }} {{ company_name }} ·
-      <a href="/privacy">Privacy</a> ·
-      <a href="/terms">Terms</a>
-    </p>
-  </main>
+
+  <div class="boot-splash" id="bootSplash" aria-hidden="true">
+    <div class="logo-mark logo-anim" style="width:72px;height:72px;color:var(--accent)">
+      <svg viewBox="0 0 64 64" fill="none" aria-hidden="true">
+        <circle class="logo-ring" cx="32" cy="32" r="27" stroke="currentColor" stroke-width="4"/>
+        <path class="logo-check" d="M20 33 L29 42 L46 23" stroke="currentColor" stroke-width="4.2" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </div>
+    <p class="boot-splash-title">Deskline</p>
+  </div>
+
+  <div class="launch">
+    <section class="launch-hero" aria-label="О Deskline">
+      <div class="launch-brand">
+        <span class="logo-mark logo-anim logo-anim-soft" style="width:40px;height:40px;color:var(--accent)">
+          <svg viewBox="0 0 64 64" fill="none" aria-hidden="true">
+            <circle class="logo-ring" cx="32" cy="32" r="27" stroke="currentColor" stroke-width="4"/>
+            <path class="logo-check" d="M20 33 L29 42 L46 23" stroke="currentColor" stroke-width="4.2" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </span>
+        <div>
+          <strong>Deskline</strong>
+          <span>by {{ company_name }}</span>
+        </div>
+      </div>
+      <h1>Аналитика рабочего дня — локально, без облака</h1>
+      <ul class="launch-points">
+        <li>Трекинг приложений и сайтов на этом ПК</li>
+        <li>Лента дня, фокус и отвлечения</li>
+        <li>Проекты, скриншоты и пароль дашборда</li>
+      </ul>
+      <div class="launch-previews" aria-hidden="true">
+        <div class="preview-card preview-donuts">
+          <div class="preview-donut" style="--p:72"><span>72%</span></div>
+          <div class="preview-donut" style="--p:54"><span>54%</span></div>
+          <div class="preview-donut" style="--p:38"><span>38%</span></div>
+          <p>Фокус за день</p>
+        </div>
+        <div class="preview-card preview-timeline">
+          <div class="preview-bar">
+            <i class="productive" style="width:48%"></i>
+            <i class="neutral" style="width:18%"></i>
+            <i class="distracting" style="width:14%"></i>
+            <i class="idle" style="width:20%"></i>
+          </div>
+          <p>Лента · 7ч 20м</p>
+        </div>
+        <div class="preview-card preview-bars">
+          <span style="height:70%"></span>
+          <span style="height:45%"></span>
+          <span style="height:88%"></span>
+          <span style="height:36%"></span>
+          <span style="height:60%"></span>
+          <p>Неделя</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="launch-panel">
+      <div class="login-card launch-card" id="loginPanel">
+        <p class="eyebrow">Deskline</p>
+        <h2 id="loginTitle">Вход</h2>
+        <p class="tagline" id="loginHint">Введите пароль, чтобы открыть дашборд.</p>
+
+        <form id="loginForm" class="login-form">
+          <label id="passLabel">
+            Пароль
+            <div class="pass-wrap">
+              <input type="password" name="password" id="password" autocomplete="current-password" required minlength="4" />
+              <button type="button" class="pass-toggle" id="togglePass" aria-label="Показать пароль">👁</button>
+            </div>
+          </label>
+          <label class="check login-remember" id="rememberRow">
+            <input type="checkbox" name="remember" id="rememberMe" />
+            Запомнить меня
+          </label>
+          <p class="login-error" id="loginError" hidden></p>
+          <button type="submit" class="btn primary" id="loginSubmit">Войти</button>
+        </form>
+
+        <p class="login-forgot" id="forgotRow">
+          <button type="button" class="linkish" id="forgotBtn">Забыли пароль?</button>
+        </p>
+
+        <form id="recoverForm" class="login-form" hidden>
+          <label>
+            Код восстановления
+            <input type="text" id="recoveryCode" autocomplete="off" required minlength="8" placeholder="XXXX-XXXX-XXXX" />
+          </label>
+          <label>
+            Новый пароль
+            <input type="password" id="newPassword" autocomplete="new-password" required minlength="4" />
+          </label>
+          <p class="login-error" id="recoverError" hidden></p>
+          <button type="submit" class="btn primary">Сбросить пароль</button>
+          <button type="button" class="btn" id="recoverCancel">Назад ко входу</button>
+        </form>
+
+        <div id="recoveryReveal" class="recovery-box" hidden>
+          <h3>Сохраните код восстановления</h3>
+          <p>Он понадобится, если забудете пароль. Показывается один раз.</p>
+          <code id="recoveryCodeOut"></code>
+          <button type="button" class="btn primary" id="recoveryContinue">Продолжить</button>
+        </div>
+
+        <p class="login-legal">
+          © {{ copyright_year }} {{ company_name }} ·
+          <a href="/privacy">Privacy</a> ·
+          <a href="/terms">Terms</a> ·
+          <a href="mailto:{{ support_email }}">Поддержка</a>
+        </p>
+      </div>
+    </section>
+  </div>
+
   <script>
+    const splash = document.getElementById("bootSplash");
+    window.setTimeout(() => splash?.classList.add("is-done"), 1100);
+
+    function showRecovery(code, thenHref) {
+      document.getElementById("loginForm").hidden = true;
+      document.getElementById("recoverForm").hidden = true;
+      document.getElementById("forgotRow").hidden = true;
+      const box = document.getElementById("recoveryReveal");
+      box.hidden = false;
+      document.getElementById("recoveryCodeOut").textContent = code;
+      document.getElementById("recoveryContinue").onclick = () => {
+        location.href = thenHref || "/";
+      };
+    }
+
     async function boot() {
       const st = await fetch("/api/auth/status").then((r) => r.json());
       const form = document.getElementById("loginForm");
+      const recoverForm = document.getElementById("recoverForm");
       const title = document.getElementById("loginTitle");
       const hint = document.getElementById("loginHint");
       const submit = document.getElementById("loginSubmit");
@@ -50,10 +159,36 @@
 
       if (setup) {
         title.textContent = "Создайте пароль";
-        hint.textContent = "Задайте пароль для входа. Запомните его — восстановить нельзя.";
+        hint.textContent = "Задайте пароль для локального дашборда. Мы выдадим код восстановления.";
         document.getElementById("password").autocomplete = "new-password";
         submit.textContent = "Сохранить и войти";
+        document.getElementById("forgotRow").hidden = true;
+      } else if (!st.has_recovery) {
+        hint.textContent = "После входа будет создан код восстановления — сохраните его.";
       }
+
+      document.getElementById("togglePass").addEventListener("click", () => {
+        const input = document.getElementById("password");
+        input.type = input.type === "password" ? "text" : "password";
+      });
+
+      document.getElementById("forgotBtn").addEventListener("click", () => {
+        form.hidden = true;
+        document.getElementById("forgotRow").hidden = true;
+        recoverForm.hidden = false;
+        title.textContent = "Восстановление";
+        hint.textContent = st.has_recovery
+          ? "Введите код восстановления и новый пароль."
+          : `Кода ещё нет. Напишите на ${st.support_email || "поддержку"} или войдите со старым паролем — код создастся автоматически.`;
+      });
+
+      document.getElementById("recoverCancel").addEventListener("click", () => {
+        recoverForm.hidden = true;
+        form.hidden = false;
+        document.getElementById("forgotRow").hidden = !!setup;
+        title.textContent = setup ? "Создайте пароль" : "Вход";
+        hint.textContent = "Введите пароль, чтобы открыть дашборд.";
+      });
 
       form.addEventListener("submit", async (ev) => {
         ev.preventDefault();
@@ -66,17 +201,45 @@
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ password, remember }),
         });
+        const text = await res.text();
+        let data = {};
+        try { data = JSON.parse(text); } catch (_) {}
         if (!res.ok) {
-          const text = await res.text();
           err.textContent = setup ? "Не удалось сохранить пароль" : "Неверный пароль";
-          try {
-            const j = JSON.parse(text);
-            if (j.detail) err.textContent = typeof j.detail === "string" ? j.detail : err.textContent;
-          } catch (_) {}
+          if (typeof data.detail === "string") err.textContent = data.detail;
           err.hidden = false;
           return;
         }
+        if (data.recovery_code) {
+          showRecovery(data.recovery_code, "/");
+          return;
+        }
         location.href = "/";
+      });
+
+      recoverForm.addEventListener("submit", async (ev) => {
+        ev.preventDefault();
+        const rerr = document.getElementById("recoverError");
+        rerr.hidden = true;
+        const res = await fetch("/api/auth/recover", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            recovery_code: document.getElementById("recoveryCode").value,
+            new_password: document.getElementById("newPassword").value,
+            remember: false,
+          }),
+        });
+        const text = await res.text();
+        let data = {};
+        try { data = JSON.parse(text); } catch (_) {}
+        if (!res.ok) {
+          rerr.textContent = typeof data.detail === "string" ? data.detail : "Не удалось сбросить пароль";
+          rerr.hidden = false;
+          return;
+        }
+        if (data.recovery_code) showRecovery(data.recovery_code, "/");
+        else location.href = "/";
       });
     }
     boot().catch(() => {

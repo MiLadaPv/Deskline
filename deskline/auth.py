@@ -54,6 +54,21 @@ def is_password_set() -> bool:
     return isinstance(h, str) and h.startswith("pbkdf2_sha256$")
 
 
+def has_recovery_code() -> bool:
+    data = _load_auth()
+    h = data.get("recovery_hash")
+    return isinstance(h, str) and h.startswith("pbkdf2_sha256$")
+
+
+def _normalize_recovery_code(code: str) -> str:
+    return "".join(ch for ch in (code or "").lower() if ch.isalnum())
+
+
+def generate_recovery_code() -> str:
+    raw = secrets.token_hex(6).upper()
+    return f"{raw[0:4]}-{raw[4:8]}-{raw[8:12]}"
+
+
 def hash_password(password: str) -> str:
     salt = secrets.token_bytes(16)
     digest = hashlib.pbkdf2_hmac(
@@ -86,20 +101,61 @@ def verify_password(password: str, encoded: str | None = None) -> bool:
     return hmac.compare_digest(digest, expected)
 
 
-def set_password(password: str) -> None:
+def verify_recovery_code(code: str) -> bool:
+    data = _load_auth()
+    encoded = data.get("recovery_hash")
+    if not isinstance(encoded, str) or not encoded.startswith("pbkdf2_sha256$"):
+        return False
+    normalized = _normalize_recovery_code(code)
+    if len(normalized) < 8:
+        return False
+    return verify_password(normalized, encoded)
+
+
+def set_password(password: str, *, issue_recovery: bool = True) -> str | None:
     if len(password) < 4:
         raise ValueError("password too short")
     data = _load_auth()
     data["password_hash"] = hash_password(password)
     if not data.get("session_secret"):
         data["session_secret"] = secrets.token_urlsafe(48)
+    recovery_plain: str | None = None
+    if issue_recovery or not (
+        isinstance(data.get("recovery_hash"), str)
+        and str(data.get("recovery_hash")).startswith("pbkdf2_sha256$")
+    ):
+        recovery_plain = generate_recovery_code()
+        data["recovery_hash"] = hash_password(_normalize_recovery_code(recovery_plain))
     _save_auth(data)
+    return recovery_plain
 
 
-def change_password(current: str, new_password: str) -> None:
+def ensure_recovery_code() -> str | None:
+    """Issue a recovery code once if the account has none. Returns plaintext only then."""
+    if has_recovery_code():
+        return None
+    if not is_password_set():
+        return None
+    data = _load_auth()
+    recovery_plain = generate_recovery_code()
+    data["recovery_hash"] = hash_password(_normalize_recovery_code(recovery_plain))
+    _save_auth(data)
+    return recovery_plain
+
+
+def change_password(current: str, new_password: str) -> str | None:
     if not verify_password(current):
         raise PermissionError("bad current password")
-    set_password(new_password)
+    return set_password(new_password, issue_recovery=True)
+
+
+def reset_password_with_recovery(recovery_code: str, new_password: str) -> str:
+    if not is_password_set():
+        raise ValueError("password not set")
+    if not verify_recovery_code(recovery_code):
+        raise PermissionError("bad recovery code")
+    code = set_password(new_password, issue_recovery=True)
+    return code or generate_recovery_code()
 
 
 def create_session_token(*, remember: bool = False) -> str:
@@ -142,6 +198,7 @@ def is_public_path(path: str) -> bool:
         "/api/auth/status",
         "/api/auth/login",
         "/api/auth/setup",
+        "/api/auth/recover",
         "/favicon.ico",
     }:
         return True

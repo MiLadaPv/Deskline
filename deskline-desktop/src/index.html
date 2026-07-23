@@ -7,16 +7,18 @@
     <style>
       :root {
         color-scheme: light;
-        --bg: #f3eee4;
-        --ink: #1c2b26;
-        --accent: #2f6f5e;
+        --bg: #e8f0ec;
+        --ink: #15241f;
+        --accent: #1f6b56;
       }
-      html,
-      body {
+      html, body {
         margin: 0;
         height: 100%;
         font-family: "Segoe UI", system-ui, sans-serif;
-        background: radial-gradient(circle at top, #fff8ec, var(--bg));
+        background:
+          radial-gradient(900px 480px at 10% -10%, #f2faf6 0%, transparent 55%),
+          radial-gradient(700px 400px at 100% 0%, #c5ddd4 0%, transparent 50%),
+          var(--bg);
         color: var(--ink);
       }
       main {
@@ -26,8 +28,30 @@
         text-align: center;
         padding: 2rem;
       }
+      .logo {
+        width: 88px;
+        height: 88px;
+        margin: 0 auto 1rem;
+        color: var(--accent);
+      }
+      .logo svg {
+        width: 100%;
+        height: 100%;
+      }
+      .logo-ring {
+        stroke-dasharray: 170;
+        stroke-dashoffset: 170;
+        animation: ring 0.95s ease forwards;
+      }
+      .logo-check {
+        stroke-dasharray: 48;
+        stroke-dashoffset: 48;
+        animation: check 0.55s ease 0.4s forwards;
+      }
+      @keyframes ring { to { stroke-dashoffset: 0; } }
+      @keyframes check { to { stroke-dashoffset: 0; } }
       h1 {
-        margin: 0 0 0.5rem;
+        margin: 0 0 0.4rem;
         font-weight: 650;
         letter-spacing: -0.02em;
       }
@@ -35,33 +59,19 @@
         margin: 0;
         opacity: 0.75;
       }
-      .pulse {
-        width: 14px;
-        height: 14px;
-        margin: 1.25rem auto 0;
-        border-radius: 50%;
-        background: var(--accent);
-        animation: pulse 1.2s ease-in-out infinite;
-      }
-      @keyframes pulse {
-        0%,
-        100% {
-          transform: scale(0.85);
-          opacity: 0.55;
-        }
-        50% {
-          transform: scale(1);
-          opacity: 1;
-        }
-      }
     </style>
   </head>
   <body>
     <main>
       <div>
+        <div class="logo" aria-hidden="true">
+          <svg viewBox="0 0 64 64" fill="none">
+            <circle class="logo-ring" cx="32" cy="32" r="27" stroke="currentColor" stroke-width="4"/>
+            <path class="logo-check" d="M20 33 L29 42 L46 23" stroke="currentColor" stroke-width="4.2" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </div>
         <h1>Deskline</h1>
         <p>Запуск локального трекера…</p>
-        <div class="pulse" aria-hidden="true"></div>
       </div>
     </main>
   </body>

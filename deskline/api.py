@@ -18,8 +18,11 @@ from deskline.auth import (
     SESSION_TTL_REMEMBER_SEC,
     change_password,
     create_session_token,
+    ensure_recovery_code,
+    has_recovery_code,
     is_password_set,
     is_public_path,
+    reset_password_with_recovery,
     set_password,
     validate_session_token,
     verify_password,
@@ -31,6 +34,7 @@ from deskline.config import (
     HOST,
     PORT,
     ICONS_DIR,
+    SUPPORT_EMAIL,
     WEB_ROOT,
     brand_template_context,
     ensure_screenshots_dir,
@@ -118,6 +122,12 @@ class RuleUpdate(BaseModel):
 
 class PasswordBody(BaseModel):
     password: str = Field(min_length=4, max_length=128)
+    remember: bool = False
+
+
+class RecoverPasswordBody(BaseModel):
+    recovery_code: str = Field(min_length=8, max_length=64)
+    new_password: str = Field(min_length=4, max_length=128)
     remember: bool = False
 
 
@@ -236,6 +246,8 @@ def create_app(tracker: Tracker, db: Database | None = None) -> FastAPI:
         return {
             "password_set": is_password_set(),
             "authenticated": validate_session_token(token),
+            "has_recovery": has_recovery_code(),
+            "support_email": SUPPORT_EMAIL,
         }
 
     @app.post("/api/auth/setup")
@@ -243,11 +255,11 @@ def create_app(tracker: Tracker, db: Database | None = None) -> FastAPI:
         if is_password_set():
             raise HTTPException(400, "password already set")
         try:
-            set_password(body.password)
+            recovery_code = set_password(body.password, issue_recovery=True)
         except ValueError as exc:
             raise HTTPException(400, str(exc)) from exc
         token = create_session_token(remember=body.remember)
-        response = JSONResponse({"ok": True})
+        response = JSONResponse({"ok": True, "recovery_code": recovery_code})
         _set_session_cookie(response, token, remember=body.remember)
         return response
 
@@ -257,8 +269,25 @@ def create_app(tracker: Tracker, db: Database | None = None) -> FastAPI:
             raise HTTPException(400, "password not set")
         if not verify_password(body.password):
             raise HTTPException(401, "Неверный пароль")
+        issued = ensure_recovery_code()
         token = create_session_token(remember=body.remember)
-        response = JSONResponse({"ok": True})
+        payload: dict[str, Any] = {"ok": True, "has_recovery": True}
+        if issued:
+            payload["recovery_code"] = issued
+        response = JSONResponse(payload)
+        _set_session_cookie(response, token, remember=body.remember)
+        return response
+
+    @app.post("/api/auth/recover")
+    def auth_recover(body: RecoverPasswordBody) -> Response:
+        try:
+            recovery_code = reset_password_with_recovery(body.recovery_code, body.new_password)
+        except PermissionError as exc:
+            raise HTTPException(401, "Неверный код восстановления") from exc
+        except ValueError as exc:
+            raise HTTPException(400, str(exc)) from exc
+        token = create_session_token(remember=body.remember)
+        response = JSONResponse({"ok": True, "recovery_code": recovery_code})
         _set_session_cookie(response, token, remember=body.remember)
         return response
 
@@ -269,14 +298,14 @@ def create_app(tracker: Tracker, db: Database | None = None) -> FastAPI:
         return response
 
     @app.post("/api/auth/change-password")
-    def auth_change_password(body: ChangePasswordBody) -> dict[str, bool]:
+    def auth_change_password(body: ChangePasswordBody) -> dict[str, Any]:
         try:
-            change_password(body.current_password, body.new_password)
+            recovery_code = change_password(body.current_password, body.new_password)
         except PermissionError as exc:
             raise HTTPException(401, "Неверный текущий пароль") from exc
         except ValueError as exc:
             raise HTTPException(400, str(exc)) from exc
-        return {"ok": True}
+        return {"ok": True, "recovery_code": recovery_code}
 
     @app.get("/", response_class=HTMLResponse)
     def index(request: Request) -> HTMLResponse:

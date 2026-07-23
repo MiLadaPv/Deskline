@@ -1971,6 +1971,15 @@ function wireUi() {
 }
 
 async function boot() {
+  const splash = document.getElementById("appSplash");
+  if (splash && !sessionStorage.getItem("deskline_splash_done")) {
+    window.setTimeout(() => {
+      splash.classList.add("is-done");
+      sessionStorage.setItem("deskline_splash_done", "1");
+    }, 1000);
+  } else if (splash) {
+    splash.classList.add("is-done");
+  }
   wireUi();
   ensureSelectedDay();
   const hashTab = (location.hash || "").replace(/^#/, "");
