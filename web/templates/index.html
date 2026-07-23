@@ -456,25 +456,68 @@
   <div class="toast-region" id="toastRegion" aria-live="polite" aria-atomic="true"></div>
 
   <div class="onboard-modal" id="onboardModal" hidden>
-    <div class="onboard-card" role="dialog" aria-labelledby="onboardTitle">
-      <h2 id="onboardTitle">Добро пожаловать в Deskline</h2>
-      <ol class="onboard-steps">
-        <li>Данные остаются на этом ПК (%LOCALAPPDATA%\Deskline).</li>
-        <li>14 дней Pro trial: скриншоты, полная история, экспорт.</li>
-        <li>Потом Free навсегда или ключ Pro из Lemon Squeezy.</li>
-      </ol>
-      <p class="hint">Это не кейлоггер. Пауза — в трее. Privacy: <a href="/privacy">/privacy</a>.</p>
-      <button type="button" class="btn primary" id="onboardDoneBtn">Понятно, начать</button>
+    <div class="onboard-card" role="dialog" aria-modal="true" aria-labelledby="onboardTitle">
+      <div class="onboard-glow" aria-hidden="true"></div>
+      <div class="onboard-brand">
+        {% with anim=true, soft=true, size=48 %}
+          {% include "partials/logo_mark.html" %}
+        {% endwith %}
+        <div>
+          <p class="onboard-kicker">Deskline · by {{ company_name }}</p>
+          <h2 id="onboardTitle">Добро пожаловать</h2>
+        </div>
+      </div>
+      <p class="onboard-lead">Локальный трекер фокуса. Без облака активности и без кейлоггера.</p>
+      <ul class="onboard-features">
+        <li>
+          <span class="onboard-ico" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none"><rect x="4" y="5" width="16" height="14" rx="3" stroke="currentColor" stroke-width="1.8"/><path d="M8 12h8M8 15h5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+          </span>
+          <div>
+            <strong>Только на этом ПК</strong>
+            <span>Данные в %LOCALAPPDATA%\Deskline — никуда не уезжают.</span>
+          </div>
+        </li>
+        <li>
+          <span class="onboard-ico" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="8" stroke="currentColor" stroke-width="1.8"/><path d="M12 8v4l3 2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+          </span>
+          <div>
+            <strong>14 дней Pro trial</strong>
+            <span>Скриншоты, полная история и экспорт — сразу.</span>
+          </div>
+        </li>
+        <li>
+          <span class="onboard-ico" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none"><path d="M7 12h10M12 7v10" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><circle cx="12" cy="12" r="8" stroke="currentColor" stroke-width="1.8"/></svg>
+          </span>
+          <div>
+            <strong>Потом Free или Pro</strong>
+            <span>Free навсегда, либо ключ Pro после оплаты.</span>
+          </div>
+        </li>
+      </ul>
+      <p class="onboard-note">Пауза записи — в трее. <a href="/privacy">Политика конфиденциальности</a></p>
+      <button type="button" class="btn onboard-cta" id="onboardDoneBtn">Начать работу</button>
     </div>
   </div>
 
   <div class="paywall-modal" id="paywallModal" hidden>
-    <div class="onboard-card" role="dialog" aria-labelledby="paywallTitle">
-      <h2 id="paywallTitle">Нужен Deskline Pro</h2>
-      <p id="paywallMessage">Эта функция доступна в Pro.</p>
-      <div class="inline-actions">
-        <a class="btn primary" href="/welcome#pricing" target="_blank" rel="noopener">Тарифы</a>
-        <button type="button" class="btn" id="paywallCloseBtn">Закрыть</button>
+    <div class="onboard-card paywall-card" role="dialog" aria-modal="true" aria-labelledby="paywallTitle">
+      <div class="onboard-glow" aria-hidden="true"></div>
+      <div class="onboard-brand">
+        {% with size=44 %}
+          {% include "partials/logo_mark.html" %}
+        {% endwith %}
+        <div>
+          <p class="onboard-kicker">Deskline Pro</p>
+          <h2 id="paywallTitle">Эта функция в Pro</h2>
+        </div>
+      </div>
+      <p class="onboard-lead" id="paywallMessage">Доступно после активации лицензии или в trial.</p>
+      <div class="onboard-actions">
+        <a class="btn onboard-cta" href="/welcome#pricing" target="_blank" rel="noopener">Смотреть тарифы</a>
+        <button type="button" class="btn onboard-ghost" id="paywallCloseBtn">Закрыть</button>
       </div>
     </div>
   </div>

@@ -1,6 +1,6 @@
 ; Deskline Inno Setup script — produces a normal Windows Setup.exe
 #define MyAppName "Deskline"
-#define MyAppVersion "0.5.0"
+#define MyAppVersion "0.5.1"
 #define MyAppPublisher "AndalusGames"
 #define MyAppURL "https://github.com/AndalusGames"
 #define MyAppExeName "Deskline.exe"
