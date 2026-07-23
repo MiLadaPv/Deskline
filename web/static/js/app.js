@@ -21,9 +21,60 @@ const CAT_LABELS = {
   unrated: "Без оценки",
 };
 
+const CAT_COLORS = {
+  productive: "#1f6b56",
+  neutral: "#6d7c74",
+  distracting: "#b54738",
+  unrated: "#9aa59f",
+};
+
+const KIND_COLORS = [
+  "#1f6b56",
+  "#3d7ea6",
+  "#8a6a3b",
+  "#b54738",
+  "#6b5b95",
+  "#4a7c59",
+  "#c47a3a",
+  "#5c6b73",
+  "#2f6f5e",
+  "#7d8a82",
+];
+
 let lastSummaryKey = "";
 let lastStatusKey = "";
 let lastBarsKey = "";
+let selectedDayIso = localDayIso(new Date());
+
+function localDayIso(d) {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+function shiftDayIso(iso, deltaDays) {
+  const d = new Date(`${iso}T12:00:00`);
+  d.setDate(d.getDate() + deltaDays);
+  return localDayIso(d);
+}
+
+function dayQueryBounds(isoDay) {
+  const start = new Date(`${isoDay}T00:00:00`);
+  const end = new Date(start);
+  end.setDate(end.getDate() + 1);
+  return { from: start.toISOString(), to: end.toISOString() };
+}
+
+function formatDayTitle(isoDay) {
+  const d = new Date(`${isoDay}T12:00:00`);
+  return d.toLocaleDateString("ru-RU", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  });
+}
 
 async function api(path, opts = {}) {
   const res = await fetch(path, {
@@ -50,16 +101,24 @@ async function api(path, opts = {}) {
   return res.json();
 }
 
-function setActiveTab(name) {
+function setActiveTab(name, { syncHash = true } = {}) {
   const aliases = { activities: "usage", apps: "usage", sites: "usage" };
   const tab = aliases[name] || name;
   document.querySelectorAll(".tab").forEach((t) => {
-    t.classList.toggle("active", t.dataset.tab === tab);
+    const on = t.dataset.tab === tab;
+    t.classList.toggle("active", on);
+    t.setAttribute("aria-selected", on ? "true" : "false");
   });
   document.querySelectorAll(".panel").forEach((p) => {
     p.classList.toggle("active", p.id === `panel-${tab}`);
   });
   if (aliases[name]) setUsageSlice(name);
+  if (syncHash) {
+    const next = `#${tab}`;
+    if (location.hash !== next) {
+      history.replaceState(null, "", next);
+    }
+  }
 }
 
 function setUsageSlice(slice) {
@@ -224,6 +283,111 @@ function renderKindBars(byKind, total) {
     .join("");
 }
 
+function renderPieChart(el, slices, total, emptyText) {
+  if (!el) return;
+  const usable = (slices || []).filter((s) => (s.sec || 0) > 0);
+  if (!usable.length || !total) {
+    el.innerHTML = `<p class="hint">${emptyText || "Пока нет данных."}</p>`;
+    return;
+  }
+  let acc = 0;
+  const stops = [];
+  for (const s of usable) {
+    const pct = (s.sec / total) * 100;
+    const start = acc;
+    acc += pct;
+    stops.push(`${s.color} ${start.toFixed(2)}% ${acc.toFixed(2)}%`);
+  }
+  if (acc < 99.5) {
+    stops.push(`${CAT_COLORS.unrated} ${acc.toFixed(2)}% 100%`);
+  }
+  el.innerHTML = `<div class="pie-layout">
+    <div class="pie" style="background:conic-gradient(${stops.join(", ")})" role="img" aria-label="Диаграмма"></div>
+    <ul class="pie-legend">
+      ${usable
+        .map((s) => {
+          const share = Math.round((s.sec / total) * 100);
+          return `<li>
+            <span class="pie-swatch" style="background:${s.color}"></span>
+            <span class="pie-name">${escapeHtml(s.label)}</span>
+            <span class="pie-meta">${fmtDur(s.sec)} · ${share}%</span>
+          </li>`;
+        })
+        .join("")}
+    </ul>
+  </div>`;
+}
+
+function categoryPieSlices(byCategory) {
+  return [
+    {
+      key: "productive",
+      label: CAT_LABELS.productive,
+      sec: byCategory.productive || 0,
+      color: CAT_COLORS.productive,
+    },
+    {
+      key: "neutral",
+      label: CAT_LABELS.neutral,
+      sec: byCategory.neutral || 0,
+      color: CAT_COLORS.neutral,
+    },
+    {
+      key: "distracting",
+      label: CAT_LABELS.distracting,
+      sec: byCategory.distracting || 0,
+      color: CAT_COLORS.distracting,
+    },
+  ];
+}
+
+function kindPieSlices(byKind) {
+  const KIND_LABELS = {
+    work: "Работа",
+    messaging: "Чаты",
+    email: "Почта",
+    video: "Видео",
+    social: "Соцсети",
+    search: "Поиск",
+    shopping: "Покупки",
+    remote: "Удалёнка",
+    system: "Система",
+    other: "Прочее",
+  };
+  return Object.entries(byKind || {})
+    .map(([k, sec], i) => ({
+      key: k,
+      label: KIND_LABELS[k] || k,
+      sec,
+      color: KIND_COLORS[i % KIND_COLORS.length],
+    }))
+    .filter((r) => r.sec >= 60)
+    .sort((a, b) => b.sec - a.sec)
+    .slice(0, 8);
+}
+
+function renderDayKpis(summary) {
+  const el = document.getElementById("dayKpiStrip");
+  if (!el) return;
+  const total = summary.total_sec || 0;
+  const idlePct = total ? Math.round(((summary.idle_sec || 0) / total) * 100) : 0;
+  const items = [
+    { label: "Всего", value: fmtDur(total), sub: formatDayTitle(selectedDayIso) },
+    { label: "Активно", value: fmtDur(summary.active_sec), sub: `${summary.activity_pct ?? 0}%` },
+    { label: "Без ввода", value: `${idlePct}%`, sub: fmtDur(summary.idle_sec) },
+    { label: "Фокус", value: `${summary.focus_pct ?? 0}%`, sub: fmtDur(summary.focus_sec) },
+  ];
+  el.innerHTML = items
+    .map(
+      (it) => `<div class="kpi-card">
+        <span class="kpi-label">${it.label}</span>
+        <strong class="kpi-value">${it.value}</strong>
+        <span class="kpi-sub">${escapeHtml(it.sub)}</span>
+      </div>`
+    )
+    .join("");
+}
+
 function weekdayShort(isoDay) {
   const d = new Date(`${isoDay}T12:00:00`);
   return d.toLocaleDateString("ru-RU", { weekday: "short", day: "numeric" });
@@ -290,7 +454,7 @@ function renderDayGantt(rows) {
   const el = document.getElementById("dayGantt");
   if (!el) return;
   if (!rows.length) {
-    el.innerHTML = `<p class="hint">Пока нет сессий для timeline.</p>`;
+    el.innerHTML = `<p class="hint">Пока нет сессий для этого дня.</p>`;
     return;
   }
 
@@ -305,23 +469,41 @@ function renderDayGantt(rows) {
   dayStart.setHours(0, 0, 0, 0);
   const dayEnd = new Date(dayStart);
   dayEnd.setDate(dayEnd.getDate() + 1);
-  // Prefer full workday window if sessions fit; else pad 30m
+  // Prefer a workday window; snap to whole hours so labels never go negative.
   minMs = Math.min(minMs, dayStart.getTime() + 8 * 3600 * 1000);
   maxMs = Math.max(maxMs, dayStart.getTime() + 19 * 3600 * 1000);
-  minMs = Math.max(dayStart.getTime(), minMs - 30 * 60 * 1000);
-  maxMs = Math.min(dayEnd.getTime(), maxMs + 30 * 60 * 1000);
-  const span = Math.max(maxMs - minMs, 60 * 60 * 1000);
+  const snapMin = new Date(minMs);
+  snapMin.setMinutes(0, 0, 0);
+  minMs = Math.max(dayStart.getTime(), snapMin.getTime());
+  const snapMax = new Date(maxMs);
+  if (
+    snapMax.getMinutes() ||
+    snapMax.getSeconds() ||
+    snapMax.getMilliseconds()
+  ) {
+    snapMax.setHours(snapMax.getHours() + 1, 0, 0, 0);
+  } else {
+    snapMax.setMinutes(0, 0, 0);
+  }
+  maxMs = Math.min(dayEnd.getTime(), snapMax.getTime());
+  if (maxMs <= minMs) maxMs = minMs + 3600 * 1000;
+  const span = maxMs - minMs;
+  const hourCount = Math.max(1, Math.round(span / 3600000));
 
   const hours = [];
-  const startH = new Date(minMs);
-  startH.setMinutes(0, 0, 0);
-  for (let t = startH.getTime(); t <= maxMs; t += 3600 * 1000) {
+  for (let t = minMs; t <= maxMs + 1; t += 3600 * 1000) {
+    if (t > maxMs + 500) break;
     const left = ((t - minMs) / span) * 100;
+    if (left < -0.1 || left > 100.1) continue;
     const label = new Date(t).toLocaleTimeString("ru-RU", {
       hour: "2-digit",
       minute: "2-digit",
     });
-    hours.push(`<span class="gantt-hour" style="left:${left}%">${label}</span>`);
+    const edge =
+      left < 2 ? " is-start" : left > 98 ? " is-end" : "";
+    hours.push(
+      `<span class="gantt-hour${edge}" style="left:${Math.min(100, Math.max(0, left))}%">${label}</span>`
+    );
   }
 
   const blocks = parsed
@@ -330,7 +512,6 @@ function renderDayGantt(rows) {
       const width = Math.max(0.4, ((r.endMs - r.startMs) / span) * 100);
       const cat = categoryClass(r.category);
       const title = `${r.name || ""} · ${fmtClock(r.started_at)}–${fmtClock(r.ended_at)} · ${fmtDur(r.sec)}`;
-      // Narrow chips only show a letter or two — hide label, keep full tooltip.
       const showLabel = width >= 4.5;
       const labelHtml = showLabel
         ? `<span>${escapeHtml(r.name || "")}</span>`
@@ -341,7 +522,7 @@ function renderDayGantt(rows) {
 
   el.innerHTML = `
     <div class="gantt-scale">${hours.join("")}</div>
-    <div class="gantt-track">${blocks}</div>
+    <div class="gantt-track" style="--gantt-hours:${hourCount}">${blocks}</div>
     <div class="gantt-legend">
       <span class="stack-leg"><i class="productive"></i>Фокус</span>
       <span class="stack-leg"><i class="neutral"></i>Нейтрально</span>
@@ -881,6 +1062,18 @@ async function refreshSummary() {
     activitySub.textContent = `${fmtDur(summary.active_sec)} активно · ${fmtDur(summary.idle_sec)} без ввода`;
   }
   renderKpis(summary);
+  renderPieChart(
+    document.getElementById("catPie"),
+    categoryPieSlices(summary.by_category || {}),
+    summary.total_sec || 0,
+    "Пока нет категорий за сегодня."
+  );
+  renderPieChart(
+    document.getElementById("kindPie"),
+    kindPieSlices(summary.by_kind || {}),
+    summary.total_sec || 0,
+    "Пока нет типов занятий."
+  );
   renderProdStack(summary.by_category || {}, summary.total_sec || 0);
   renderBars(summary.by_category, summary.total_sec, { animate: false });
   renderKindBars(summary.by_kind || {}, summary.total_sec || 0);
@@ -1104,10 +1297,40 @@ function fmtClock(iso) {
   return d.toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" });
 }
 
+function syncDayDateInput() {
+  const input = document.getElementById("dayDate");
+  if (input) input.value = selectedDayIso;
+  const todayBtn = document.getElementById("dayTodayBtn");
+  if (todayBtn) {
+    todayBtn.disabled = selectedDayIso === localDayIso(new Date());
+  }
+}
+
 async function refreshTimeline() {
-  const rows = await api("/api/timeline/today");
-  renderDayGantt(rows);
+  syncDayDateInput();
+  const { from, to } = dayQueryBounds(selectedDayIso);
+  const q = `day=${encodeURIComponent(selectedDayIso)}`;
+  const [rows, summary] = await Promise.all([
+    api(`/api/timeline?${q}`),
+    api(`/api/summary?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`),
+  ]);
+  renderDayGantt(rows || []);
+  renderDayKpis(summary || {});
+  renderPieChart(
+    document.getElementById("dayCatPie"),
+    categoryPieSlices(summary.by_category || {}),
+    summary.total_sec || 0,
+    "Нет данных за этот день."
+  );
+  renderPieChart(
+    document.getElementById("dayKindPie"),
+    kindPieSlices(summary.by_kind || {}),
+    summary.total_sec || 0,
+    "Нет типов занятий за этот день."
+  );
+
   const el = document.getElementById("timelineList");
+  if (!el) return;
   if (!rows.length) {
     el.innerHTML = `<li><span class="timeline-time">—</span><span class="rank-icon">•</span><span class="rank-name">Пока нет сессий</span><span class="rank-meta"></span></li>`;
     return;
@@ -1168,6 +1391,7 @@ async function refreshRatings() {
 
 function wireUi() {
   document.querySelectorAll(".tab").forEach((tab) => {
+    tab.setAttribute("role", "tab");
     tab.addEventListener("click", () => {
       setActiveTab(tab.dataset.tab);
       if (tab.dataset.tab === "shots") refreshShots();
@@ -1178,6 +1402,54 @@ function wireUi() {
       if (tab.dataset.tab === "usage") refreshUsageReport();
     });
   });
+
+  window.addEventListener("hashchange", () => {
+    const name = (location.hash || "#today").replace(/^#/, "") || "today";
+    const known = ["today", "day", "usage", "projects", "ratings", "shots", "settings"];
+    if (!known.includes(name)) return;
+    setActiveTab(name, { syncHash: false });
+    if (name === "day") refreshTimeline().catch(() => {});
+    if (name === "usage") refreshUsageReport().catch(() => {});
+    if (name === "projects") refreshProjects().catch(() => {});
+    if (name === "ratings") refreshRatings().catch(() => {});
+    if (name === "shots") refreshShots().catch(() => {});
+    if (name === "settings") loadSettings().catch(() => {});
+  });
+
+  const dayDate = document.getElementById("dayDate");
+  const dayPrev = document.getElementById("dayPrev");
+  const dayNext = document.getElementById("dayNext");
+  const dayTodayBtn = document.getElementById("dayTodayBtn");
+  if (dayDate) {
+    dayDate.value = selectedDayIso;
+    dayDate.max = localDayIso(new Date());
+    dayDate.addEventListener("change", () => {
+      if (!dayDate.value) return;
+      selectedDayIso = dayDate.value;
+      refreshTimeline().catch(() => {});
+    });
+  }
+  if (dayPrev) {
+    dayPrev.addEventListener("click", () => {
+      selectedDayIso = shiftDayIso(selectedDayIso, -1);
+      refreshTimeline().catch(() => {});
+    });
+  }
+  if (dayNext) {
+    dayNext.addEventListener("click", () => {
+      const tomorrow = shiftDayIso(selectedDayIso, 1);
+      const today = localDayIso(new Date());
+      if (tomorrow > today) return;
+      selectedDayIso = tomorrow;
+      refreshTimeline().catch(() => {});
+    });
+  }
+  if (dayTodayBtn) {
+    dayTodayBtn.addEventListener("click", () => {
+      selectedDayIso = localDayIso(new Date());
+      refreshTimeline().catch(() => {});
+    });
+  }
 
   document.querySelectorAll(".seg-btn").forEach((btn) => {
     btn.addEventListener("click", () => setUsageSlice(btn.dataset.usage));
@@ -1618,16 +1890,31 @@ function wireUi() {
 
 async function boot() {
   wireUi();
+  const hashTab = (location.hash || "").replace(/^#/, "");
+  const known = ["today", "day", "usage", "projects", "ratings", "shots", "settings"];
+  if (known.includes(hashTab)) {
+    setActiveTab(hashTab, { syncHash: false });
+  } else {
+    setActiveTab("today");
+  }
   await Promise.all([
     refreshSummary(),
     refreshStatus(),
     refreshProjects(),
     refreshUsageReport(),
   ]);
+  if ((location.hash || "").replace(/^#/, "") === "day") {
+    await refreshTimeline().catch(() => {});
+  }
   setInterval(() => {
     refreshSummary().catch(() => {});
     refreshStatus().catch(() => {});
     refreshUsageReport().catch(() => {});
+    if (document.getElementById("panel-day")?.classList.contains("active")) {
+      if (selectedDayIso === localDayIso(new Date())) {
+        refreshTimeline().catch(() => {});
+      }
+    }
   }, 5000);
 }
 

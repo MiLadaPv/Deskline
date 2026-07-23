@@ -53,17 +53,20 @@
   </header>
 
   <nav class="tabs" role="tablist" aria-label="Разделы">
-    <div class="tab-group">
+    <div class="tab-group" data-nav-group="overview">
+      <span class="tab-group-label">Обзор</span>
       <button class="tab active" data-tab="today" type="button">Сегодня</button>
-      <button class="tab" data-tab="day" type="button">День</button>
+      <button class="tab" data-tab="day" type="button">По часам</button>
       <button class="tab" data-tab="usage" type="button">Где время</button>
     </div>
-    <div class="tab-group">
+    <div class="tab-group" data-nav-group="work">
+      <span class="tab-group-label">Работа</span>
       <button class="tab" data-tab="projects" type="button">Проекты</button>
       <button class="tab" data-tab="ratings" type="button">Рейтинги</button>
       <button class="tab" data-tab="shots" type="button">Скриншоты</button>
     </div>
-    <div class="tab-group tab-group-end">
+    <div class="tab-group tab-group-end" data-nav-group="system">
+      <span class="tab-group-label">Система</span>
       <button class="tab" data-tab="settings" type="button">Настройки</button>
     </div>
   </nav>
@@ -82,14 +85,16 @@
 
       <div class="kpi-strip" id="kpiStrip" aria-label="Сводка за день"></div>
 
-      <div class="charts-grid">
+      <div class="charts-grid pies-grid">
         <div class="chart-card">
           <h3 class="subhead">Фокус и отвлечения</h3>
+          <div class="pie-chart" id="catPie" aria-label="Круговая диаграмма категорий"></div>
           <div class="stack-bar" id="prodStack"></div>
           <div class="cats" id="catBars"></div>
         </div>
         <div class="chart-card">
           <h3 class="subhead">Чем занимались</h3>
+          <div class="pie-chart" id="kindPie" aria-label="Круговая диаграмма типов занятий"></div>
           <div class="kind-bars" id="kindBars"></div>
         </div>
       </div>
@@ -110,7 +115,27 @@
     </section>
 
     <section id="panel-day" class="panel">
-      <h2>День</h2>
+      <div class="panel-head">
+        <h2>По часам</h2>
+        <div class="day-nav" role="group" aria-label="Выбор дня">
+          <button type="button" class="btn day-nav-btn" id="dayPrev" aria-label="Предыдущий день">‹</button>
+          <input type="date" id="dayDate" aria-label="Дата" />
+          <button type="button" class="btn day-nav-btn" id="dayNext" aria-label="Следующий день">›</button>
+          <button type="button" class="btn" id="dayTodayBtn">Сегодня</button>
+        </div>
+      </div>
+      <div class="kpi-strip" id="dayKpiStrip" aria-label="Сводка за выбранный день"></div>
+      <div class="charts-grid pies-grid">
+        <div class="chart-card">
+          <h3 class="subhead">Категории</h3>
+          <div class="pie-chart" id="dayCatPie"></div>
+        </div>
+        <div class="chart-card">
+          <h3 class="subhead">Типы занятий</h3>
+          <div class="pie-chart" id="dayKindPie"></div>
+        </div>
+      </div>
+      <h3 class="subhead">Лента дня</h3>
       <div class="gantt-wrap" id="dayGantt"></div>
       <h3 class="subhead">Сессии</h3>
       <ol class="timeline" id="timelineList"></ol>

@@ -334,6 +334,18 @@ def create_app(tracker: Tracker, db: Database | None = None) -> FastAPI:
     def timeline_today() -> list[dict[str, Any]]:
         return db.timeline_for_day(date.today())
 
+    @app.get("/api/timeline")
+    def timeline(
+        day: str | None = Query(default=None, description="YYYY-MM-DD local calendar day"),
+    ) -> list[dict[str, Any]]:
+        if not day:
+            return db.timeline_for_day(date.today())
+        try:
+            target = date.fromisoformat(day)
+        except ValueError as exc:
+            raise HTTPException(400, "Invalid day; use YYYY-MM-DD") from exc
+        return db.timeline_for_day(target)
+
     @app.get("/api/projects")
     def projects(include_archived: bool = False) -> list[dict[str, Any]]:
         return db.list_projects(include_archived=include_archived)
