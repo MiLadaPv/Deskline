@@ -14,7 +14,7 @@ from deskline.config import (
 
 
 def test_brand_constants():
-    assert COMPANY_NAME == "Milanochka Games"
+    assert COMPANY_NAME == "AndalusGames"
     assert SUPPORT_EMAIL == "milanochka.llc@gmail.com"
     assert GITHUB_URL == "https://github.com/AndalusGames"
     assert "Jordan" in LEGAL_JURISDICTION

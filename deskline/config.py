@@ -12,7 +12,7 @@ PORT = 8787
 BASE_URL = f"http://{HOST}:{PORT}"
 
 # Public brand / legal (shown in footer and /about|/privacy|/terms)
-COMPANY_NAME = "Milanochka Games"
+COMPANY_NAME = "AndalusGames"
 SUPPORT_EMAIL = "milanochka.llc@gmail.com"
 GITHUB_URL = "https://github.com/AndalusGames"
 LEGAL_JURISDICTION = "Hashemite Kingdom of Jordan"
