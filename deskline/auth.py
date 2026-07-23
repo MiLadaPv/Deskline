@@ -13,7 +13,8 @@ from deskline.config import DATA_ROOT, ensure_data_dirs
 
 AUTH_PATH = DATA_ROOT / "auth.json"
 COOKIE_NAME = "deskline_session"
-SESSION_TTL_SEC = 60 * 60 * 12  # 12 hours
+SESSION_TTL_SEC = 60 * 60 * 12  # 12 hours (browser session cookie by default)
+SESSION_TTL_REMEMBER_SEC = 60 * 60 * 24 * 30  # 30 days when "remember me"
 _PBKDF2_ITERATIONS = 200_000
 
 
@@ -101,9 +102,10 @@ def change_password(current: str, new_password: str) -> None:
     set_password(new_password)
 
 
-def create_session_token() -> str:
+def create_session_token(*, remember: bool = False) -> str:
     secret = ensure_session_secret().encode("utf-8")
-    exp = int(time.time()) + SESSION_TTL_SEC
+    ttl = SESSION_TTL_REMEMBER_SEC if remember else SESSION_TTL_SEC
+    exp = int(time.time()) + ttl
     nonce = secrets.token_hex(8)
     payload = f"{exp}.{nonce}"
     sig = hmac.new(secret, payload.encode("utf-8"), hashlib.sha256).hexdigest()

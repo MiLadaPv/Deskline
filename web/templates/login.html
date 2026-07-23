@@ -20,6 +20,10 @@
         Пароль
         <input type="password" name="password" id="password" autocomplete="current-password" required minlength="4" />
       </label>
+      <label class="check login-remember">
+        <input type="checkbox" name="remember" id="rememberMe" />
+        Запомнить меня
+      </label>
       <p class="login-error" id="loginError" hidden></p>
       <button type="submit" class="btn primary" id="loginSubmit">Войти</button>
     </form>
@@ -55,11 +59,12 @@
         ev.preventDefault();
         err.hidden = true;
         const password = document.getElementById("password").value;
+        const remember = document.getElementById("rememberMe").checked;
         const url = setup ? "/api/auth/setup" : "/api/auth/login";
         const res = await fetch(url, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ password }),
+          body: JSON.stringify({ password, remember }),
         });
         if (!res.ok) {
           const text = await res.text();

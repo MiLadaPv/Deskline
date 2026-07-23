@@ -35,6 +35,8 @@ def test_auth_setup_login_and_gate(tmp_path, monkeypatch):
     assert "пароль" in login_page.text.lower() or "Пароль" in login_page.text
     assert "password2" not in login_page.text
     assert "Повторите" not in login_page.text
+    assert "Запомнить меня" in login_page.text
+    assert 'id="rememberMe"' in login_page.text
 
     setup = client.post("/api/auth/setup", json={"password": "secret1"})
     assert setup.status_code == 200

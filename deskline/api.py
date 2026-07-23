@@ -15,6 +15,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from deskline import __version__
 from deskline.auth import (
     COOKIE_NAME,
+    SESSION_TTL_REMEMBER_SEC,
     change_password,
     create_session_token,
     is_password_set,
@@ -117,6 +118,7 @@ class RuleUpdate(BaseModel):
 
 class PasswordBody(BaseModel):
     password: str = Field(min_length=4, max_length=128)
+    remember: bool = False
 
 
 class ChangePasswordBody(BaseModel):
@@ -124,15 +126,19 @@ class ChangePasswordBody(BaseModel):
     new_password: str = Field(min_length=4, max_length=128)
 
 
-def _set_session_cookie(response: Response, token: str) -> None:
-    # Session cookie (no max_age): cleared when the browser is closed.
-    response.set_cookie(
-        key=COOKIE_NAME,
-        value=token,
-        httponly=True,
-        samesite="strict",
-        path="/",
-    )
+def _set_session_cookie(response: Response, token: str, *, remember: bool = False) -> None:
+    # Default: session cookie (cleared when the browser is closed).
+    # Remember me: persist for SESSION_TTL_REMEMBER_SEC.
+    kwargs: dict[str, Any] = {
+        "key": COOKIE_NAME,
+        "value": token,
+        "httponly": True,
+        "samesite": "strict",
+        "path": "/",
+    }
+    if remember:
+        kwargs["max_age"] = SESSION_TTL_REMEMBER_SEC
+    response.set_cookie(**kwargs)
 
 
 def _clear_session_cookie(response: Response) -> None:
@@ -240,9 +246,9 @@ def create_app(tracker: Tracker, db: Database | None = None) -> FastAPI:
             set_password(body.password)
         except ValueError as exc:
             raise HTTPException(400, str(exc)) from exc
-        token = create_session_token()
+        token = create_session_token(remember=body.remember)
         response = JSONResponse({"ok": True})
-        _set_session_cookie(response, token)
+        _set_session_cookie(response, token, remember=body.remember)
         return response
 
     @app.post("/api/auth/login")
@@ -251,9 +257,9 @@ def create_app(tracker: Tracker, db: Database | None = None) -> FastAPI:
             raise HTTPException(400, "password not set")
         if not verify_password(body.password):
             raise HTTPException(401, "Неверный пароль")
-        token = create_session_token()
+        token = create_session_token(remember=body.remember)
         response = JSONResponse({"ok": True})
-        _set_session_cookie(response, token)
+        _set_session_cookie(response, token, remember=body.remember)
         return response
 
     @app.post("/api/auth/logout")
