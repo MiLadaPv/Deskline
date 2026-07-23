@@ -16,11 +16,10 @@ def test_still_working_body_explains_continue_and_pause() -> None:
     assert "выберите «Да, работаю»" not in text
 
 
-def test_still_working_body_message_box_mentions_yes_no() -> None:
-    text = still_working_body("Deskline", for_message_box=True)
-    assert text.startswith("Нет клавиатуры")
-    assert "Да —" in text
-    assert "Нет —" in text
+def test_still_working_dialog_module_importable() -> None:
+    from deskline import still_working_dialog
+
+    assert callable(still_working_dialog.main)
 
 
 def test_autostart_prefers_desktop_exe(tmp_path: Path, monkeypatch) -> None:

@@ -1,8 +1,10 @@
-from __future__ import annotations
-
 """Windows notifications and styled dialogs for Deskline."""
 
+from __future__ import annotations
+
 import ctypes
+import subprocess
+import sys
 import threading
 from ctypes import wintypes
 from typing import Any, Literal
@@ -12,7 +14,6 @@ _icon: Any = None
 
 StillWorkingAnswer = Literal["yes", "no", "timeout"]
 
-# Custom TaskDialog button IDs (must be > 100 per Win32 convention for custom buttons)
 _TD_CONTINUE = 101
 _TD_PAUSE = 102
 
@@ -38,8 +39,6 @@ def notify(title: str, message: str) -> None:
 
 def _powershell_toast(title: str, message: str) -> None:
     try:
-        import subprocess
-
         t = title.replace("'", "''")
         m = message.replace("'", "''")
         script = (
@@ -64,29 +63,17 @@ def _powershell_toast(title: str, message: str) -> None:
         pass
 
 
-def still_working_body(label: str, *, for_message_box: bool = False) -> str:
-    """User-facing body that states what each choice does."""
-    head = (
-        f"Нет клавиатуры и мыши уже некоторое время.\n"
-        f"Сейчас: {label}\n\n"
-    )
-    if for_message_box:
-        return (
-            head
-            + "Да — я за компьютером, продолжить учёт времени.\n"
-            + "Нет — перерыв: поставить Deskline на паузу.\n\n"
-            + "Если не ответите, трекинг продолжится."
-        )
+def still_working_body(label: str) -> str:
+    """Short body — actions are on the buttons themselves."""
     return (
-        head
-        + "«Продолжить» — я за компьютером, учёт времени идёт дальше.\n"
-        + "«На паузу» — это перерыв, Deskline ставится на паузу.\n\n"
-        + "Без ответа трекинг продолжится."
+        f"Нет клавиатуры и мыши уже некоторое время.\n"
+        f"Сейчас открыто: {label}\n\n"
+        f"Продолжить — вы за ПК, учёт идёт дальше.\n"
+        f"На паузу — перерыв, Deskline останавливает запись."
     )
 
 
 def ask_yes_no(title: str, message: str) -> bool:
-    """Blocking Yes/No. Prefer ask_still_working for the idle prompt."""
     return ask_still_working(title, message) == "yes"
 
 
@@ -97,40 +84,71 @@ def ask_still_working(
     timeout_sec: float = 45.0,
 ) -> StillWorkingAnswer:
     """
-    Still-working dialog.
-    Returns yes / no / timeout. Timeout means keep tracking (do NOT pause).
+    Still-working dialog with explicit Continue / Pause actions.
+    Returns yes / no / timeout. Timeout keeps tracking (does NOT pause).
     """
+    # 1) Own process with Tk — reliable UI thread (fixes Да/Нет MessageBox fallback)
     try:
-        return _tk_still_working(title, message, timeout_sec=timeout_sec)
+        return _subprocess_still_working(title, message, timeout_sec=timeout_sec)
     except Exception:
         pass
+    # 2) In-process TaskDialog with custom button labels
     try:
         return _taskdialog_still_working(title, message)
     except Exception:
         pass
+    # 3) Last resort MessageBox — map Да/Нет in the text itself (cannot rename buttons)
     try:
         return _messagebox_still_working(title, message)
     except Exception:
         return "yes"
 
 
+def _subprocess_still_working(
+    title: str, message: str, *, timeout_sec: float
+) -> StillWorkingAnswer:
+    creation = 0
+    # Do NOT use CREATE_NO_WINDOW — dialog must be visible.
+    proc = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "deskline.still_working_dialog",
+            title or "Deskline",
+            message,
+            str(timeout_sec),
+        ],
+        capture_output=True,
+        timeout=max(30.0, timeout_sec + 30.0),
+        creationflags=creation,
+    )
+    code = int(proc.returncode)
+    if code == 0:
+        return "yes"
+    if code == 1:
+        return "no"
+    return "timeout"
+
+
 def _messagebox_still_working(title: str, message: str) -> StillWorkingAnswer:
-    # Ensure consequences are visible even with generic Да/Нет labels.
-    body = message
-    if "продолжить" not in message.lower() and "пауз" not in message.lower():
-        body = still_working_body("Deskline", for_message_box=True)
+    body = (
+        "ВАЖНО:\n"
+        "• ДА  = Продолжить учёт (я за компьютером)\n"
+        "• НЕТ = На паузу (перерыв)\n\n"
+        + (message or still_working_body("Deskline"))
+    )
     result = ctypes.windll.user32.MessageBoxW(
         0, body, title, 0x04 | 0x20 | 0x40000  # MB_YESNO | MB_ICONQUESTION | MB_TOPMOST
     )
-    if int(result) == 6:  # IDYES
+    if int(result) == 6:
         return "yes"
-    if int(result) == 7:  # IDNO
+    if int(result) == 7:
         return "no"
     return "timeout"
 
 
 def _taskdialog_still_working(title: str, message: str) -> StillWorkingAnswer:
-    """Win32 TaskDialog with custom Continue / Pause buttons (no Tk required)."""
+    """Win32 TaskDialog with Продолжить / На паузу."""
     comctl32 = ctypes.windll.comctl32
 
     class TASKDIALOG_BUTTON(ctypes.Structure):
@@ -147,7 +165,7 @@ def _taskdialog_still_working(title: str, message: str) -> StillWorkingAnswer:
             ("dwFlags", ctypes.c_uint),
             ("dwCommonButtons", ctypes.c_uint),
             ("pszWindowTitle", wintypes.LPCWSTR),
-            ("hMainIcon", wintypes.LPCWSTR),  # union simplified as pointer/PCWSTR
+            ("hMainIcon", ctypes.c_void_p),
             ("pszMainInstruction", wintypes.LPCWSTR),
             ("pszContent", wintypes.LPCWSTR),
             ("cButtons", ctypes.c_uint),
@@ -160,7 +178,7 @@ def _taskdialog_still_working(title: str, message: str) -> StillWorkingAnswer:
             ("pszExpandedInformation", wintypes.LPCWSTR),
             ("pszExpandedControlText", wintypes.LPCWSTR),
             ("pszCollapsedControlText", wintypes.LPCWSTR),
-            ("pszFooterIcon", wintypes.LPCWSTR),
+            ("pszFooterIcon", ctypes.c_void_p),
             ("pszFooter", wintypes.LPCWSTR),
             ("pfCallback", ctypes.c_void_p),
             ("lpCallbackData", ctypes.c_longlong),
@@ -168,7 +186,7 @@ def _taskdialog_still_working(title: str, message: str) -> StillWorkingAnswer:
         ]
 
     TDF_ALLOW_DIALOG_CANCELLATION = 0x0008
-    TDF_POSITION_RELATIVE_TO_WINDOW = 0x1000
+    TDF_USE_HICON_MAIN = 0x0002
 
     buttons = (TASKDIALOG_BUTTON * 2)(
         TASKDIALOG_BUTTON(_TD_CONTINUE, "Продолжить"),
@@ -179,7 +197,7 @@ def _taskdialog_still_working(title: str, message: str) -> StillWorkingAnswer:
     cfg.cbSize = ctypes.sizeof(TASKDIALOGCONFIG)
     cfg.hwndParent = None
     cfg.hInstance = None
-    cfg.dwFlags = TDF_ALLOW_DIALOG_CANCELLATION | TDF_POSITION_RELATIVE_TO_WINDOW
+    cfg.dwFlags = TDF_ALLOW_DIALOG_CANCELLATION
     cfg.dwCommonButtons = 0
     cfg.pszWindowTitle = title or "Deskline"
     cfg.hMainIcon = None
@@ -188,21 +206,9 @@ def _taskdialog_still_working(title: str, message: str) -> StillWorkingAnswer:
     cfg.cButtons = 2
     cfg.pButtons = ctypes.cast(buttons, ctypes.POINTER(TASKDIALOG_BUTTON))
     cfg.nDefaultButton = _TD_CONTINUE
-    cfg.cRadioButtons = 0
-    cfg.pRadioButtons = None
-    cfg.nDefaultRadioButton = 0
-    cfg.pszVerificationText = None
-    cfg.pszExpandedInformation = None
-    cfg.pszExpandedControlText = None
-    cfg.pszCollapsedControlText = None
-    cfg.pszFooterIcon = None
-    cfg.pszFooter = "Без ответа закройте окно — трекинг продолжится."
-    cfg.pfCallback = None
-    cfg.lpCallbackData = 0
+    cfg.pszFooter = "Закрытие окна без выбора — учёт продолжится."
     cfg.cxWidth = 0
 
-    pn_button = ctypes.c_int(0)
-    # InitCommonControlsEx may be required on some systems
     try:
         class INITCOMMONCONTROLSEX(ctypes.Structure):
             _fields_ = [("dwSize", ctypes.c_uint), ("dwICC", ctypes.c_uint)]
@@ -212,6 +218,7 @@ def _taskdialog_still_working(title: str, message: str) -> StillWorkingAnswer:
     except Exception:
         pass
 
+    pn_button = ctypes.c_int(0)
     hr = comctl32.TaskDialogIndirect(
         ctypes.byref(cfg),
         ctypes.byref(pn_button),
@@ -225,127 +232,4 @@ def _taskdialog_still_working(title: str, message: str) -> StillWorkingAnswer:
         return "yes"
     if btn == _TD_PAUSE:
         return "no"
-    # Cancel / close / Esc → keep tracking
     return "timeout"
-
-
-def _tk_still_working(title: str, message: str, *, timeout_sec: float) -> StillWorkingAnswer:
-    import tkinter as tk
-    from tkinter import font as tkfont
-
-    # Tk often fails from a non-main thread under pythonw; surface that clearly.
-    if threading.current_thread() is not threading.main_thread():
-        # Still try — works on some setups; TaskDialog is the reliable fallback.
-        pass
-
-    result: dict[str, StillWorkingAnswer] = {"value": "timeout"}
-
-    root = tk.Tk()
-    root.title(title or "Deskline")
-    root.resizable(False, False)
-    root.attributes("-topmost", True)
-    root.configure(bg="#1a2e28")
-
-    try:
-        root.iconbitmap(default="")
-    except Exception:
-        pass
-
-    width, height = 460, 300
-    sw = root.winfo_screenwidth()
-    sh = root.winfo_screenheight()
-    root.geometry(f"{width}x{height}+{(sw - width) // 2}+{(sh - height) // 3}")
-
-    title_font = tkfont.Font(family="Segoe UI Semibold", size=14)
-    body_font = tkfont.Font(family="Segoe UI", size=11)
-    btn_font = tkfont.Font(family="Segoe UI Semibold", size=10)
-
-    frame = tk.Frame(root, bg="#1a2e28", padx=28, pady=24)
-    frame.pack(fill="both", expand=True)
-
-    tk.Label(
-        frame,
-        text="Deskline",
-        fg="#8fbfb0",
-        bg="#1a2e28",
-        font=title_font,
-        anchor="w",
-    ).pack(fill="x")
-
-    tk.Label(
-        frame,
-        text="Вы ещё за компьютером?",
-        fg="#f4f7f5",
-        bg="#1a2e28",
-        font=title_font,
-        anchor="w",
-        pady=(12, 6),
-    ).pack(fill="x")
-
-    tk.Label(
-        frame,
-        text=message,
-        fg="#c5d5cf",
-        bg="#1a2e28",
-        font=body_font,
-        wraplength=400,
-        justify="left",
-        anchor="w",
-    ).pack(fill="x", pady=(0, 18))
-
-    btns = tk.Frame(frame, bg="#1a2e28")
-    btns.pack(fill="x")
-
-    def choose(val: StillWorkingAnswer) -> None:
-        result["value"] = val
-        root.destroy()
-
-    yes_btn = tk.Button(
-        btns,
-        text="Продолжить",
-        font=btn_font,
-        bg="#2f6f5e",
-        fg="#ffffff",
-        activebackground="#3d8a75",
-        activeforeground="#ffffff",
-        relief="flat",
-        padx=16,
-        pady=10,
-        cursor="hand2",
-        command=lambda: choose("yes"),
-    )
-    yes_btn.pack(side="left", padx=(0, 10))
-
-    no_btn = tk.Button(
-        btns,
-        text="На паузу",
-        font=btn_font,
-        bg="#2a3d37",
-        fg="#e8f0ed",
-        activebackground="#3a524a",
-        activeforeground="#ffffff",
-        relief="flat",
-        padx=16,
-        pady=10,
-        cursor="hand2",
-        command=lambda: choose("no"),
-    )
-    no_btn.pack(side="left")
-
-    hint = tk.Label(
-        frame,
-        text=f"Без ответа через {int(timeout_sec)} с трекинг продолжится",
-        fg="#7a948c",
-        bg="#1a2e28",
-        font=tkfont.Font(family="Segoe UI", size=9),
-        anchor="w",
-        pady=(16, 0),
-    )
-    hint.pack(fill="x")
-
-    root.protocol("WM_DELETE_WINDOW", lambda: choose("timeout"))
-    root.after(int(max(5.0, timeout_sec) * 1000), lambda: choose("timeout"))
-    root.focus_force()
-    yes_btn.focus_set()
-    root.mainloop()
-    return result["value"]
