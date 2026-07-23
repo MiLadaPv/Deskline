@@ -55,4 +55,5 @@ def test_login_template_has_launch_and_forgot():
     assert "Забыли пароль?" in html
     assert "recoverForm" in html
     assert "logo-anim" in html
-    assert "preview-donut" in html
+    assert "preview-gauge" in html
+    assert "preview-donut" not in html or "preview-gauge" in html

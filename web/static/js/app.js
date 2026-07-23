@@ -346,6 +346,19 @@ function renderKindBars(byKind, total) {
     .join("");
 }
 
+function donutSegmentPath(cx, cy, rOut, rIn, a0, a1) {
+  const sweep = Math.max(0, Math.min(359.999, a1 - a0));
+  if (sweep < 0.2) return "";
+  const rad = (deg) => ((deg - 90) * Math.PI) / 180;
+  const pt = (r, deg) => [cx + r * Math.cos(rad(deg)), cy + r * Math.sin(rad(deg))];
+  const [x0, y0] = pt(rOut, a0);
+  const [x1, y1] = pt(rOut, a0 + sweep);
+  const [x2, y2] = pt(rIn, a0 + sweep);
+  const [x3, y3] = pt(rIn, a0);
+  const large = sweep > 180 ? 1 : 0;
+  return `M${x0.toFixed(2)} ${y0.toFixed(2)} A${rOut} ${rOut} 0 ${large} 1 ${x1.toFixed(2)} ${y1.toFixed(2)} L${x2.toFixed(2)} ${y2.toFixed(2)} A${rIn} ${rIn} 0 ${large} 0 ${x3.toFixed(2)} ${y3.toFixed(2)} Z`;
+}
+
 function renderPieChart(el, slices, total, emptyText) {
   if (!el) return;
   const usable = (slices || []).filter((s) => (s.sec || 0) > 0);
@@ -353,19 +366,33 @@ function renderPieChart(el, slices, total, emptyText) {
     el.innerHTML = `<p class="hint">${emptyText || "Пока нет данных."}</p>`;
     return;
   }
-  let acc = 0;
-  const stops = [];
-  for (const s of usable) {
-    const pct = (s.sec / total) * 100;
-    const start = acc;
-    acc += pct;
-    stops.push(`${s.color} ${start.toFixed(2)}% ${acc.toFixed(2)}%`);
-  }
-  if (acc < 99.5) {
-    stops.push(`${CAT_COLORS.unrated} ${acc.toFixed(2)}% 100%`);
-  }
+  const cx = 60;
+  const cy = 60;
+  const rOut = 52;
+  const rIn = 34;
+  let angle = 0;
+  const paths = usable
+    .map((s) => {
+      const sweep = (s.sec / total) * 360;
+      const d = donutSegmentPath(cx, cy, rOut, rIn, angle, angle + sweep);
+      angle += sweep;
+      if (!d) return "";
+      return `<path d="${d}" fill="${s.color}" stroke="#fff" stroke-width="1.5"/>`;
+    })
+    .join("");
+  const primary = usable[0];
+  const primaryPct = Math.round((primary.sec / total) * 100);
   el.innerHTML = `<div class="pie-layout">
-    <div class="pie" style="background:conic-gradient(${stops.join(", ")})" role="img" aria-label="Диаграмма"></div>
+    <div class="donut-wrap" role="img" aria-label="Диаграмма">
+      <svg class="donut-svg" viewBox="0 0 120 120" width="148" height="148">
+        <circle cx="60" cy="60" r="43" fill="none" stroke="rgba(21,36,31,0.06)" stroke-width="16"/>
+        ${paths}
+      </svg>
+      <div class="donut-center">
+        <strong>${primaryPct}%</strong>
+        <span>${escapeHtml(primary.label)}</span>
+      </div>
+    </div>
     <ul class="pie-legend">
       ${usable
         .map((s) => {

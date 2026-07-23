@@ -43,28 +43,69 @@
         <li>Проекты, скриншоты и пароль дашборда</li>
       </ul>
       <div class="launch-previews" aria-hidden="true">
-        <div class="preview-card preview-donuts">
-          <div class="preview-donut" style="--p:72"><span>72%</span></div>
-          <div class="preview-donut" style="--p:54"><span>54%</span></div>
-          <div class="preview-donut" style="--p:38"><span>38%</span></div>
-          <p>Фокус за день</p>
+        <div class="preview-card preview-gauges">
+          <div class="preview-card-head">
+            <strong>Фокус за день</strong>
+            <span>Highest % productive</span>
+          </div>
+          <div class="preview-gauge-row">
+            <div class="preview-gauge">
+              <div class="gauge-ring" style="--p:72;--c:#1f6b56">
+                <svg viewBox="0 0 36 36"><circle class="gauge-track" cx="18" cy="18" r="15.9155"/><circle class="gauge-value" cx="18" cy="18" r="15.9155" stroke="#1f6b56" stroke-dasharray="72 28" transform="rotate(-90 18 18)"/></svg>
+                <span>72%</span>
+              </div>
+              <em>Design</em>
+            </div>
+            <div class="preview-gauge">
+              <div class="gauge-ring" style="--p:54;--c:#2f8f74">
+                <svg viewBox="0 0 36 36"><circle class="gauge-track" cx="18" cy="18" r="15.9155"/><circle class="gauge-value" cx="18" cy="18" r="15.9155" stroke="#2f8f74" stroke-dasharray="54 46" transform="rotate(-90 18 18)"/></svg>
+                <span>54%</span>
+              </div>
+              <em>Code</em>
+            </div>
+            <div class="preview-gauge">
+              <div class="gauge-ring" style="--p:38;--c:#4a7c59">
+                <svg viewBox="0 0 36 36"><circle class="gauge-track" cx="18" cy="18" r="15.9155"/><circle class="gauge-value" cx="18" cy="18" r="15.9155" stroke="#4a7c59" stroke-dasharray="38 62" transform="rotate(-90 18 18)"/></svg>
+                <span>38%</span>
+              </div>
+              <em>Ops</em>
+            </div>
+          </div>
         </div>
         <div class="preview-card preview-timeline">
-          <div class="preview-bar">
-            <i class="productive" style="width:48%"></i>
-            <i class="neutral" style="width:18%"></i>
-            <i class="distracting" style="width:14%"></i>
-            <i class="idle" style="width:20%"></i>
+          <div class="preview-card-head">
+            <strong>Лента дня</strong>
+            <span>7ч 20м tracked</span>
           </div>
-          <p>Лента · 7ч 20м</p>
+          <div class="preview-timeline-meta">
+            <span>09:12</span>
+            <span>17:48</span>
+          </div>
+          <div class="preview-bar preview-bar-lg">
+            <i class="productive" style="width:46%"></i>
+            <i class="neutral" style="width:16%"></i>
+            <i class="distracting" style="width:12%"></i>
+            <i class="idle" style="width:26%"></i>
+          </div>
+          <div class="preview-timeline-legs">
+            <span><i class="productive"></i>Фокус</span>
+            <span><i class="neutral"></i>Нейтр.</span>
+            <span><i class="distracting"></i>Отвлеч.</span>
+            <span><i class="idle"></i>Простой</span>
+          </div>
         </div>
-        <div class="preview-card preview-bars">
-          <span style="height:70%"></span>
-          <span style="height:45%"></span>
-          <span style="height:88%"></span>
-          <span style="height:36%"></span>
-          <span style="height:60%"></span>
-          <p>Неделя</p>
+        <div class="preview-card preview-week">
+          <div class="preview-card-head">
+            <strong>Неделя</strong>
+            <span>Focus by day</span>
+          </div>
+          <div class="preview-week-chart">
+            <div class="preview-week-col"><span style="height:62%"></span><b>пн</b></div>
+            <div class="preview-week-col"><span style="height:44%"></span><b>вт</b></div>
+            <div class="preview-week-col"><span style="height:88%"></span><b>ср</b></div>
+            <div class="preview-week-col"><span style="height:36%"></span><b>чт</b></div>
+            <div class="preview-week-col"><span style="height:71%"></span><b>пт</b></div>
+          </div>
         </div>
       </div>
     </section>
