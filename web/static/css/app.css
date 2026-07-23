@@ -2743,13 +2743,24 @@ main {
 }
 
 .hours-line {
-  min-height: 150px;
+  min-height: 168px;
 }
 
 .hours-line-svg {
   width: 100%;
-  height: 150px;
+  height: 168px;
   display: block;
+  overflow: visible;
+}
+
+.hours-grid {
+  stroke: rgba(21, 36, 31, 0.08);
+  stroke-width: 1;
+  stroke-dasharray: 3 4;
+}
+
+.hours-line-fill {
+  fill: rgba(31, 107, 86, 0.1);
 }
 
 .hours-line-path {
@@ -2768,6 +2779,13 @@ main {
 .hours-axis {
   fill: var(--ink-soft);
   font-size: 10px;
+  font-family: var(--sans, Manrope, system-ui, sans-serif);
+}
+
+.hours-x {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: lowercase;
 }
 
 .pulse-panel {

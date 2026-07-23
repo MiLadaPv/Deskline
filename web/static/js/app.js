@@ -812,6 +812,15 @@ function weekdayShort(isoDay) {
   return d.toLocaleDateString("ru-RU", { weekday: "short", day: "numeric" });
 }
 
+function niceHoursCeiling(sec) {
+  const h = Math.max(sec / 3600, 1);
+  if (h <= 4) return Math.ceil(h);
+  if (h <= 8) return Math.ceil(h / 2) * 2;
+  if (h <= 12) return Math.ceil(h / 3) * 3;
+  if (h <= 24) return Math.ceil(h / 4) * 4;
+  return Math.ceil(h / 6) * 6;
+}
+
 function renderHoursChart(trends) {
   const el = document.getElementById("hoursChart");
   if (!el) return;
@@ -823,31 +832,49 @@ function renderHoursChart(trends) {
     return;
   }
   const vals = rows.map((r) => Number(r.active_sec || r.total_sec || 0));
-  const max = Math.max(...vals, 1);
-  const w = 320;
-  const h = 140;
-  const padX = 12;
-  const padY = 16;
+  const maxSec = Math.max(...vals, 1);
+  const maxH = niceHoursCeiling(maxSec);
+  const maxScale = maxH * 3600;
+  const w = 360;
+  const h = 168;
+  const padL = 36;
+  const padR = 12;
+  const padT = 14;
+  const padB = 28;
+  const chartW = w - padL - padR;
+  const chartH = h - padT - padB;
+  const yTicks = [0, 0.5, 1].map((t) => Math.round(maxH * t * 10) / 10);
+  const uniqTicks = [...new Set(yTicks)];
+  const grid = uniqTicks
+    .map((tick) => {
+      const y = padT + chartH - (tick / maxH) * chartH;
+      return `<line class="hours-grid" x1="${padL}" y1="${y.toFixed(1)}" x2="${w - padR}" y2="${y.toFixed(1)}"/>
+        <text x="${padL - 6}" y="${(y + 3).toFixed(1)}" text-anchor="end" class="hours-axis">${tick}ч</text>`;
+    })
+    .join("");
   const pts = vals.map((v, i) => {
-    const x = padX + (i * (w - padX * 2)) / Math.max(vals.length - 1, 1);
-    const y = h - padY - (v / max) * (h - padY * 2);
+    const x = padL + (i * chartW) / Math.max(vals.length - 1, 1);
+    const y = padT + chartH - (v / maxScale) * chartH;
     return [x, y];
   });
   const poly = pts.map(([x, y]) => `${x.toFixed(1)},${y.toFixed(1)}`).join(" ");
+  const area = `${padL},${(padT + chartH).toFixed(1)} ${poly} ${(padL + chartW).toFixed(1)},${(padT + chartH).toFixed(1)}`;
   const dots = pts
     .map(([x, y], i) => {
-      const label = new Date(`${rows[i].day}T12:00:00`).toLocaleDateString("ru-RU", {
-        weekday: "narrow",
-      });
+      const d = new Date(`${rows[i].day}T12:00:00`);
+      const label = d.toLocaleDateString("ru-RU", { weekday: "short" }).replace(".", "");
+      const tip = `${d.toLocaleDateString("ru-RU", { day: "numeric", month: "short" })} · ${fmtDur(vals[i])}`;
       return `<g>
-        <circle cx="${x}" cy="${y}" r="4" class="hours-dot"/>
-        <text x="${x}" y="${h - 2}" text-anchor="middle" class="hours-axis">${label}</text>
+        <circle cx="${x}" cy="${y}" r="4.5" class="hours-dot">
+          <title>${escapeHtml(tip)}</title>
+        </circle>
+        <text x="${x}" y="${h - 8}" text-anchor="middle" class="hours-axis hours-x">${escapeHtml(label)}</text>
       </g>`;
     })
     .join("");
-  const maxH = Math.round(max / 3600);
   el.innerHTML = `<svg class="hours-line-svg" viewBox="0 0 ${w} ${h}" role="img" aria-label="Часы за неделю">
-    <text x="${w - 4}" y="14" text-anchor="end" class="hours-axis">${maxH}ч</text>
+    ${grid}
+    <polygon class="hours-line-fill" points="${area}"/>
     <polyline class="hours-line-path" fill="none" points="${poly}"/>
     ${dots}
   </svg>`;
