@@ -1216,6 +1216,7 @@ function renderGroupedList(el, rows, emptyText, opts = {}) {
         const cShare =
           showShare && total ? ` · ${Math.round((c.sec / total) * 100)}%` : "";
         parts.push(`<li class="rank-row-child">
+          <span class="rank-nest" aria-hidden="true"></span>
           ${cIcon}
           <span class="rank-text">
             <span class="rank-name">${escapeHtml(c.name)}</span>
