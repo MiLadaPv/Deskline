@@ -60,7 +60,9 @@ def test_login_template_has_launch_and_forgot():
     assert "logo-anim" in logo
     assert "logo.png" in logo
     assert "logo-dark.png" in logo
-    assert "logo-grow.webp" in html or "logo_mark.html" in html
+    assert "logo-splash.svg" in html
+    assert "logo-splash-dark.svg" in html
+    assert "logo-grow.webp" not in html
     assert "preview-gauge" in html
     assert "preview-stage" in html
     assert "stack-svg" in html

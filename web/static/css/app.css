@@ -2271,16 +2271,17 @@ html[data-theme="dark"] .rank-row-child {
 }
 
 .boot-logo-anim {
-  width: min(220px, 42vw);
+  width: min(240px, 48vw);
   height: auto;
   display: block;
   margin: 0 auto;
   object-fit: contain;
-  background: transparent;
+  background: transparent !important;
   border: 0;
   border-radius: 0;
   box-shadow: none;
-  filter: drop-shadow(0 14px 28px rgba(0, 0, 0, 0.28));
+  /* Soft shadow only — never a solid white plate behind the mark */
+  filter: drop-shadow(0 10px 22px rgba(0, 0, 0, 0.22));
   image-rendering: auto;
 }
 
