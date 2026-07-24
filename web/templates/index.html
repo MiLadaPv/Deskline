@@ -14,7 +14,7 @@
 <body>
   <div class="atmosphere" aria-hidden="true"></div>
   <div class="boot-splash" id="appSplash" aria-hidden="true">
-    {% with anim=true, size=80 %}
+    {% with anim=true, size=176, logo_uid='appsplash' %}
       {% include "partials/logo_mark.html" %}
     {% endwith %}
     <p class="boot-splash-title">Deskline</p>
@@ -22,7 +22,7 @@
   <header class="top">
     <div class="brand-block">
       <div class="brand-lockup">
-        {% with anim=true, soft=true, size=64 %}
+        {% with anim=true, soft=true, size=64, logo_uid='apptop' %}
           {% include "partials/logo_mark.html" %}
         {% endwith %}
         <div class="brand-lockup-text">

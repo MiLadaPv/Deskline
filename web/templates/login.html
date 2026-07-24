@@ -16,7 +16,7 @@
   <button type="button" class="theme-toggle theme-toggle-float" id="themeToggle" title="Тема">Тема</button>
 
   <div class="boot-splash" id="bootSplash" aria-hidden="true">
-    {% with anim=true, size=80 %}
+    {% with anim=true, size=176, logo_uid='splash' %}
       {% include "partials/logo_mark.html" %}
     {% endwith %}
     <p class="boot-splash-title">Deskline</p>
@@ -25,7 +25,7 @@
   <div class="launch">
     <section class="launch-hero" aria-label="О Deskline">
       <div class="launch-brand brand-lockup">
-        {% with anim=true, soft=true, size=56 %}
+        {% with anim=true, soft=true, size=56, logo_uid='hero' %}
           {% include "partials/logo_mark.html" %}
         {% endwith %}
         <div class="brand-lockup-text">
@@ -125,33 +125,43 @@
               <strong>Картина дня</strong>
               <span>12 AM–12 AM</span>
             </div>
-            <div class="preview-timeline-meta">
+            <div class="preview-timeline-meta preview-timeline-meta-fine">
               <span>12 AM</span>
+              <span>6 AM</span>
               <span>12 PM</span>
+              <span>6 PM</span>
               <span>12 AM</span>
             </div>
             <div class="preview-day-svg">
-              <svg viewBox="0 0 560 36" preserveAspectRatio="none">
+              <svg viewBox="0 0 560 40" preserveAspectRatio="none">
                 <defs>
                   <linearGradient id="segP" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#5eead4"/><stop offset="100%" stop-color="#1f6b56"/></linearGradient>
                   <linearGradient id="segN" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#94a3b8"/><stop offset="100%" stop-color="#64748b"/></linearGradient>
                   <linearGradient id="segD" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#fb923c"/><stop offset="100%" stop-color="#c2410c"/></linearGradient>
                   <linearGradient id="segI" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#cbd5e1"/><stop offset="100%" stop-color="#64748b"/></linearGradient>
                 </defs>
-                <rect class="day-track" x="0" y="6" width="560" height="24" rx="8"/>
-                <rect x="0" y="6" width="212" height="24" rx="0" class="day-void"/>
-                <rect x="212" y="6" width="123" height="24" fill="url(#segP)"/>
-                <rect x="335" y="6" width="34" height="24" fill="url(#segN)"/>
-                <rect x="369" y="6" width="45" height="24" class="day-void"/>
-                <rect x="414" y="6" width="28" height="24" fill="url(#segD)"/>
-                <rect x="442" y="6" width="22" height="24" fill="url(#segI)"/>
-                <rect x="464" y="6" width="39" height="24" fill="url(#segP)"/>
-                <rect x="503" y="6" width="57" height="24" class="day-void"/>
+                <g class="day-ticks" stroke="currentColor" stroke-width="1" opacity="0.28">
+                  <line x1="70" y1="2" x2="70" y2="8"/><line x1="140" y1="2" x2="140" y2="10"/>
+                  <line x1="210" y1="2" x2="210" y2="8"/><line x1="280" y1="2" x2="280" y2="10"/>
+                  <line x1="350" y1="2" x2="350" y2="8"/><line x1="420" y1="2" x2="420" y2="10"/>
+                  <line x1="490" y1="2" x2="490" y2="8"/>
+                </g>
+                <rect class="day-track" x="0" y="12" width="560" height="24" rx="6"/>
+                <g class="day-segments">
+                  <rect x="0" y="12" width="212" height="24" class="day-void day-seg"/>
+                  <rect x="212" y="12" width="123" height="24" fill="url(#segP)" class="day-seg"/>
+                  <rect x="335" y="12" width="34" height="24" fill="url(#segN)" class="day-seg"/>
+                  <rect x="369" y="12" width="45" height="24" class="day-void day-seg"/>
+                  <rect x="414" y="12" width="28" height="24" fill="url(#segD)" class="day-seg"/>
+                  <rect x="442" y="12" width="22" height="24" fill="url(#segI)" class="day-seg"/>
+                  <rect x="464" y="12" width="39" height="24" fill="url(#segP)" class="day-seg"/>
+                  <rect x="503" y="12" width="57" height="24" class="day-void day-seg"/>
+                </g>
                 <g stroke="rgba(255,255,255,0.35)" stroke-width="1">
-                  <line x1="212" y1="6" x2="212" y2="30"/><line x1="335" y1="6" x2="335" y2="30"/>
-                  <line x1="369" y1="6" x2="369" y2="30"/><line x1="414" y1="6" x2="414" y2="30"/>
-                  <line x1="442" y1="6" x2="442" y2="30"/><line x1="464" y1="6" x2="464" y2="30"/>
-                  <line x1="503" y1="6" x2="503" y2="30"/>
+                  <line x1="212" y1="12" x2="212" y2="36"/><line x1="335" y1="12" x2="335" y2="36"/>
+                  <line x1="369" y1="12" x2="369" y2="36"/><line x1="414" y1="12" x2="414" y2="36"/>
+                  <line x1="442" y1="12" x2="442" y2="36"/><line x1="464" y1="12" x2="464" y2="36"/>
+                  <line x1="503" y1="12" x2="503" y2="36"/>
                 </g>
               </svg>
             </div>
@@ -173,43 +183,98 @@
             </div>
             <div class="preview-week-chart preview-week-rich">
               <div class="preview-week-col">
-                <span class="stack stack-rich">
-                  <i class="distracting" style="--h:14%"></i>
-                  <i class="neutral" style="--h:12%"></i>
-                  <i class="productive" style="--h:58%"></i>
-                </span>
+                <svg class="stack-svg" viewBox="0 0 24 100" width="28" height="116" aria-hidden="true">
+                  <defs>
+                    <linearGradient id="wkP1" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#5eead4"/><stop offset="100%" stop-color="#1f6b56"/></linearGradient>
+                    <linearGradient id="wkN1" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#e2e8f0"/><stop offset="100%" stop-color="#94a3b8"/></linearGradient>
+                    <linearGradient id="wkD1" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#fb923c"/><stop offset="100%" stop-color="#c2410c"/></linearGradient>
+                    <clipPath id="wkClip1"><rect x="0" y="0" width="24" height="100" rx="5"/></clipPath>
+                  </defs>
+                  <rect class="week-stack-track" x="0" y="0" width="24" height="100" rx="5"/>
+                  <g clip-path="url(#wkClip1)">
+                    <g class="stack-grow">
+                      <rect class="seg productive" x="0" y="42" width="24" height="58" fill="url(#wkP1)"/>
+                      <rect class="seg distracting" x="0" y="28" width="24" height="14" fill="url(#wkD1)"/>
+                      <rect class="seg neutral" x="0" y="14" width="24" height="14" fill="url(#wkN1)"/>
+                    </g>
+                  </g>
+                </svg>
                 <b>пн</b>
               </div>
               <div class="preview-week-col">
-                <span class="stack stack-rich">
-                  <i class="distracting" style="--h:14%"></i>
-                  <i class="neutral" style="--h:16%"></i>
-                  <i class="productive" style="--h:42%"></i>
-                </span>
+                <svg class="stack-svg" viewBox="0 0 24 100" width="28" height="116" aria-hidden="true">
+                  <defs>
+                    <linearGradient id="wkP2" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#5eead4"/><stop offset="100%" stop-color="#1f6b56"/></linearGradient>
+                    <linearGradient id="wkN2" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#e2e8f0"/><stop offset="100%" stop-color="#94a3b8"/></linearGradient>
+                    <linearGradient id="wkD2" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#fb923c"/><stop offset="100%" stop-color="#c2410c"/></linearGradient>
+                    <clipPath id="wkClip2"><rect x="0" y="0" width="24" height="100" rx="5"/></clipPath>
+                  </defs>
+                  <rect class="week-stack-track" x="0" y="0" width="24" height="100" rx="5"/>
+                  <g clip-path="url(#wkClip2)">
+                    <g class="stack-grow">
+                      <rect class="seg productive" x="0" y="58" width="24" height="42" fill="url(#wkP2)"/>
+                      <rect class="seg distracting" x="0" y="44" width="24" height="14" fill="url(#wkD2)"/>
+                      <rect class="seg neutral" x="0" y="28" width="24" height="16" fill="url(#wkN2)"/>
+                    </g>
+                  </g>
+                </svg>
                 <b>вт</b>
               </div>
               <div class="preview-week-col">
-                <span class="stack stack-rich">
-                  <i class="distracting" style="--h:14%"></i>
-                  <i class="neutral" style="--h:10%"></i>
-                  <i class="productive" style="--h:64%"></i>
-                </span>
+                <svg class="stack-svg" viewBox="0 0 24 100" width="28" height="116" aria-hidden="true">
+                  <defs>
+                    <linearGradient id="wkP3" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#5eead4"/><stop offset="100%" stop-color="#1f6b56"/></linearGradient>
+                    <linearGradient id="wkN3" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#e2e8f0"/><stop offset="100%" stop-color="#94a3b8"/></linearGradient>
+                    <linearGradient id="wkD3" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#fb923c"/><stop offset="100%" stop-color="#c2410c"/></linearGradient>
+                    <clipPath id="wkClip3"><rect x="0" y="0" width="24" height="100" rx="5"/></clipPath>
+                  </defs>
+                  <rect class="week-stack-track" x="0" y="0" width="24" height="100" rx="5"/>
+                  <g clip-path="url(#wkClip3)">
+                    <g class="stack-grow">
+                      <rect class="seg productive" x="0" y="36" width="24" height="64" fill="url(#wkP3)"/>
+                      <rect class="seg distracting" x="0" y="22" width="24" height="14" fill="url(#wkD3)"/>
+                      <rect class="seg neutral" x="0" y="14" width="24" height="8" fill="url(#wkN3)"/>
+                    </g>
+                  </g>
+                </svg>
                 <b>ср</b>
               </div>
               <div class="preview-week-col">
-                <span class="stack stack-rich">
-                  <i class="distracting" style="--h:14%"></i>
-                  <i class="neutral" style="--h:18%"></i>
-                  <i class="productive" style="--h:36%"></i>
-                </span>
+                <svg class="stack-svg" viewBox="0 0 24 100" width="28" height="116" aria-hidden="true">
+                  <defs>
+                    <linearGradient id="wkP4" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#5eead4"/><stop offset="100%" stop-color="#1f6b56"/></linearGradient>
+                    <linearGradient id="wkN4" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#e2e8f0"/><stop offset="100%" stop-color="#94a3b8"/></linearGradient>
+                    <linearGradient id="wkD4" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#fb923c"/><stop offset="100%" stop-color="#c2410c"/></linearGradient>
+                    <clipPath id="wkClip4"><rect x="0" y="0" width="24" height="100" rx="5"/></clipPath>
+                  </defs>
+                  <rect class="week-stack-track" x="0" y="0" width="24" height="100" rx="5"/>
+                  <g clip-path="url(#wkClip4)">
+                    <g class="stack-grow">
+                      <rect class="seg productive" x="0" y="64" width="24" height="36" fill="url(#wkP4)"/>
+                      <rect class="seg distracting" x="0" y="50" width="24" height="14" fill="url(#wkD4)"/>
+                      <rect class="seg neutral" x="0" y="32" width="24" height="18" fill="url(#wkN4)"/>
+                    </g>
+                  </g>
+                </svg>
                 <b>чт</b>
               </div>
               <div class="preview-week-col">
-                <span class="stack stack-rich">
-                  <i class="distracting" style="--h:14%"></i>
-                  <i class="neutral" style="--h:12%"></i>
-                  <i class="productive" style="--h:56%"></i>
-                </span>
+                <svg class="stack-svg" viewBox="0 0 24 100" width="28" height="116" aria-hidden="true">
+                  <defs>
+                    <linearGradient id="wkP5" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#5eead4"/><stop offset="100%" stop-color="#1f6b56"/></linearGradient>
+                    <linearGradient id="wkN5" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#e2e8f0"/><stop offset="100%" stop-color="#94a3b8"/></linearGradient>
+                    <linearGradient id="wkD5" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#fb923c"/><stop offset="100%" stop-color="#c2410c"/></linearGradient>
+                    <clipPath id="wkClip5"><rect x="0" y="0" width="24" height="100" rx="5"/></clipPath>
+                  </defs>
+                  <rect class="week-stack-track" x="0" y="0" width="24" height="100" rx="5"/>
+                  <g clip-path="url(#wkClip5)">
+                    <g class="stack-grow">
+                      <rect class="seg productive" x="0" y="44" width="24" height="56" fill="url(#wkP5)"/>
+                      <rect class="seg distracting" x="0" y="30" width="24" height="14" fill="url(#wkD5)"/>
+                      <rect class="seg neutral" x="0" y="18" width="24" height="12" fill="url(#wkN5)"/>
+                    </g>
+                  </g>
+                </svg>
                 <b>пт</b>
               </div>
             </div>
@@ -221,7 +286,7 @@
     <section class="launch-panel">
       <div class="login-card launch-card" id="loginPanel">
         <div class="brand-lockup">
-          {% with anim=true, soft=true, size=52 %}
+          {% with anim=true, soft=true, size=52, logo_uid='card' %}
             {% include "partials/logo_mark.html" %}
           {% endwith %}
           <div class="brand-lockup-text">
@@ -286,7 +351,7 @@
 
   <script>
     const splash = document.getElementById("bootSplash");
-    window.setTimeout(() => splash?.classList.add("is-done"), 1100);
+    window.setTimeout(() => splash?.classList.add("is-done"), 1700);
 
     function showRecovery(code, thenHref) {
       document.getElementById("loginForm").hidden = true;
