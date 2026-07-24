@@ -37,19 +37,16 @@ def test_legal_paths_are_public():
 
 
 def test_logo_gallery_assets_exist():
+    from deskline.logo_gallery import load_logo_cards
+
     logos = WEB_ROOT / "static" / "img" / "logos"
     assert logos.is_dir()
-    needed = [
-        "01-pulse-d.svg",
-        "08-classic-solid.svg",
-        "12-lockup.svg",
-        "14-dual-peak.svg",
-    ]
-    for name in needed:
-        assert (logos / name).is_file(), name
+    cards = load_logo_cards()
+    assert len(cards) >= 10
+    assert all("<svg" in c["svg"] for c in cards)
     page = (WEB_ROOT / "templates" / "logos.html").read_text(encoding="utf-8")
-    assert "01-pulse-d.svg" in page
-    assert "Галерея" in page or "Логотипы" in page
+    assert "logo_cards" in page
+    assert "card.svg" in page
 
 
 def test_legal_templates_exist_and_mention_company():

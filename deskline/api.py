@@ -346,10 +346,14 @@ def create_app(tracker: Tracker, db: Database | None = None) -> FastAPI:
 
     @app.get("/logos", response_class=HTMLResponse)
     def logos_page(request: Request) -> HTMLResponse:
+        from deskline.logo_gallery import load_logo_cards
+
+        ctx = brand_template_context()
+        ctx["logo_cards"] = load_logo_cards()
         return templates.TemplateResponse(
             request,
             "logos.html",
-            brand_template_context(),
+            ctx,
         )
 
     @app.get("/about", response_class=HTMLResponse)

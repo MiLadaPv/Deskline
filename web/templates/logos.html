@@ -58,15 +58,17 @@
         #fff;
       border: 1px solid rgba(21, 36, 31, 0.05);
       margin-bottom: 12px;
+      padding: 16px;
     }
-    .logo-stage img {
+    .logo-stage svg {
       width: 112px;
       height: 112px;
       display: block;
     }
-    .logo-card.is-wide .logo-stage img {
-      width: min(420px, 90%);
+    .logo-card.is-wide .logo-stage svg {
+      width: min(420px, 92%);
       height: auto;
+      aspect-ratio: 480 / 128;
     }
     .logo-card figcaption strong {
       display: block;
@@ -99,6 +101,12 @@
       padding: 2px 8px;
       border-radius: 8px;
     }
+    .logo-empty {
+      padding: 24px;
+      border-radius: 16px;
+      background: #fff3f0;
+      color: #8a3a2a;
+    }
   </style>
 </head>
 <body class="logo-gallery-body">
@@ -110,73 +118,29 @@
     </div>
     <h1>Логотипы Deskline</h1>
     <p class="lede">
-      Все знаки нарисованы как чистый SVG — резкие на любом размере.
-      Откройте, сравните на светлом фоне, напишите номер фаворита (можно 2–3).
-      После выбора подключим выбранный знак везде: splash, login, шапка, установщик.
+      Знаки встроены в страницу (без отдельных загрузок) — так они стабильно видны в браузере и в окне Deskline.
+      Напишите номер фаворита (можно 2–3). После выбора подключим его везде.
     </p>
 
+    {% if not logo_cards %}
+      <p class="logo-empty">Файлы логотипов не найдены в static/img/logos. Перезапустите Deskline после sync.</p>
+    {% else %}
     <div class="logo-grid">
-      <figure class="logo-card">
-        <div class="logo-stage"><img src="/static/img/logos/01-pulse-d.svg" alt="01 Pulse D" /></div>
-        <figcaption><strong>01 · Pulse D</strong><span>D + линия дня с пиком фокуса. Самый «продуктовый» смысл.</span></figcaption>
+      {% for card in logo_cards %}
+      <figure class="logo-card{% if card.wide %} is-wide{% endif %}">
+        <div class="logo-stage">{{ card.svg | safe }}</div>
+        <figcaption>
+          <strong>{{ card.title }}</strong>
+          <span>{{ card.blurb }}</span>
+        </figcaption>
       </figure>
-      <figure class="logo-card">
-        <div class="logo-stage"><img src="/static/img/logos/02-ribbon.svg" alt="02 Ribbon" /></div>
-        <figcaption><strong>02 · Day Ribbon</strong><span>Абстрактная лента дня без буквы — спокойная иконка.</span></figcaption>
-      </figure>
-      <figure class="logo-card">
-        <div class="logo-stage"><img src="/static/img/logos/03-negative-d.svg" alt="03 Negative D" /></div>
-        <figcaption><strong>03 · Negative D</strong><span>Смелый solid-знак. Хорошо читается в трее и на ярлыке.</span></figcaption>
-      </figure>
-      <figure class="logo-card">
-        <div class="logo-stage"><img src="/static/img/logos/04-gauge.svg" alt="04 Gauge" /></div>
-        <figcaption><strong>04 · Focus Gauge</strong><span>Кольцо фокуса + намёк на D. Связь с диаграммами в UI.</span></figcaption>
-      </figure>
-      <figure class="logo-card">
-        <div class="logo-stage"><img src="/static/img/logos/05-layers.svg" alt="05 Layers" /></div>
-        <figcaption><strong>05 · Desk Layers</strong><span>Слои стола и пик. Тихий, «wellness» характер.</span></figcaption>
-      </figure>
-      <figure class="logo-card">
-        <div class="logo-stage"><img src="/static/img/logos/06-stroke-dl.svg" alt="06 Stroke DL" /></div>
-        <figcaption><strong>06 · Stroke DL</strong><span>Один жест: D переходит в L. Геометрия бренда.</span></figcaption>
-      </figure>
-      <figure class="logo-card">
-        <div class="logo-stage"><img src="/static/img/logos/07-window.svg" alt="07 Window" /></div>
-        <figcaption><strong>07 · Focus Window</strong><span>Окно рабочего дня + sparkline. Понятнее новичкам.</span></figcaption>
-      </figure>
-      <figure class="logo-card">
-        <div class="logo-stage"><img src="/static/img/logos/08-classic-solid.svg" alt="08 Classic" /></div>
-        <figcaption><strong>08 · Classic Solid</strong><span>Pulse D на зелёном поле. Кандидат в app icon / favicon.</span></figcaption>
-      </figure>
-      <figure class="logo-card">
-        <div class="logo-stage"><img src="/static/img/logos/09-hex-slash.svg" alt="09 Hex" /></div>
-        <figcaption><strong>09 · Hex Slash</strong><span>Современный tech-знак. Меньше «трекер», больше бренд.</span></figcaption>
-      </figure>
-      <figure class="logo-card">
-        <div class="logo-stage"><img src="/static/img/logos/10-split-dayline.svg" alt="10 Split" /></div>
-        <figcaption><strong>10 · Split Dayline</strong><span>Диагональный split + timeline. Самый характерный силуэт.</span></figcaption>
-      </figure>
-      <figure class="logo-card">
-        <div class="logo-stage"><img src="/static/img/logos/11-sunrise.svg" alt="11 Sunrise" /></div>
-        <figcaption><strong>11 · Sunrise Desk</strong><span>Рассвет над линией стола. Тёплый, человечный.</span></figcaption>
-      </figure>
-      <figure class="logo-card">
-        <div class="logo-stage"><img src="/static/img/logos/13-soft-seal.svg" alt="13 Soft Seal" /></div>
-        <figcaption><strong>13 · Soft Seal</strong><span>Печать / badge. Хорош для splash и onboarding.</span></figcaption>
-      </figure>
-      <figure class="logo-card">
-        <div class="logo-stage"><img src="/static/img/logos/14-dual-peak.svg" alt="14 Dual Peak" /></div>
-        <figcaption><strong>14 · Dual Peak</strong><span>График фокуса как логотип. Чистая метафора продукта.</span></figcaption>
-      </figure>
-      <figure class="logo-card is-wide">
-        <div class="logo-stage"><img src="/static/img/logos/12-lockup.svg" alt="12 Lockup" /></div>
-        <figcaption><strong>12 · Wordmark Lockup</strong><span>Иконка + Deskline для сайта, установщика и шапки.</span></figcaption>
-      </figure>
+      {% endfor %}
     </div>
+    {% endif %}
 
     <div class="logo-pick">
       <p style="margin:0 0 8px"><strong>Как выбрать:</strong> напишите в чат, например <code>08 + 12</code> или <code>03 иконка, 12 шапка</code>.</p>
-      <p style="margin:0;color:var(--ink-soft)">Можно попросить доработку: «03 но мягче угол», «01 толще линия» — доведём до финала.</p>
+      <p style="margin:0;color:var(--ink-soft)">Можно попросить доработку: «03 но мягче угол», «01 толще линия».</p>
     </div>
   </main>
 </body>
