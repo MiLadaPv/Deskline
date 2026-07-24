@@ -473,6 +473,15 @@
         </label>
         <button type="submit" class="btn">Сменить пароль</button>
       </form>
+      <div class="settings-form" id="googleAuthSettings">
+        <h3 class="subhead">Google</h3>
+        <p class="hint settings-hint" id="googleAuthHint">Google только разблокирует дашборд. Данные активности не уходят в Google.</p>
+        <p class="tagline" id="googleAuthStatus">Проверка…</p>
+        <div class="settings-actions" style="margin-top:10px">
+          <a class="btn" id="googleLinkBtn" href="/api/auth/google/start?bind=1" hidden>Привязать Google</a>
+          <button type="button" class="btn" id="googleUnlinkBtn" hidden>Отвязать Google</button>
+        </div>
+      </div>
       <div class="settings-actions">
         <button type="button" class="btn" id="logoutBtn">Выйти из дашборда</button>
         <button type="button" class="btn" id="purgeShotsBtn">Удалить старые скриншоты сейчас</button>

@@ -2941,6 +2941,47 @@ function wireUi() {
     }
   });
 
+  async function refreshGoogleAuthSettings() {
+    const statusEl = document.getElementById("googleAuthStatus");
+    const linkBtn = document.getElementById("googleLinkBtn");
+    const unlinkBtn = document.getElementById("googleUnlinkBtn");
+    if (!statusEl || !linkBtn || !unlinkBtn) return;
+    try {
+      const st = await fetch("/api/auth/status").then((r) => r.json());
+      if (!st.google_configured) {
+        statusEl.textContent = "Google OAuth не настроен (нет client credentials).";
+        linkBtn.hidden = true;
+        unlinkBtn.hidden = true;
+        return;
+      }
+      if (st.google_linked) {
+        statusEl.textContent = st.google_email
+          ? `Привязан: ${st.google_email}`
+          : "Google-аккаунт привязан.";
+        linkBtn.hidden = true;
+        unlinkBtn.hidden = !st.password_set;
+      } else {
+        statusEl.textContent = "Не привязан. Можно войти через Google после привязки.";
+        linkBtn.hidden = false;
+        unlinkBtn.hidden = true;
+      }
+    } catch (_) {
+      statusEl.textContent = "Не удалось загрузить статус Google.";
+    }
+  }
+  refreshGoogleAuthSettings();
+
+  document.getElementById("googleUnlinkBtn")?.addEventListener("click", async () => {
+    if (!confirm("Отвязать Google? Вход останется по паролю.")) return;
+    try {
+      await api("/api/auth/google/unlink", { method: "POST" });
+      showToast("Google отвязан", "ok");
+      await refreshGoogleAuthSettings();
+    } catch (e) {
+      showToast(e?.message || "Не удалось отвязать Google", "error");
+    }
+  });
+
   document.getElementById("logoutBtn").addEventListener("click", async () => {
     await api("/api/auth/logout", { method: "POST" });
     location.href = "/login";

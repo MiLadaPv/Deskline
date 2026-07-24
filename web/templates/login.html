@@ -313,6 +313,12 @@
           <button type="submit" class="btn primary" id="loginSubmit">Войти</button>
         </form>
 
+        <div class="login-oauth" id="googleAuthBlock" hidden>
+          <p class="login-or" aria-hidden="true"><span>или</span></p>
+          <a class="btn google-btn" id="googleLoginBtn" href="/api/auth/google/start">Войти через Google</a>
+          <p class="hint login-oauth-hint">Google только для входа. Активность остаётся на этом ПК.</p>
+        </div>
+
         <p class="login-forgot" id="forgotRow">
           <button type="button" class="linkish" id="forgotBtn">Забыли пароль?</button>
         </p>
@@ -357,6 +363,8 @@
       document.getElementById("loginForm").hidden = true;
       document.getElementById("recoverForm").hidden = true;
       document.getElementById("forgotRow").hidden = true;
+      const g = document.getElementById("googleAuthBlock");
+      if (g) g.hidden = true;
       const box = document.getElementById("recoveryReveal");
       box.hidden = false;
       document.getElementById("recoveryCodeOut").textContent = code;
@@ -373,18 +381,48 @@
       const hint = document.getElementById("loginHint");
       const submit = document.getElementById("loginSubmit");
       const err = document.getElementById("loginError");
-      const setup = !st.password_set;
+      const setup = !st.password_set && !st.google_linked;
+      const params = new URLSearchParams(location.search);
 
-      if (st.authenticated) {
+      if (st.authenticated && !params.get("google_recovery")) {
         location.href = "/";
         return;
       }
 
+      const googleBlock = document.getElementById("googleAuthBlock");
+      if (st.google_configured) {
+        googleBlock.hidden = false;
+        if (!st.password_set && !st.google_linked) {
+          document.getElementById("googleLoginBtn").textContent = "Продолжить через Google";
+        }
+      }
+
+      const googleErr = params.get("google_error");
+      if (googleErr) {
+        err.textContent = googleErr;
+        err.hidden = false;
+        history.replaceState({}, "", "/login");
+      }
+      const googleRecovery = params.get("google_recovery");
+      if (googleRecovery) {
+        showRecovery(googleRecovery, "/");
+        history.replaceState({}, "", "/login");
+        return;
+      }
+
       if (setup) {
-        title.textContent = "Создайте пароль";
-        hint.textContent = "Задайте пароль для локального дашборда. Мы выдадим код восстановления.";
+        title.textContent = "Создайте вход";
+        hint.textContent = st.google_configured
+          ? "Задайте пароль или войдите через Google. Код восстановления покажем один раз."
+          : "Задайте пароль для локального дашборда. Мы выдадим код восстановления.";
         document.getElementById("password").autocomplete = "new-password";
         submit.textContent = "Сохранить и войти";
+        document.getElementById("forgotRow").hidden = true;
+      } else if (!st.password_set && st.google_linked) {
+        title.textContent = "Вход";
+        hint.textContent = "Войдите через Google или задайте пароль ниже как запасной способ.";
+        submit.textContent = "Сохранить пароль и войти";
+        document.getElementById("password").autocomplete = "new-password";
         document.getElementById("forgotRow").hidden = true;
       } else if (!st.has_recovery) {
         hint.textContent = "После входа будет создан код восстановления — сохраните его.";
@@ -398,6 +436,8 @@
       document.getElementById("forgotBtn").addEventListener("click", () => {
         form.hidden = true;
         document.getElementById("forgotRow").hidden = true;
+        const g = document.getElementById("googleAuthBlock");
+        if (g) g.hidden = true;
         recoverForm.hidden = false;
         title.textContent = "Восстановление";
         hint.textContent = st.has_recovery
@@ -408,8 +448,9 @@
       document.getElementById("recoverCancel").addEventListener("click", () => {
         recoverForm.hidden = true;
         form.hidden = false;
-        document.getElementById("forgotRow").hidden = !!setup;
-        title.textContent = setup ? "Создайте пароль" : "Вход";
+        document.getElementById("forgotRow").hidden = !!setup || (!st.password_set && st.google_linked);
+        if (st.google_configured) document.getElementById("googleAuthBlock").hidden = false;
+        title.textContent = setup ? "Создайте вход" : "Вход";
         hint.textContent = "Введите пароль, чтобы открыть дашборд.";
       });
 
@@ -418,7 +459,8 @@
         err.hidden = true;
         const password = document.getElementById("password").value;
         const remember = document.getElementById("rememberMe").checked;
-        const url = setup ? "/api/auth/setup" : "/api/auth/login";
+        const needSetup = !st.password_set;
+        const url = needSetup ? "/api/auth/setup" : "/api/auth/login";
         const res = await fetch(url, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -428,7 +470,7 @@
         let data = {};
         try { data = JSON.parse(text); } catch (_) {}
         if (!res.ok) {
-          err.textContent = setup ? "Не удалось сохранить пароль" : "Неверный пароль";
+          err.textContent = needSetup ? "Не удалось сохранить пароль" : "Неверный пароль";
           if (typeof data.detail === "string") err.textContent = data.detail;
           err.hidden = false;
           return;

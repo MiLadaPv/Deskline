@@ -2961,6 +2961,58 @@ html[data-theme="dark"] .preview-timeline-legs i.void {
   margin: 12px 0 0;
 }
 
+.login-oauth {
+  margin-top: 14px;
+  display: grid;
+  gap: 8px;
+}
+
+.login-or {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 10px;
+  margin: 4px 0 0;
+  color: var(--ink-soft);
+  font-size: 0.8rem;
+}
+
+.login-or::before,
+.login-or::after {
+  content: "";
+  height: 1px;
+  background: var(--line);
+}
+
+.login-or span {
+  text-transform: lowercase;
+}
+
+.google-btn {
+  text-align: center;
+  text-decoration: none;
+  display: inline-flex;
+  justify-content: center;
+  align-items: center;
+  background: #fff;
+  color: #1f1f1f;
+  border: 1px solid var(--line);
+}
+
+.google-btn:hover {
+  border-color: rgba(31, 107, 86, 0.35);
+}
+
+html[data-theme="dark"] .google-btn {
+  background: var(--paper-2);
+  color: var(--ink);
+}
+
+.login-oauth-hint {
+  margin: 0;
+  font-size: 0.78rem;
+}
+
 .linkish {
   appearance: none;
   border: 0;

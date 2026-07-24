@@ -54,6 +54,70 @@ def is_password_set() -> bool:
     return isinstance(h, str) and h.startswith("pbkdf2_sha256$")
 
 
+def is_google_linked() -> bool:
+    data = _load_auth()
+    sub = data.get("google_sub")
+    return isinstance(sub, str) and bool(sub.strip())
+
+
+def google_email() -> str | None:
+    data = _load_auth()
+    email = data.get("google_email")
+    if isinstance(email, str) and email.strip():
+        return email.strip()
+    return None
+
+
+def is_auth_configured() -> bool:
+    """Local unlock is ready when password or Google account is linked."""
+    return is_password_set() or is_google_linked()
+
+
+def link_google_account(sub: str, email: str | None = None) -> None:
+    sub = (sub or "").strip()
+    if not sub:
+        raise ValueError("missing google sub")
+    data = _load_auth()
+    existing = data.get("google_sub")
+    if isinstance(existing, str) and existing.strip() and existing.strip() != sub:
+        raise PermissionError("another google account is already linked")
+    data["google_sub"] = sub
+    if email:
+        data["google_email"] = email.strip()
+    if not data.get("session_secret"):
+        data["session_secret"] = secrets.token_urlsafe(48)
+    _save_auth(data)
+
+
+def unlink_google_account() -> None:
+    data = _load_auth()
+    data.pop("google_sub", None)
+    data.pop("google_email", None)
+    _save_auth(data)
+
+
+def verify_google_sub(sub: str) -> bool:
+    data = _load_auth()
+    linked = data.get("google_sub")
+    if not isinstance(linked, str) or not linked.strip():
+        return False
+    return hmac.compare_digest(linked.strip(), (sub or "").strip())
+
+
+def setup_with_google(sub: str, email: str | None = None) -> str | None:
+    """First-run account via Google. Issues recovery code when none exists."""
+    if is_auth_configured():
+        raise ValueError("auth already configured")
+    link_google_account(sub, email)
+    if has_recovery_code():
+        return None
+    data = _load_auth()
+    recovery_plain = generate_recovery_code()
+    data["recovery_hash"] = hash_password(_normalize_recovery_code(recovery_plain))
+    _save_auth(data)
+    return recovery_plain
+
+
 def has_recovery_code() -> bool:
     data = _load_auth()
     h = data.get("recovery_hash")
@@ -205,6 +269,8 @@ def is_public_path(path: str) -> bool:
         "/api/auth/login",
         "/api/auth/setup",
         "/api/auth/recover",
+        "/api/auth/google/start",
+        "/api/auth/google/callback",
         "/api/license/status",
         "/favicon.ico",
     }:

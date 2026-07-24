@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import urllib.parse
 import webbrowser
 from datetime import date, datetime, timedelta
 from pathlib import Path
@@ -20,13 +21,30 @@ from deskline.auth import (
     change_password,
     create_session_token,
     ensure_recovery_code,
+    google_email,
     has_recovery_code,
+    is_auth_configured,
+    is_google_linked,
     is_password_set,
     is_public_path,
+    link_google_account,
     reset_password_with_recovery,
     set_password,
+    setup_with_google,
+    unlink_google_account,
     validate_session_token,
+    verify_google_sub,
     verify_password,
+)
+from deskline.google_oauth import (
+    OAUTH_STATE_COOKIE,
+    build_authorize_url,
+    exchange_code,
+    is_google_oauth_configured,
+    load_google_oauth_config,
+    make_oauth_state,
+    make_pkce_pair,
+    resolve_google_identity,
 )
 from deskline.capture import resolve_screenshot_file, screenshots_storage_info
 from deskline.config import (
@@ -247,9 +265,9 @@ class AuthMiddleware(BaseHTTPMiddleware):
 
         token = request.cookies.get(COOKIE_NAME)
         authed = validate_session_token(token)
-        password_ready = is_password_set()
+        auth_ready = is_auth_configured()
 
-        if not password_ready:
+        if not auth_ready:
             if path.startswith("/api/"):
                 return JSONResponse({"detail": "password setup required"}, status_code=401)
             return RedirectResponse(url="/login", status_code=303)
@@ -397,10 +415,123 @@ def create_app(tracker: Tracker, db: Database | None = None) -> FastAPI:
         token = request.cookies.get(COOKIE_NAME)
         return {
             "password_set": is_password_set(),
+            "auth_configured": is_auth_configured(),
             "authenticated": validate_session_token(token),
             "has_recovery": has_recovery_code(),
+            "google_configured": is_google_oauth_configured(),
+            "google_linked": is_google_linked(),
+            "google_email": google_email(),
             "support_email": SUPPORT_EMAIL,
         }
+
+    def _oauth_error_redirect(message: str) -> RedirectResponse:
+        q = urllib.parse.urlencode({"google_error": message})
+        return RedirectResponse(url=f"/login?{q}", status_code=303)
+
+    @app.get("/api/auth/google/start")
+    def auth_google_start(request: Request, bind: int = 0) -> Response:
+        cfg = load_google_oauth_config()
+        if cfg is None:
+            raise HTTPException(400, "Google OAuth не настроен")
+        want_bind = bool(bind)
+        if want_bind and not validate_session_token(request.cookies.get(COOKIE_NAME)):
+            raise HTTPException(401, "Сначала войдите паролем, чтобы привязать Google")
+        state = make_oauth_state()
+        verifier, challenge = make_pkce_pair()
+        payload = json.dumps(
+            {"state": state, "verifier": verifier, "bind": want_bind},
+            separators=(",", ":"),
+        )
+        url = build_authorize_url(cfg, state=state, code_challenge=challenge)
+        response = RedirectResponse(url=url, status_code=303)
+        response.set_cookie(
+            key=OAUTH_STATE_COOKIE,
+            value=payload,
+            httponly=True,
+            samesite="lax",
+            path="/",
+            max_age=600,
+        )
+        return response
+
+    @app.get("/api/auth/google/callback")
+    def auth_google_callback(
+        request: Request,
+        code: str | None = None,
+        state: str | None = None,
+        error: str | None = None,
+    ) -> Response:
+        if error:
+            return _oauth_error_redirect("Вход через Google отменён")
+        if not code or not state:
+            return _oauth_error_redirect("Некорректный ответ Google")
+
+        raw_cookie = request.cookies.get(OAUTH_STATE_COOKIE) or ""
+        try:
+            meta = json.loads(raw_cookie) if raw_cookie else {}
+        except json.JSONDecodeError:
+            meta = {}
+        if not isinstance(meta, dict) or meta.get("state") != state:
+            return _oauth_error_redirect("Сессия Google устарела — попробуйте снова")
+        verifier = str(meta.get("verifier") or "")
+        want_bind = bool(meta.get("bind"))
+        if not verifier:
+            return _oauth_error_redirect("Сессия Google повреждена")
+
+        cfg = load_google_oauth_config()
+        if cfg is None:
+            return _oauth_error_redirect("Google OAuth не настроен")
+
+        try:
+            tokens = exchange_code(cfg, code=code, code_verifier=verifier)
+            sub, email = resolve_google_identity(tokens)
+        except RuntimeError:
+            return _oauth_error_redirect("Не удалось подтвердить аккаунт Google")
+
+        recovery_code: str | None = None
+        try:
+            if want_bind:
+                if not validate_session_token(request.cookies.get(COOKIE_NAME)):
+                    return _oauth_error_redirect("Сначала войдите паролем")
+                link_google_account(sub, email)
+            elif verify_google_sub(sub):
+                pass
+            elif not is_auth_configured():
+                recovery_code = setup_with_google(sub, email)
+            elif is_google_linked():
+                return _oauth_error_redirect("Этот Google-аккаунт не привязан")
+            else:
+                return _oauth_error_redirect(
+                    "Привяжите Google в Настройках после входа по паролю"
+                )
+        except PermissionError:
+            return _oauth_error_redirect("Уже привязан другой Google-аккаунт")
+        except ValueError:
+            return _oauth_error_redirect("Аккаунт уже настроен")
+
+        token = create_session_token(remember=True)
+        if recovery_code:
+            q = urllib.parse.urlencode({"google_recovery": recovery_code})
+            response = RedirectResponse(url=f"/login?{q}", status_code=303)
+        elif want_bind:
+            response = RedirectResponse(url="/#settings", status_code=303)
+        else:
+            response = RedirectResponse(url="/", status_code=303)
+        _set_session_cookie(response, token, remember=True)
+        response.delete_cookie(OAUTH_STATE_COOKIE, path="/")
+        return response
+
+    @app.post("/api/auth/google/unlink")
+    def auth_google_unlink(request: Request) -> dict[str, Any]:
+        if not validate_session_token(request.cookies.get(COOKIE_NAME)):
+            raise HTTPException(401, "authentication required")
+        if not is_password_set():
+            raise HTTPException(
+                400,
+                "Сначала задайте пароль — иначе нельзя отвязать единственный способ входа",
+            )
+        unlink_google_account()
+        return {"ok": True, "google_linked": False}
 
     @app.post("/api/auth/setup")
     def auth_setup(body: PasswordBody) -> Response:
