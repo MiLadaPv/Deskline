@@ -58,8 +58,8 @@ def test_login_template_has_launch_and_forgot():
     assert "brand-lockup" in html
     assert "partials/logo_mark.html" in html
     assert "logo-anim" in logo
-    assert "logo-bar" in logo
-    assert "logo-d" in logo
+    assert "logo.png" in logo
+    assert "logo-dark.png" in logo
     assert "preview-gauge" in html
     assert "preview-donut" not in html or "preview-gauge" in html
     assert "Кто в фокусе" in html

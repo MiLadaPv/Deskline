@@ -2105,6 +2105,7 @@ main {
   display: inline-grid;
   place-items: center;
   color: var(--logo-ink);
+  position: relative;
 }
 
 .logo-mark img,
@@ -2114,7 +2115,17 @@ main {
   display: block;
   color: inherit;
   overflow: visible;
+  object-fit: contain;
 }
+
+.logo-mark .logo-img-light,
+.logo-mark .logo-img-dark {
+  grid-area: 1 / 1;
+}
+
+.logo-mark .logo-img-dark { display: none; }
+html[data-theme="dark"] .logo-mark .logo-img-light { display: none; }
+html[data-theme="dark"] .logo-mark .logo-img-dark { display: block; }
 
 .logo-d {
   fill: var(--logo-ink);
@@ -2124,41 +2135,17 @@ main {
 .logo-bar-2 { fill: #14b8a6; }
 .logo-bar-3 { fill: #84cc16; }
 
-.logo-anim .logo-d {
-  opacity: 0;
-  animation: logo-tile-in 0.45s ease 0.05s forwards;
+.logo-anim {
+  animation: logo-tile-in 0.55s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
-.logo-anim .logo-bar {
-  transform-box: fill-box;
-  transform-origin: bottom center;
-  opacity: 0;
-  animation: logo-bar-pop 0.45s cubic-bezier(0.22, 1, 0.36, 1) forwards;
-}
-
-.logo-anim .logo-bar-1 { animation-delay: 0.2s; }
-.logo-anim .logo-bar-2 { animation-delay: 0.32s; }
-.logo-anim .logo-bar-3 { animation-delay: 0.44s; }
-
-.logo-anim-soft .logo-d,
-.logo-anim-soft .logo-bar {
-  animation-duration: 0.65s;
+.logo-anim-soft {
+  animation-duration: 0.75s;
 }
 
 @keyframes logo-tile-in {
   from { opacity: 0; transform: scale(0.92); }
   to { opacity: 1; transform: scale(1); }
-}
-
-@keyframes logo-bar-pop {
-  from {
-    opacity: 0;
-    transform: scaleY(0.2);
-  }
-  to {
-    opacity: 1;
-    transform: scaleY(1);
-  }
 }
 
 .theme-toggle {

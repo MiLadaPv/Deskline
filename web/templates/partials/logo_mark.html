@@ -1,9 +1,5 @@
-{# Deskline brand mark: bold D + growth bars; color via --logo-ink #}
+{# Exact brand mark from source art — theme swaps light/dark PNG #}
 <span class="logo-mark{% if anim %} logo-anim{% endif %}{% if soft %} logo-anim-soft{% endif %}"{% if size %} style="width:{{ size }}px;height:{{ size }}px"{% endif %} aria-hidden="true">
-  <svg viewBox="0 0 64 64" fill="none">
-    <path class="logo-d" fill-rule="evenodd" d="M14 10h18c12.5 0 22 9.2 22 22s-9.5 22-22 22H14V10zm10 10v24h8c6.8 0 12-5.2 12-12s-5.2-12-12-12h-8z"/>
-    <rect class="logo-bar logo-bar-1" x="26" y="34" width="5" height="10" rx="2.5"/>
-    <rect class="logo-bar logo-bar-2" x="33.5" y="28" width="5" height="16" rx="2.5"/>
-    <rect class="logo-bar logo-bar-3" x="41" y="22" width="5" height="22" rx="2.5"/>
-  </svg>
+  <img class="logo-img logo-img-light" src="/static/img/logo.png?v={{ version }}" alt="" width="{{ size or 40 }}" height="{{ size or 40 }}" decoding="async" />
+  <img class="logo-img logo-img-dark" src="/static/img/logo-dark.png?v={{ version }}" alt="" width="{{ size or 40 }}" height="{{ size or 40 }}" decoding="async" />
 </span>
