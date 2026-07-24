@@ -16,7 +16,7 @@
   <button type="button" class="theme-toggle theme-toggle-float" id="themeToggle" title="Тема">Тема</button>
 
   <div class="boot-splash" id="bootSplash" aria-hidden="true">
-    {% with anim=true, size=176, logo_uid='splash' %}
+    {% with anim=true, size=80 %}
       {% include "partials/logo_mark.html" %}
     {% endwith %}
     <p class="boot-splash-title">Deskline</p>
@@ -25,7 +25,7 @@
   <div class="launch">
     <section class="launch-hero" aria-label="О Deskline">
       <div class="launch-brand brand-lockup">
-        {% with anim=true, soft=true, size=56, logo_uid='hero' %}
+        {% with anim=true, soft=true, size=56 %}
           {% include "partials/logo_mark.html" %}
         {% endwith %}
         <div class="brand-lockup-text">
@@ -286,7 +286,7 @@
     <section class="launch-panel">
       <div class="login-card launch-card" id="loginPanel">
         <div class="brand-lockup">
-          {% with anim=true, soft=true, size=52, logo_uid='card' %}
+          {% with anim=true, soft=true, size=52 %}
             {% include "partials/logo_mark.html" %}
           {% endwith %}
           <div class="brand-lockup-text">
@@ -351,7 +351,7 @@
 
   <script>
     const splash = document.getElementById("bootSplash");
-    window.setTimeout(() => splash?.classList.add("is-done"), 1700);
+    window.setTimeout(() => splash?.classList.add("is-done"), 1100);
 
     function showRecovery(code, thenHref) {
       document.getElementById("loginForm").hidden = true;

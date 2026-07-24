@@ -60,7 +60,6 @@ def test_login_template_has_launch_and_forgot():
     assert "logo-anim" in logo
     assert "logo.png" in logo
     assert "logo-dark.png" in logo
-    assert "logo_svg" in logo or "logo-svg" in logo
     assert "preview-gauge" in html
     assert "preview-stage" in html
     assert "stack-svg" in html
@@ -73,15 +72,3 @@ def test_login_template_has_launch_and_forgot():
     assert "Кто в фокусе" in html
     assert "Ритм фокуса" in html
     assert "Highest % productive time" not in html
-
-
-def test_logo_svg_markup_unique_ids():
-    from deskline.config import logo_svg_markup
-
-    light = logo_svg_markup("splash-l", dark=False)
-    dark = logo_svg_markup("splash-d", dark=True)
-    assert 'id="splash-l-g1"' in light
-    assert "url(#splash-l-g1)" in light
-    assert 'id="splash-d-g1"' in dark
-    assert "logo-bar-1" in light
-    assert "logo-svg-el" in light

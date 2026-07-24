@@ -149,22 +149,6 @@ def save_config(cfg: dict[str, Any]) -> dict[str, Any]:
     return merged
 
 
-def logo_svg_markup(uid: str, *, dark: bool = False) -> str:
-    """Inline brand SVG with unique gradient ids (safe for multiple marks per page)."""
-    import re
-
-    name = "logo-dark.svg" if dark else "logo.svg"
-    path = WEB_ROOT / "static" / "img" / name
-    text = path.read_text(encoding="utf-8")
-    text = re.sub(r"<\?xml[^?]*\?>", "", text, count=1).strip()
-    safe_uid = re.sub(r"[^a-zA-Z0-9_-]", "", uid) or "logo"
-    for gid in ("g1", "g2", "g3"):
-        text = text.replace(f'id="{gid}"', f'id="{safe_uid}-{gid}"')
-        text = text.replace(f"url(#{gid})", f"url(#{safe_uid}-{gid})")
-    text = text.replace("<svg ", '<svg class="logo-svg-el" ', 1)
-    return text
-
-
 def brand_template_context(*, version: str | None = None, base_url: str | None = None) -> dict[str, Any]:
     """Shared Jinja context for dashboard and legal pages."""
     from datetime import datetime
@@ -180,5 +164,4 @@ def brand_template_context(*, version: str | None = None, base_url: str | None =
         "github_url": GITHUB_URL,
         "legal_jurisdiction": LEGAL_JURISDICTION,
         "copyright_year": datetime.now().astimezone().year,
-        "logo_svg": logo_svg_markup,
     }

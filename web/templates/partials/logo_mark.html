@@ -1,12 +1,5 @@
-{# Brand mark: inline SVG when animating (crisp + bar grow); PNG otherwise. #}
-{% set _size = size or 40 %}
-{% set _uid = logo_uid or 'm' %}
-<span class="logo-mark{% if anim %} logo-anim logo-vector{% endif %}{% if soft %} logo-anim-soft{% endif %}"{% if _size %} style="width:{{ _size }}px;height:{{ _size }}px"{% endif %} aria-hidden="true">
-  {% if anim and logo_svg is defined %}
-  <span class="logo-svg logo-svg-light">{{ logo_svg(_uid ~ '-l', dark=false) | safe }}</span>
-  <span class="logo-svg logo-svg-dark">{{ logo_svg(_uid ~ '-d', dark=true) | safe }}</span>
-  {% else %}
-  <img class="logo-img logo-img-light" src="/static/img/logo.png?v={{ version }}" alt="" width="{{ _size }}" height="{{ _size }}" decoding="async" />
-  <img class="logo-img logo-img-dark" src="/static/img/logo-dark.png?v={{ version }}" alt="" width="{{ _size }}" height="{{ _size }}" decoding="async" />
-  {% endif %}
+{# Exact brand mark from source art — theme swaps light/dark PNG #}
+<span class="logo-mark{% if anim %} logo-anim{% endif %}{% if soft %} logo-anim-soft{% endif %}"{% if size %} style="width:{{ size }}px;height:{{ size }}px"{% endif %} aria-hidden="true">
+  <img class="logo-img logo-img-light" src="/static/img/logo.png?v={{ version }}" alt="" width="{{ size or 40 }}" height="{{ size or 40 }}" decoding="async" />
+  <img class="logo-img logo-img-dark" src="/static/img/logo-dark.png?v={{ version }}" alt="" width="{{ size or 40 }}" height="{{ size or 40 }}" decoding="async" />
 </span>
