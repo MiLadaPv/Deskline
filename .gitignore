@@ -10,3 +10,11 @@ build/
 release/*.exe
 deskline-desktop/src-tauri/target/
 deskline-desktop/node_modules/
+
+# Local secrets (Google OAuth, env)
+.env
+.env.*
+!.env.example
+client_secret*.json
+**/google-oauth*.json
+secrets/
