@@ -44,7 +44,10 @@ from deskline.google_oauth import (
     load_google_oauth_config,
     make_oauth_state,
     make_pkce_pair,
+    pop_oauth_pending,
+    redirect_uri,
     resolve_google_identity,
+    save_oauth_pending,
 )
 from deskline.capture import resolve_screenshot_file, screenshots_storage_info
 from deskline.config import (
@@ -421,12 +424,27 @@ def create_app(tracker: Tracker, db: Database | None = None) -> FastAPI:
             "google_configured": is_google_oauth_configured(),
             "google_linked": is_google_linked(),
             "google_email": google_email(),
+            "google_redirect_uri": redirect_uri() if is_google_oauth_configured() else None,
             "support_email": SUPPORT_EMAIL,
         }
 
     def _oauth_error_redirect(message: str) -> RedirectResponse:
         q = urllib.parse.urlencode({"google_error": message})
         return RedirectResponse(url=f"/login?{q}", status_code=303)
+
+    def _google_error_message(error: str, description: str | None = None) -> str:
+        err = (error or "").strip().lower()
+        desc = (description or "").strip()
+        if err == "redirect_uri_mismatch" or "redirect_uri" in desc.lower():
+            return (
+                "Google отклонил redirect URI. В Google Cloud → Clients добавьте: "
+                f"{redirect_uri()}"
+            )
+        if err in {"access_denied", "consent_required"}:
+            return "Вход через Google отменён"
+        if desc:
+            return f"Google: {desc[:180]}"
+        return "Вход через Google не удался"
 
     @app.get("/api/auth/google/start")
     def auth_google_start(request: Request, bind: int = 0) -> Response:
@@ -436,8 +454,13 @@ def create_app(tracker: Tracker, db: Database | None = None) -> FastAPI:
         want_bind = bool(bind)
         if want_bind and not validate_session_token(request.cookies.get(COOKIE_NAME)):
             raise HTTPException(401, "Сначала войдите паролем, чтобы привязать Google")
+        if not want_bind and is_password_set() and not is_google_linked():
+            return _oauth_error_redirect(
+                "Сначала войдите паролем, затем Настройки → Привязать Google"
+            )
         state = make_oauth_state()
         verifier, challenge = make_pkce_pair()
+        save_oauth_pending(state, verifier=verifier, bind=want_bind)
         payload = json.dumps(
             {"state": state, "verifier": verifier, "bind": want_bind},
             separators=(",", ":"),
@@ -460,19 +483,31 @@ def create_app(tracker: Tracker, db: Database | None = None) -> FastAPI:
         code: str | None = None,
         state: str | None = None,
         error: str | None = None,
+        error_description: str | None = None,
     ) -> Response:
         if error:
-            return _oauth_error_redirect("Вход через Google отменён")
+            return _oauth_error_redirect(_google_error_message(error, error_description))
         if not code or not state:
-            return _oauth_error_redirect("Некорректный ответ Google")
+            return _oauth_error_redirect(
+                "Некорректный ответ Google. Проверьте redirect URI: "
+                f"{redirect_uri()}"
+            )
 
+        pending = pop_oauth_pending(state)
         raw_cookie = request.cookies.get(OAUTH_STATE_COOKIE) or ""
         try:
-            meta = json.loads(raw_cookie) if raw_cookie else {}
+            cookie_meta = json.loads(raw_cookie) if raw_cookie else {}
         except json.JSONDecodeError:
-            meta = {}
-        if not isinstance(meta, dict) or meta.get("state") != state:
+            cookie_meta = {}
+        if not isinstance(cookie_meta, dict):
+            cookie_meta = {}
+
+        meta = pending if isinstance(pending, dict) else None
+        if meta is None and cookie_meta.get("state") == state:
+            meta = cookie_meta
+        if meta is None:
             return _oauth_error_redirect("Сессия Google устарела — попробуйте снова")
+
         verifier = str(meta.get("verifier") or "")
         want_bind = bool(meta.get("bind"))
         if not verifier:
@@ -485,7 +520,13 @@ def create_app(tracker: Tracker, db: Database | None = None) -> FastAPI:
         try:
             tokens = exchange_code(cfg, code=code, code_verifier=verifier)
             sub, email = resolve_google_identity(tokens)
-        except RuntimeError:
+        except RuntimeError as exc:
+            msg = str(exc)
+            if "redirect_uri" in msg.lower():
+                return _oauth_error_redirect(
+                    "Google отклонил redirect URI. Добавьте в Clients: "
+                    f"{redirect_uri()}"
+                )
             return _oauth_error_redirect("Не удалось подтвердить аккаунт Google")
 
         recovery_code: str | None = None

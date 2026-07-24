@@ -26,6 +26,14 @@ def test_build_authorize_url_includes_pkce():
     assert "code_challenge=" in url
     assert "code_challenge_method=S256" in url
     assert "redirect_uri=" in url
+    assert "localhost" in url
+
+
+def test_redirect_uri_uses_localhost():
+    from deskline.google_oauth import redirect_uri
+
+    assert redirect_uri().startswith("http://localhost:")
+    assert redirect_uri().endswith("/api/auth/google/callback")
 
 
 def test_setup_with_google_and_status(tmp_path, monkeypatch):

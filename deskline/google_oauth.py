@@ -7,13 +7,15 @@ import hashlib
 import json
 import os
 import secrets
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
 
-from deskline.config import BASE_URL, DATA_ROOT, ensure_data_dirs
+from deskline.config import DATA_ROOT, ensure_data_dirs
 
 GOOGLE_AUTH_URI = "https://accounts.google.com/o/oauth2/v2/auth"
 GOOGLE_TOKEN_URI = "https://oauth2.googleapis.com/token"
@@ -22,6 +24,7 @@ OAUTH_SCOPES = "openid email profile"
 OAUTH_STATE_COOKIE = "deskline_oauth"
 OAUTH_JSON_NAME = "google-oauth.json"
 REDIRECT_PATH = "/api/auth/google/callback"
+OAUTH_PENDING_DIRNAME = "oauth_pending"
 
 
 @dataclass(frozen=True)
@@ -33,7 +36,62 @@ class GoogleOAuthConfig:
 
 
 def redirect_uri() -> str:
-    return f"{BASE_URL.rstrip('/')}{REDIRECT_PATH}"
+    """Loopback URI Google Desktop/Web clients accept.
+
+    Prefer localhost (matches typical Desktop client JSON) over 127.0.0.1.
+    Override with DESKLINE_GOOGLE_REDIRECT_URI if needed.
+    """
+    override = (os.environ.get("DESKLINE_GOOGLE_REDIRECT_URI") or "").strip()
+    if override:
+        return override
+    from deskline.config import PORT
+
+    return f"http://localhost:{PORT}{REDIRECT_PATH}"
+
+
+def _pending_dir() -> Path:
+    ensure_data_dirs()
+    path = DATA_ROOT / OAUTH_PENDING_DIRNAME
+    path.mkdir(parents=True, exist_ok=True)
+    return path
+
+
+def save_oauth_pending(state: str, *, verifier: str, bind: bool) -> None:
+    path = _pending_dir() / f"{state}.json"
+    path.write_text(
+        json.dumps(
+            {
+                "verifier": verifier,
+                "bind": bool(bind),
+                "exp": int(time.time()) + 600,
+            },
+            indent=2,
+        ),
+        encoding="utf-8",
+    )
+
+
+def pop_oauth_pending(state: str) -> dict[str, Any] | None:
+    path = _pending_dir() / f"{state}.json"
+    if not path.is_file():
+        return None
+    try:
+        raw = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        raw = None
+    try:
+        path.unlink(missing_ok=True)
+    except OSError:
+        pass
+    if not isinstance(raw, dict):
+        return None
+    try:
+        exp = int(raw.get("exp") or 0)
+    except (TypeError, ValueError):
+        return None
+    if exp < int(time.time()):
+        return None
+    return raw
 
 
 def _parse_oauth_dict(raw: dict[str, Any]) -> GoogleOAuthConfig | None:

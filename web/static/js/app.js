@@ -2961,7 +2961,9 @@ function wireUi() {
         linkBtn.hidden = true;
         unlinkBtn.hidden = !st.password_set;
       } else {
-        statusEl.textContent = "Не привязан. Можно войти через Google после привязки.";
+        statusEl.textContent = st.google_redirect_uri
+          ? `Не привязан. В Google Cloud Clients добавьте redirect: ${st.google_redirect_uri}`
+          : "Не привязан. Можно войти через Google после привязки.";
         linkBtn.hidden = false;
         unlinkBtn.hidden = true;
       }

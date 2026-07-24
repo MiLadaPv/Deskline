@@ -391,9 +391,24 @@
 
       const googleBlock = document.getElementById("googleAuthBlock");
       if (st.google_configured) {
+        const canGoogleLogin = st.google_linked || !st.password_set;
         googleBlock.hidden = false;
-        if (!st.password_set && !st.google_linked) {
-          document.getElementById("googleLoginBtn").textContent = "Продолжить через Google";
+        const gBtn = document.getElementById("googleLoginBtn");
+        const gHint = document.querySelector(".login-oauth-hint");
+        if (canGoogleLogin) {
+          gBtn.hidden = false;
+          gBtn.textContent = st.google_linked
+            ? "Войти через Google"
+            : "Продолжить через Google";
+          if (gHint) {
+            gHint.textContent = "Google только для входа. Активность остаётся на этом ПК.";
+          }
+        } else {
+          gBtn.hidden = true;
+          if (gHint) {
+            gHint.textContent =
+              "Google ещё не привязан: войдите паролем → Настройки → Привязать Google.";
+          }
         }
       }
 
