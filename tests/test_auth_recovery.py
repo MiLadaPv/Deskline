@@ -61,6 +61,8 @@ def test_login_template_has_launch_and_forgot():
     assert "logo.png" in logo
     assert "logo-dark.png" in logo
     assert "preview-gauge" in html
+    assert "preview-stage" in html
+    assert "stack-rich" in html
     assert "preview-donut" not in html or "preview-gauge" in html
     assert "Кто в фокусе" in html
     assert "Ритм фокуса" in html

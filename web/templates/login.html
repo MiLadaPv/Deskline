@@ -42,79 +42,177 @@
       </ul>
       <div class="launch-previews" aria-hidden="true">
         <div class="preview-card preview-gauges">
-          <div class="preview-card-head">
-            <strong>Кто в фокусе</strong>
-            <span>сегодня</span>
-          </div>
-          <div class="preview-gauge-row">
-            <div class="preview-gauge">
-              <div class="gauge-ring">
-                <svg viewBox="0 0 36 36"><circle class="gauge-track" cx="18" cy="18" r="15.9155"/><circle class="gauge-value" cx="18" cy="18" r="15.9155" stroke="#1f6b56" stroke-dasharray="72 28" transform="rotate(-90 18 18)"/></svg>
-                <span>72%</span>
-              </div>
-              <div class="preview-person"><i style="background:#1f6b56">Я</i><em>Дизайн</em></div>
+          <div class="preview-stage">
+            <div class="preview-card-head">
+              <strong>Кто в фокусе</strong>
+              <span>сегодня · live</span>
             </div>
-            <div class="preview-gauge">
-              <div class="gauge-ring">
-                <svg viewBox="0 0 36 36"><circle class="gauge-track" cx="18" cy="18" r="15.9155"/><circle class="gauge-value" cx="18" cy="18" r="15.9155" stroke="#0f766e" stroke-dasharray="54 46" transform="rotate(-90 18 18)"/></svg>
-                <span>54%</span>
+            <div class="preview-gauge-row">
+              <div class="preview-gauge">
+                <div class="gauge-ring gauge-ring-rich">
+                  <svg viewBox="0 0 120 120">
+                    <defs>
+                      <linearGradient id="gFocusA" x1="0" y1="0" x2="1" y2="1">
+                        <stop offset="0%" stop-color="#5eead4"/><stop offset="100%" stop-color="#1f6b56"/>
+                      </linearGradient>
+                      <filter id="gGlowA" x="-40%" y="-40%" width="180%" height="180%">
+                        <feGaussianBlur stdDeviation="2.2" result="b"/>
+                        <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+                      </filter>
+                    </defs>
+                    <circle class="gauge-track" cx="60" cy="60" r="46"/>
+                    <g class="gauge-ticks" stroke="currentColor" stroke-width="1.4" opacity="0.28">
+                      <line x1="60" y1="12" x2="60" y2="20"/><line x1="60" y1="100" x2="60" y2="108"/>
+                      <line x1="12" y1="60" x2="20" y2="60"/><line x1="100" y1="60" x2="108" y2="60"/>
+                    </g>
+                    <circle class="gauge-value" cx="60" cy="60" r="46" stroke="url(#gFocusA)" filter="url(#gGlowA)" stroke-dasharray="208.7 80.9" pathLength="289.6" transform="rotate(-90 60 60)"/>
+                  </svg>
+                  <span>72%</span>
+                </div>
+                <div class="preview-person"><i style="background:linear-gradient(145deg,#34d399,#1f6b56)">Я</i><em>Дизайн</em></div>
               </div>
-              <div class="preview-person"><i style="background:#0f766e">CD</i><em>Код</em></div>
-            </div>
-            <div class="preview-gauge">
-              <div class="gauge-ring">
-                <svg viewBox="0 0 36 36"><circle class="gauge-track" cx="18" cy="18" r="15.9155"/><circle class="gauge-value" cx="18" cy="18" r="15.9155" stroke="#365314" stroke-dasharray="38 62" transform="rotate(-90 18 18)"/></svg>
-                <span>38%</span>
+              <div class="preview-gauge">
+                <div class="gauge-ring gauge-ring-rich">
+                  <svg viewBox="0 0 120 120">
+                    <defs>
+                      <linearGradient id="gFocusB" x1="0" y1="0" x2="1" y2="1">
+                        <stop offset="0%" stop-color="#67e8f9"/><stop offset="100%" stop-color="#0f766e"/>
+                      </linearGradient>
+                    </defs>
+                    <circle class="gauge-track" cx="60" cy="60" r="46"/>
+                    <g class="gauge-ticks" stroke="currentColor" stroke-width="1.4" opacity="0.28">
+                      <line x1="60" y1="12" x2="60" y2="20"/><line x1="60" y1="100" x2="60" y2="108"/>
+                      <line x1="12" y1="60" x2="20" y2="60"/><line x1="100" y1="60" x2="108" y2="60"/>
+                    </g>
+                    <circle class="gauge-value" cx="60" cy="60" r="46" stroke="url(#gFocusB)" stroke-dasharray="156.4 133.2" pathLength="289.6" transform="rotate(-90 60 60)"/>
+                  </svg>
+                  <span>54%</span>
+                </div>
+                <div class="preview-person"><i style="background:linear-gradient(145deg,#22d3ee,#0f766e)">CD</i><em>Код</em></div>
               </div>
-              <div class="preview-person"><i style="background:#365314">OP</i><em>Ops</em></div>
+              <div class="preview-gauge">
+                <div class="gauge-ring gauge-ring-rich">
+                  <svg viewBox="0 0 120 120">
+                    <defs>
+                      <linearGradient id="gFocusC" x1="0" y1="0" x2="1" y2="1">
+                        <stop offset="0%" stop-color="#bef264"/><stop offset="100%" stop-color="#3f6212"/>
+                      </linearGradient>
+                    </defs>
+                    <circle class="gauge-track" cx="60" cy="60" r="46"/>
+                    <g class="gauge-ticks" stroke="currentColor" stroke-width="1.4" opacity="0.28">
+                      <line x1="60" y1="12" x2="60" y2="20"/><line x1="60" y1="100" x2="60" y2="108"/>
+                      <line x1="12" y1="60" x2="20" y2="60"/><line x1="100" y1="60" x2="108" y2="60"/>
+                    </g>
+                    <circle class="gauge-value" cx="60" cy="60" r="46" stroke="url(#gFocusC)" stroke-dasharray="110 179.6" pathLength="289.6" transform="rotate(-90 60 60)"/>
+                  </svg>
+                  <span>38%</span>
+                </div>
+                <div class="preview-person"><i style="background:linear-gradient(145deg,#a3e635,#3f6212)">OP</i><em>Ops</em></div>
+              </div>
             </div>
           </div>
         </div>
+
         <div class="preview-card preview-timeline">
-          <div class="preview-kpi-row">
-            <div><b>В фокусе</b><strong>4ч 12м</strong><span class="preview-mini productive"></span></div>
-            <div><b>Отвлечения</b><strong>48м</strong><span class="preview-mini distracting"></span></div>
-            <div><b>Простой</b><strong>1ч 05м</strong><span class="preview-mini idle"></span></div>
-            <div><b>Всего</b><strong>7ч 20м</strong><span class="preview-mini tracked"></span></div>
-          </div>
-          <div class="preview-card-head">
-            <strong>Картина дня</strong>
-            <span>00:00–24:00</span>
-          </div>
-          <div class="preview-timeline-meta">
-            <span>00:00</span>
-            <span>12:00</span>
-            <span>24:00</span>
-          </div>
-          <div class="preview-bar preview-bar-lg preview-bar-day">
-            <i class="void" style="width:38%"></i>
-            <i class="productive" style="width:22%"></i>
-            <i class="neutral" style="width:6%"></i>
-            <i class="void" style="width:8%"></i>
-            <i class="distracting" style="width:5%"></i>
-            <i class="idle" style="width:4%"></i>
-            <i class="productive" style="width:7%"></i>
-            <i class="void" style="width:10%"></i>
-          </div>
-          <div class="preview-timeline-legs">
-            <span><i class="productive"></i>Фокус</span>
-            <span><i class="neutral"></i>Нейтр.</span>
-            <span><i class="distracting"></i>Отвлеч.</span>
-            <span><i class="idle"></i>Простой</span>
-            <span><i class="void"></i>Пусто</span>
+          <div class="preview-stage">
+            <div class="preview-kpi-row">
+              <div><b>В фокусе</b><strong>4ч 12м</strong><span class="preview-mini productive"></span></div>
+              <div><b>Отвлечения</b><strong>48м</strong><span class="preview-mini distracting"></span></div>
+              <div><b>Простой</b><strong>1ч 05м</strong><span class="preview-mini idle"></span></div>
+              <div><b>Всего</b><strong>7ч 20м</strong><span class="preview-mini tracked"></span></div>
+            </div>
+            <div class="preview-card-head">
+              <strong>Картина дня</strong>
+              <span>00:00–24:00</span>
+            </div>
+            <div class="preview-timeline-meta">
+              <span>00:00</span>
+              <span>12:00</span>
+              <span>24:00</span>
+            </div>
+            <div class="preview-day-svg">
+              <svg viewBox="0 0 560 36" preserveAspectRatio="none">
+                <defs>
+                  <linearGradient id="segP" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#5eead4"/><stop offset="100%" stop-color="#1f6b56"/></linearGradient>
+                  <linearGradient id="segN" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#94a3b8"/><stop offset="100%" stop-color="#64748b"/></linearGradient>
+                  <linearGradient id="segD" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#fb923c"/><stop offset="100%" stop-color="#c2410c"/></linearGradient>
+                  <linearGradient id="segI" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#cbd5e1"/><stop offset="100%" stop-color="#64748b"/></linearGradient>
+                </defs>
+                <rect class="day-track" x="0" y="6" width="560" height="24" rx="8"/>
+                <rect x="0" y="6" width="212" height="24" rx="0" class="day-void"/>
+                <rect x="212" y="6" width="123" height="24" fill="url(#segP)"/>
+                <rect x="335" y="6" width="34" height="24" fill="url(#segN)"/>
+                <rect x="369" y="6" width="45" height="24" class="day-void"/>
+                <rect x="414" y="6" width="28" height="24" fill="url(#segD)"/>
+                <rect x="442" y="6" width="22" height="24" fill="url(#segI)"/>
+                <rect x="464" y="6" width="39" height="24" fill="url(#segP)"/>
+                <rect x="503" y="6" width="57" height="24" class="day-void"/>
+                <g stroke="rgba(255,255,255,0.35)" stroke-width="1">
+                  <line x1="212" y1="6" x2="212" y2="30"/><line x1="335" y1="6" x2="335" y2="30"/>
+                  <line x1="369" y1="6" x2="369" y2="30"/><line x1="414" y1="6" x2="414" y2="30"/>
+                  <line x1="442" y1="6" x2="442" y2="30"/><line x1="464" y1="6" x2="464" y2="30"/>
+                  <line x1="503" y1="6" x2="503" y2="30"/>
+                </g>
+              </svg>
+            </div>
+            <div class="preview-timeline-legs">
+              <span><i class="productive"></i>Фокус</span>
+              <span><i class="neutral"></i>Нейтр.</span>
+              <span><i class="distracting"></i>Отвлеч.</span>
+              <span><i class="idle"></i>Простой</span>
+              <span><i class="void"></i>Пусто</span>
+            </div>
           </div>
         </div>
+
         <div class="preview-card preview-week">
-          <div class="preview-card-head">
-            <strong>Ритм фокуса</strong>
-            <span>неделя</span>
-          </div>
-          <div class="preview-week-chart preview-week-stack">
-            <div class="preview-week-col"><span class="stack"><i class="distracting" style="height:18%"></i><i class="productive" style="height:62%"></i></span><b>пн</b></div>
-            <div class="preview-week-col"><span class="stack"><i class="distracting" style="height:28%"></i><i class="productive" style="height:44%"></i></span><b>вт</b></div>
-            <div class="preview-week-col"><span class="stack"><i class="distracting" style="height:10%"></i><i class="productive" style="height:78%"></i></span><b>ср</b></div>
-            <div class="preview-week-col"><span class="stack"><i class="distracting" style="height:32%"></i><i class="productive" style="height:36%"></i></span><b>чт</b></div>
-            <div class="preview-week-col"><span class="stack"><i class="distracting" style="height:14%"></i><i class="productive" style="height:66%"></i></span><b>пт</b></div>
+          <div class="preview-stage">
+            <div class="preview-card-head">
+              <strong>Ритм фокуса</strong>
+              <span>неделя</span>
+            </div>
+            <div class="preview-week-chart preview-week-rich">
+              <div class="preview-week-col">
+                <span class="stack stack-rich">
+                  <i class="distracting" style="--h:14%"></i>
+                  <i class="neutral" style="--h:12%"></i>
+                  <i class="productive" style="--h:58%"></i>
+                </span>
+                <b>пн</b>
+              </div>
+              <div class="preview-week-col">
+                <span class="stack stack-rich">
+                  <i class="distracting" style="--h:22%"></i>
+                  <i class="neutral" style="--h:10%"></i>
+                  <i class="productive" style="--h:40%"></i>
+                </span>
+                <b>вт</b>
+              </div>
+              <div class="preview-week-col">
+                <span class="stack stack-rich">
+                  <i class="distracting" style="--h:8%"></i>
+                  <i class="neutral" style="--h:8%"></i>
+                  <i class="productive" style="--h:72%"></i>
+                </span>
+                <b>ср</b>
+              </div>
+              <div class="preview-week-col">
+                <span class="stack stack-rich">
+                  <i class="distracting" style="--h:26%"></i>
+                  <i class="neutral" style="--h:14%"></i>
+                  <i class="productive" style="--h:32%"></i>
+                </span>
+                <b>чт</b>
+              </div>
+              <div class="preview-week-col">
+                <span class="stack stack-rich">
+                  <i class="distracting" style="--h:12%"></i>
+                  <i class="neutral" style="--h:10%"></i>
+                  <i class="productive" style="--h:62%"></i>
+                </span>
+                <b>пт</b>
+              </div>
+            </div>
           </div>
         </div>
       </div>
