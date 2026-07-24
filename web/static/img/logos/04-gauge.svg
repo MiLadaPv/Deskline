@@ -1,5 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-label="Deskline Focus Gauge">
-  <title>04 · Focus Gauge</title>
+  <title>04 - Focus Gauge</title>
   <rect x="8" y="8" width="112" height="112" rx="32" fill="#f4faf7"/>
   <circle cx="64" cy="64" r="34" fill="none" stroke="#d7e6e0" stroke-width="12"/>
   <path d="M64 30a34 34 0 1 1-28.2 51.2" fill="none" stroke="#1f6b56" stroke-width="12" stroke-linecap="round"/>

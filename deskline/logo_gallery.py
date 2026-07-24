@@ -103,7 +103,11 @@ def load_logo_cards() -> list[dict]:
         path = LOGOS_DIR / f"{lid}.svg"
         if not path.is_file():
             continue
-        raw = path.read_text(encoding="utf-8")
+        try:
+            raw = path.read_text(encoding="utf-8")
+        except UnicodeDecodeError:
+            raw = path.read_text(encoding="cp1252")
+        raw = raw.replace("\u00b7", "-").replace("·", "-")
         # Strip XML declaration if present
         raw = re.sub(r"<\?xml[^>]*\?>\s*", "", raw)
         svg = _unique_svg_ids(raw, lid.replace("-", ""))
