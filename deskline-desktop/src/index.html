@@ -9,7 +9,7 @@
         color-scheme: light;
         --bg: #e8f0ec;
         --ink: #15241f;
-        --accent: #1f6b56;
+        --logo-ink: #1a1f2b;
       }
       html, body {
         margin: 0;
@@ -32,46 +32,33 @@
         width: 88px;
         height: 88px;
         margin: 0 auto 1rem;
-        color: var(--accent);
       }
       .logo svg {
         width: 100%;
         height: 100%;
         overflow: visible;
       }
-      .logo-d-stem,
-      .logo-d-arc {
-        stroke-dasharray: 90;
-        stroke-dashoffset: 90;
-        animation: draw 0.7s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+      .logo-d {
+        fill: var(--logo-ink);
+        opacity: 0;
+        animation: mark-in 0.55s cubic-bezier(0.22, 1, 0.36, 1) forwards;
       }
-      .logo-d-arc { animation-delay: 0.12s; }
-      .logo-dayline {
-        stroke-dasharray: 72;
-        stroke-dashoffset: 72;
-        animation: draw 0.85s cubic-bezier(0.22, 1, 0.36, 1) 0.28s forwards;
-      }
-      .logo-now {
+      .logo-bar {
+        opacity: 0;
         transform-box: fill-box;
-        transform-origin: center;
-        opacity: 0;
-        animation:
-          now-in 0.35s ease 0.85s forwards,
-          now-pulse 2.4s ease-in-out 1.2s infinite;
+        transform-origin: bottom;
+        animation: bar-in 0.45s cubic-bezier(0.22, 1, 0.36, 1) forwards;
       }
-      .logo-tile {
-        opacity: 0;
-        animation: tile-in 0.45s ease 0.05s forwards;
+      .logo-bar-1 { fill: #3b82f6; animation-delay: 0.18s; }
+      .logo-bar-2 { fill: #14b8a6; animation-delay: 0.28s; }
+      .logo-bar-3 { fill: #84cc16; animation-delay: 0.38s; }
+      @keyframes mark-in {
+        from { opacity: 0; transform: translateY(4px); }
+        to { opacity: 1; transform: translateY(0); }
       }
-      @keyframes draw { to { stroke-dashoffset: 0; } }
-      @keyframes tile-in { from { opacity: 0; } to { opacity: 1; } }
-      @keyframes now-in {
-        from { opacity: 0; transform: scale(0.4); }
-        to { opacity: 1; transform: scale(1); }
-      }
-      @keyframes now-pulse {
-        0%, 100% { transform: scale(1); opacity: 1; }
-        50% { transform: scale(1.22); opacity: 0.85; }
+      @keyframes bar-in {
+        from { opacity: 0; transform: scaleY(0.25); }
+        to { opacity: 1; transform: scaleY(1); }
       }
       h1 {
         margin: 0 0 0.4rem;
@@ -89,11 +76,10 @@
       <div>
         <div class="logo" aria-hidden="true">
           <svg viewBox="0 0 64 64" fill="none">
-            <rect class="logo-tile" x="4" y="4" width="56" height="56" rx="14" fill="currentColor"/>
-            <path class="logo-d-stem" d="M20 18v28" stroke="#f4faf7" stroke-width="4.5" stroke-linecap="round"/>
-            <path class="logo-d-arc" d="M20 18h10c9 0 15 6.2 15 14s-6 14-15 14H20" stroke="#f4faf7" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round"/>
-            <path class="logo-dayline" d="M15 34h9c2.5 0 4.2-2.5 7-6s5.5-6 8.5-6 4.5 2 6.5 4.8S50 34 53 34" stroke="#f4faf7" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
-            <circle class="logo-now" cx="40" cy="22" r="2.8" fill="#f4faf7"/>
+            <path class="logo-d" fill-rule="evenodd" d="M14 10h18c12.5 0 22 9.2 22 22s-9.5 22-22 22H14V10zm10 10v24h8c6.8 0 12-5.2 12-12s-5.2-12-12-12h-8z"/>
+            <rect class="logo-bar logo-bar-1" x="26" y="34" width="5" height="10" rx="2.5"/>
+            <rect class="logo-bar logo-bar-2" x="33.5" y="28" width="5" height="16" rx="2.5"/>
+            <rect class="logo-bar logo-bar-3" x="41" y="22" width="5" height="22" rx="2.5"/>
           </svg>
         </div>
         <h1>Deskline</h1>

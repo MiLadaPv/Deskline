@@ -147,9 +147,10 @@ function renderDayWeekStrip() {
 }
 
 async function api(path, opts = {}) {
+  const { quiet402, ...fetchOpts } = opts;
   const res = await fetch(path, {
-    headers: { "Content-Type": "application/json", ...(opts.headers || {}) },
-    ...opts,
+    headers: { "Content-Type": "application/json", ...(fetchOpts.headers || {}) },
+    ...fetchOpts,
   });
   if (res.status === 401 && !path.startsWith("/api/auth/")) {
     location.href = "/login";
@@ -170,7 +171,11 @@ async function api(path, opts = {}) {
     } catch (_) {}
     if (res.status === 402) {
       if (detail?.entitlements) applyEntitlements(detail.entitlements);
-      showPaywall(message);
+      if (!quiet402) showPaywall(message);
+      const err = new Error(message);
+      err.code = detail?.code || "pro_required";
+      err.detail = detail;
+      throw err;
     }
     throw new Error(message);
   }
@@ -206,11 +211,67 @@ function applyEntitlements(ent) {
   ensureSelectedDay();
 }
 
+let _paywallShownAt = 0;
+
 function showPaywall(message) {
   const modal = document.getElementById("paywallModal");
   const msg = document.getElementById("paywallMessage");
   if (msg) msg.textContent = message || "Доступно в Deskline Pro";
-  if (modal) modal.hidden = false;
+  if (!modal) return;
+  if (!modal.hidden) return;
+  const now = Date.now();
+  if (now - _paywallShownAt < 10000) return;
+  _paywallShownAt = now;
+  modal.hidden = false;
+}
+
+const THEME_CYCLE = ["system", "light", "dark"];
+const THEME_LABELS = { system: "Система", light: "Светлая", dark: "Тёмная" };
+
+function resolveTheme(pref) {
+  if (pref === "dark" || pref === "light") return pref;
+  return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+}
+
+function applyThemePref(pref) {
+  const next = THEME_CYCLE.includes(pref) ? pref : "system";
+  try {
+    localStorage.setItem("deskline_theme", next);
+  } catch (_) {}
+  document.documentElement.setAttribute("data-theme", resolveTheme(next));
+  document.documentElement.setAttribute("data-theme-pref", next);
+  const btn = document.getElementById("themeToggle");
+  if (btn) btn.textContent = THEME_LABELS[next] || "Тема";
+}
+
+async function persistTheme(pref) {
+  applyThemePref(pref);
+  try {
+    await api("/api/settings", {
+      method: "PUT",
+      body: JSON.stringify({ theme: pref }),
+      quiet402: true,
+    });
+  } catch (_) {}
+}
+
+function wireThemeToggle() {
+  const btn = document.getElementById("themeToggle");
+  if (!btn || btn.dataset.wired === "1") return;
+  btn.dataset.wired = "1";
+  applyThemePref(localStorage.getItem("deskline_theme") || "system");
+  btn.addEventListener("click", () => {
+    const cur = localStorage.getItem("deskline_theme") || "system";
+    const idx = THEME_CYCLE.indexOf(cur);
+    const next = THEME_CYCLE[(idx < 0 ? 0 : idx + 1) % THEME_CYCLE.length];
+    persistTheme(next);
+  });
+  try {
+    window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => {
+      const cur = localStorage.getItem("deskline_theme") || "system";
+      if (cur === "system") applyThemePref("system");
+    });
+  } catch (_) {}
 }
 
 async function refreshLicenseStatus() {
@@ -1598,8 +1659,8 @@ async function refreshSummary() {
   const teamQ = `from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}${filterProjectId ? `&project_id=${encodeURIComponent(filterProjectId)}` : ""}`;
   const [summary, team, timelineRows] = await Promise.all([
     api(`/api/summary/today${q}`),
-    api(`/api/company/team?${teamQ}`).catch(() => []),
-    api(`/api/timeline/today${q}`).catch(() => []),
+    api(`/api/company/team?${teamQ}`, { quiet402: true }).catch(() => []),
+    api(`/api/timeline/today${q}`, { quiet402: true }).catch(() => []),
   ]);
   const key = summaryKey(summary) + `|p:${filterProjectId}|e:${filterEmployeeId}`;
   if (key === lastSummaryKey) return;
@@ -1778,8 +1839,20 @@ function shotCaption(row) {
 }
 
 async function refreshShots() {
-  const rows = await api("/api/screenshots");
   const grid = document.getElementById("shotsGrid");
+  let rows;
+  try {
+    rows = await api("/api/screenshots", { quiet402: true });
+  } catch (e) {
+    lightboxItems = [];
+    if (e?.code === "pro_required" || e?.detail?.feature === "screenshots") {
+      if (grid) {
+        grid.innerHTML = `<p class="hint">Скриншоты доступны в Deskline Pro.</p>`;
+      }
+      return;
+    }
+    throw e;
+  }
   lightboxItems = rows.map((r) => ({
     url: r.url,
     caption: shotCaption(r),
@@ -1839,6 +1912,7 @@ async function loadSettings() {
   updateStorageHint(cfg);
   const workToggle = document.getElementById("workModeToggle");
   if (workToggle) workToggle.checked = !!cfg.work_mode;
+  if (cfg.theme) applyThemePref(cfg.theme);
   if (cfg.entitlements) applyEntitlements(cfg.entitlements);
 }
 
@@ -1959,14 +2033,34 @@ async function refreshTimeline() {
     const emp = filterEmployeeId ? `&employee_id=${encodeURIComponent(filterEmployeeId)}` : "";
     const q = `day=${encodeURIComponent(selectedDayIso)}${emp}`;
     const [rowsRes, summaryRes] = await Promise.allSettled([
-      api(`/api/timeline?${q}`),
-      api(`/api/summary?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}${emp}`),
+      api(`/api/timeline?${q}`, { quiet402: true }),
+      api(`/api/summary?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}${emp}`, {
+        quiet402: true,
+      }),
     ]);
     const rows = rowsRes.status === "fulfilled" ? rowsRes.value || [] : [];
     const summary = summaryRes.status === "fulfilled" ? summaryRes.value || {} : {};
-    if (rowsRes.status !== "fulfilled") {
+    const gated =
+      (rowsRes.status !== "fulfilled" &&
+        (rowsRes.reason?.code === "history_limit" || rowsRes.reason?.code === "pro_required")) ||
+      (summaryRes.status !== "fulfilled" &&
+        (summaryRes.reason?.code === "history_limit" ||
+          summaryRes.reason?.code === "pro_required"));
+    if (rowsRes.status !== "fulfilled" && !gated) {
       console.error(rowsRes.reason);
       showToast("Не удалось загрузить ленту дня", "error");
+    }
+
+    const el = document.getElementById("timelineList");
+    if (gated) {
+      renderDayGantt([]);
+      renderDayKpis({});
+      renderPieChart(document.getElementById("dayCatPie"), [], 0, "Доступно в Pro");
+      renderPieChart(document.getElementById("dayKindPie"), [], 0, "Доступно в Pro");
+      if (el) {
+        el.innerHTML = `<li><span class="timeline-time">—</span><span class="rank-icon">•</span><span class="rank-name">История дальше Free-лимита — доступно в Pro</span><span class="rank-meta"></span></li>`;
+      }
+      return;
     }
 
     renderDayGantt(rows);
@@ -1985,7 +2079,6 @@ async function refreshTimeline() {
       "Нет типов занятий за этот день."
     );
 
-    const el = document.getElementById("timelineList");
     if (!el) return;
     if (!rows.length) {
       el.innerHTML = `<li><span class="timeline-time">—</span><span class="rank-icon">•</span><span class="rank-name">Пока нет сессий</span><span class="rank-meta"></span></li>`;
@@ -2067,6 +2160,7 @@ async function refreshRatings() {
 }
 
 function wireUi() {
+  wireThemeToggle();
   document.querySelectorAll(".tab").forEach((tab) => {
     tab.setAttribute("role", "tab");
     tab.addEventListener("click", () => {

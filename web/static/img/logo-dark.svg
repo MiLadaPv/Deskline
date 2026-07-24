@@ -1,5 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none" aria-hidden="true">
-  <path class="logo-d" fill="#1A1F2B" fill-rule="evenodd" d="M14 10h18c12.5 0 22 9.2 22 22s-9.5 22-22 22H14V10zm10 10v24h8c6.8 0 12-5.2 12-12s-5.2-12-12-12h-8z"/>
+  <path class="logo-d" fill="#F4F7F5" fill-rule="evenodd" d="M14 10h18c12.5 0 22 9.2 22 22s-9.5 22-22 22H14V10zm10 10v24h8c6.8 0 12-5.2 12-12s-5.2-12-12-12h-8z"/>
   <rect x="26" y="34" width="5" height="10" rx="2.5" fill="#3B82F6"/>
   <rect x="33.5" y="28" width="5" height="16" rx="2.5" fill="#14B8A6"/>
   <rect x="41" y="22" width="5" height="22" rx="2.5" fill="#84CC16"/>

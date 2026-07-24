@@ -76,6 +76,7 @@ class SettingsUpdate(BaseModel):
     current_project_id: int | None = None
     current_task_id: int | None = None
     show_mini_tracker: bool | None = None
+    theme: str | None = Field(default=None, pattern="^(system|light|dark)$")
     company_mode: bool | None = None
     company_display_name: str | None = Field(default=None, max_length=120)
     listen_host: str | None = Field(default=None, max_length=64)

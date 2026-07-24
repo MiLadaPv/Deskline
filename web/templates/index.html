@@ -4,10 +4,12 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Deskline</title>
+  <script src="/static/js/theme.js?v={{ version }}"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="/static/css/app.css?v={{ version }}" />
+  <link rel="icon" href="/static/img/logo.svg" type="image/svg+xml" />
 </head>
 <body>
   <div class="atmosphere" aria-hidden="true"></div>
@@ -44,6 +46,7 @@
         </div>
       </div>
       <div class="control-strip">
+        <button type="button" class="theme-toggle" id="themeToggle" title="Тема" aria-label="Переключить тему">Тема</button>
         <label class="work-toggle" title="Мессенджеры считаются фокусом">
           <input type="checkbox" id="workModeToggle" />
           <span>На работе</span>
