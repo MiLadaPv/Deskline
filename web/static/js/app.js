@@ -1147,6 +1147,88 @@ function kindSubtitle(kind) {
   return kindLabel(key);
 }
 
+const GROUPED_PAGE = 12;
+let expandedActivityGroups = new Set();
+let groupedTodayCache = [];
+let groupedUsageCache = [];
+let groupedTodayLimit = GROUPED_PAGE;
+let groupedUsageLimit = GROUPED_PAGE;
+
+function filterGroupedRows(rows, query) {
+  const q = String(query || "").trim().toLowerCase();
+  if (!q) return rows || [];
+  return (rows || []).filter((r) => {
+    if (String(r.name || "").toLowerCase().includes(q)) return true;
+    return (r.children || []).some((c) => String(c.name || "").toLowerCase().includes(q));
+  });
+}
+
+function renderGroupedList(el, rows, emptyText, opts = {}) {
+  if (!el) return;
+  const {
+    searchInput = null,
+    moreBtn = null,
+    limit = GROUPED_PAGE,
+    showShare = false,
+    total = 0,
+    cacheKey = "today",
+  } = opts;
+  const query = searchInput ? searchInput.value : "";
+  const filtered = filterGroupedRows(rows, query);
+  const sliced = filtered.slice(0, limit);
+  if (moreBtn) {
+    moreBtn.hidden = filtered.length <= limit;
+  }
+
+  if (!sliced.length) {
+    el.innerHTML = `<li class="empty-state"><span class="rank-icon" aria-hidden="true">•</span><span class="rank-text"><span class="rank-name">${escapeHtml(emptyText || "Пока нет данных")}</span></span><span class="rank-meta">—</span></li>`;
+    return;
+  }
+
+  const parts = [];
+  sliced.forEach((r, idx) => {
+    const children = r.children || [];
+    const expandable = children.length > 0;
+    const key = `${cacheKey}:${r.name}`;
+    const open = expandable && (expandedActivityGroups.has(key) || !!query);
+    const icon = r.icon_url
+      ? iconImgHtml(r.icon_url, 22)
+      : `<span class="rank-icon" aria-hidden="true">•</span>`;
+    const chevron = expandable ? `<span class="rank-chevron" aria-hidden="true">▸</span>` : "";
+    const share =
+      showShare && total ? ` · ${Math.round((r.sec / total) * 100)}%` : "";
+    parts.push(`<li class="rank-row-parent${open ? " is-open" : ""}${expandable ? " is-expandable" : ""}" data-group-key="${escapeHtml(key)}" ${expandable ? 'role="button" tabindex="0"' : ""}>
+      ${icon}
+      <span class="rank-text">
+        <span class="rank-name">${chevron}${escapeHtml(r.name)}</span>
+      </span>
+      <span class="rank-meta">${fmtDur(r.sec)}${share}</span>
+    </li>`);
+    if (open) {
+      children.forEach((c) => {
+        const cIcon = c.icon_url
+          ? iconImgHtml(c.icon_url, 18)
+          : `<span class="rank-icon" aria-hidden="true">•</span>`;
+        const kind = kindSubtitle(c.kind);
+        const kindHtml = kind
+          ? `<span class="rank-kind">${escapeHtml(kind)}</span>`
+          : "";
+        const cShare =
+          showShare && total ? ` · ${Math.round((c.sec / total) * 100)}%` : "";
+        parts.push(`<li class="rank-row-child">
+          ${cIcon}
+          <span class="rank-text">
+            <span class="rank-name">${escapeHtml(c.name)}</span>
+            ${kindHtml}
+          </span>
+          <span class="rank-meta">${fmtDur(c.sec)}${cShare}</span>
+        </li>`);
+      });
+    }
+  });
+  el.innerHTML = parts.join("");
+}
+
 function renderList(el, rows, emptyText) {
   const sliced = (rows || []).slice(0, 15);
   const signature = sliced.length
@@ -1203,9 +1285,10 @@ function escapeHtml(s) {
 const ICON_ONERROR =
   "this.replaceWith(Object.assign(document.createElement('span'),{className:'rank-icon',textContent:'•'}))";
 
-function iconImgHtml(url) {
+function iconImgHtml(url, size = 36) {
   if (!url) return `<span class="rank-icon" aria-hidden="true">•</span>`;
-  return `<span class="rank-icon"><img class="rank-icon-img" src="${escapeHtml(url)}" alt="" width="36" height="36" decoding="async" onerror="${ICON_ONERROR}" /></span>`;
+  const s = Number(size) || 36;
+  return `<span class="rank-icon"><img class="rank-icon-img" src="${escapeHtml(url)}" alt="" width="${s}" height="${s}" decoding="async" onerror="${ICON_ONERROR}" /></span>`;
 }
 
 function updateStorageHint(cfg) {
@@ -1696,20 +1779,32 @@ async function refreshSummary() {
   renderBars(summary.by_category, summary.total_sec, { animate: false });
   renderKindBars(summary.by_kind || {}, summary.total_sec || 0);
   refreshTrends().catch(() => {});
-  const activities = summary.by_activity || [];
-  renderList(document.getElementById("topAppsToday"), activities, "Занятий пока нет");
+  groupedTodayCache = summary.by_app_grouped || [];
+  renderGroupedList(document.getElementById("topAppsToday"), groupedTodayCache, "Занятий пока нет", {
+    searchInput: document.getElementById("activitySearchToday"),
+    moreBtn: document.getElementById("topAppsTodayMore"),
+    limit: groupedTodayLimit,
+    cacheKey: "today",
+  });
 }
 
 async function refreshUsageReport() {
   const q = periodQuery(usagePeriod, filterProjectId, filterTaskId, filterEmployeeId);
   const summary = await api(`/api/summary?${q}`);
   const total = summary.total_sec || 0;
-  renderUsageList(
+  groupedUsageCache = summary.by_app_grouped || [];
+  renderGroupedList(
     document.getElementById("activitiesList"),
-    summary.by_activity || [],
-    total,
-    "activity",
-    "Занятий пока нет"
+    groupedUsageCache,
+    "Занятий пока нет",
+    {
+      searchInput: document.getElementById("activitySearchUsage"),
+      moreBtn: document.getElementById("activitiesListMore"),
+      limit: groupedUsageLimit,
+      showShare: true,
+      total,
+      cacheKey: "usage",
+    }
   );
   renderUsageList(
     document.getElementById("appsList"),
@@ -1773,6 +1868,8 @@ function renderUsageList(el, rows, total, kind, emptyText) {
 
 async function refreshStatus() {
   const st = await api("/api/status");
+  const pending = st.rdp_vision_pending || null;
+  const pendingKey = pending ? `${pending.label}|${pending.created_at}` : "";
   const key = JSON.stringify({
     paused: !!st.paused,
     idle: !!st.idle,
@@ -1782,7 +1879,9 @@ async function refreshStatus() {
     project: st.current_project_id || "",
     task: st.current_task_id || "",
     focusNames: lastFocusNames,
+    rdpPending: pendingKey,
   });
+  maybeShowRdpVision(pending);
   if (key === lastStatusKey) return;
   lastStatusKey = key;
 
@@ -1804,6 +1903,29 @@ async function refreshStatus() {
   document.getElementById("statusLine").textContent = line;
   const ver = document.getElementById("appVersion");
   if (ver && st.version) ver.textContent = `Deskline v${st.version}`;
+}
+
+let _rdpVisionShownKey = "";
+
+function maybeShowRdpVision(pending) {
+  const modal = document.getElementById("rdpVisionModal");
+  if (!modal) return;
+  if (!pending) {
+    modal.hidden = true;
+    _rdpVisionShownKey = "";
+    return;
+  }
+  const key = `${pending.label}|${pending.created_at}`;
+  if (key === _rdpVisionShownKey && !modal.hidden) return;
+  _rdpVisionShownKey = key;
+  const msg = document.getElementById("rdpVisionMessage");
+  const conf = pending.confidence != null ? ` (${Math.round(pending.confidence * 100)}%)` : "";
+  if (msg) {
+    msg.textContent = `Похоже: ${pending.label}${conf}. Засчитать как занятие? (Focus % не пересчитывается — только ярлык remote-сессии.)`;
+  }
+  modal.hidden = false;
+  modal.dataset.label = pending.label || "";
+  modal.dataset.sessionId = pending.session_id != null ? String(pending.session_id) : "";
 }
 
 function fmtShotWhen(iso) {
@@ -1906,6 +2028,16 @@ async function loadSettings() {
   if (form.hub_ingest_token) {
     form.hub_ingest_token.value = cfg.hub_ingest_token || "";
   }
+  if (form.rdp_vision_consent) form.rdp_vision_consent.checked = !!cfg.rdp_vision_consent;
+  if (form.rdp_vision_enabled) form.rdp_vision_enabled.checked = !!cfg.rdp_vision_enabled;
+  if (form.rdp_vision_api_key) form.rdp_vision_api_key.value = cfg.rdp_vision_api_key || "";
+  if (form.rdp_vision_interval_sec) {
+    form.rdp_vision_interval_sec.value = cfg.rdp_vision_interval_sec ?? 180;
+  }
+  if (form.rdp_vision_base_url) {
+    form.rdp_vision_base_url.value = cfg.rdp_vision_base_url || "https://api.openai.com/v1";
+  }
+  if (form.rdp_vision_model) form.rdp_vision_model.value = cfg.rdp_vision_model || "gpt-4o-mini";
   companyMode = !!cfg.company_mode;
   updateCompanyUiVisibility();
   await refreshCompanyPanel();
@@ -2159,8 +2291,94 @@ async function refreshRatings() {
     .join("");
 }
 
+function wireGroupedLists() {
+  const toggle = (ev) => {
+    const row = ev.target.closest(".rank-row-parent.is-expandable");
+    if (!row) return;
+    const key = row.dataset.groupKey;
+    if (!key) return;
+    if (expandedActivityGroups.has(key)) expandedActivityGroups.delete(key);
+    else expandedActivityGroups.add(key);
+    const total = 0;
+    if (key.startsWith("today:")) {
+      renderGroupedList(document.getElementById("topAppsToday"), groupedTodayCache, "Занятий пока нет", {
+        searchInput: document.getElementById("activitySearchToday"),
+        moreBtn: document.getElementById("topAppsTodayMore"),
+        limit: groupedTodayLimit,
+        cacheKey: "today",
+      });
+    } else if (key.startsWith("usage:")) {
+      renderGroupedList(document.getElementById("activitiesList"), groupedUsageCache, "Занятий пока нет", {
+        searchInput: document.getElementById("activitySearchUsage"),
+        moreBtn: document.getElementById("activitiesListMore"),
+        limit: groupedUsageLimit,
+        showShare: true,
+        total: groupedUsageCache.reduce((s, r) => s + (r.sec || 0), 0),
+        cacheKey: "usage",
+      });
+    }
+  };
+  document.getElementById("topAppsToday")?.addEventListener("click", toggle);
+  document.getElementById("activitiesList")?.addEventListener("click", toggle);
+  document.getElementById("topAppsToday")?.addEventListener("keydown", (ev) => {
+    if (ev.key === "Enter" || ev.key === " ") {
+      ev.preventDefault();
+      toggle(ev);
+    }
+  });
+  document.getElementById("activitiesList")?.addEventListener("keydown", (ev) => {
+    if (ev.key === "Enter" || ev.key === " ") {
+      ev.preventDefault();
+      toggle(ev);
+    }
+  });
+
+  const searchToday = document.getElementById("activitySearchToday");
+  searchToday?.addEventListener("input", () => {
+    renderGroupedList(document.getElementById("topAppsToday"), groupedTodayCache, "Занятий пока нет", {
+      searchInput: searchToday,
+      moreBtn: document.getElementById("topAppsTodayMore"),
+      limit: groupedTodayLimit,
+      cacheKey: "today",
+    });
+  });
+  const searchUsage = document.getElementById("activitySearchUsage");
+  searchUsage?.addEventListener("input", () => {
+    renderGroupedList(document.getElementById("activitiesList"), groupedUsageCache, "Занятий пока нет", {
+      searchInput: searchUsage,
+      moreBtn: document.getElementById("activitiesListMore"),
+      limit: groupedUsageLimit,
+      showShare: true,
+      total: groupedUsageCache.reduce((s, r) => s + (r.sec || 0), 0),
+      cacheKey: "usage",
+    });
+  });
+
+  document.getElementById("topAppsTodayMore")?.addEventListener("click", () => {
+    groupedTodayLimit += GROUPED_PAGE;
+    renderGroupedList(document.getElementById("topAppsToday"), groupedTodayCache, "Занятий пока нет", {
+      searchInput: document.getElementById("activitySearchToday"),
+      moreBtn: document.getElementById("topAppsTodayMore"),
+      limit: groupedTodayLimit,
+      cacheKey: "today",
+    });
+  });
+  document.getElementById("activitiesListMore")?.addEventListener("click", () => {
+    groupedUsageLimit += GROUPED_PAGE;
+    renderGroupedList(document.getElementById("activitiesList"), groupedUsageCache, "Занятий пока нет", {
+      searchInput: document.getElementById("activitySearchUsage"),
+      moreBtn: document.getElementById("activitiesListMore"),
+      limit: groupedUsageLimit,
+      showShare: true,
+      total: groupedUsageCache.reduce((s, r) => s + (r.sec || 0), 0),
+      cacheKey: "usage",
+    });
+  });
+}
+
 function wireUi() {
   wireThemeToggle();
+  wireGroupedLists();
   document.querySelectorAll(".tab").forEach((tab) => {
     tab.setAttribute("role", "tab");
     tab.addEventListener("click", () => {
@@ -2584,6 +2802,16 @@ function wireUi() {
       listen_host: form.listen_host ? form.listen_host.value : "127.0.0.1",
       hub_url: form.hub_url ? form.hub_url.value.trim() : "",
       hub_ingest_token: form.hub_ingest_token ? form.hub_ingest_token.value.trim() : "",
+      rdp_vision_consent: form.rdp_vision_consent ? form.rdp_vision_consent.checked : false,
+      rdp_vision_enabled: form.rdp_vision_enabled ? form.rdp_vision_enabled.checked : false,
+      rdp_vision_api_key: form.rdp_vision_api_key ? form.rdp_vision_api_key.value.trim() : "",
+      rdp_vision_interval_sec: form.rdp_vision_interval_sec
+        ? Number(form.rdp_vision_interval_sec.value)
+        : 180,
+      rdp_vision_base_url: form.rdp_vision_base_url
+        ? form.rdp_vision_base_url.value.trim()
+        : "https://api.openai.com/v1",
+      rdp_vision_model: form.rdp_vision_model ? form.rdp_vision_model.value.trim() : "gpt-4o-mini",
     };
     try {
       const saved = await api("/api/settings", { method: "PUT", body: JSON.stringify(body) });
@@ -2791,6 +3019,39 @@ function wireUi() {
   document.getElementById("paywallCloseBtn")?.addEventListener("click", () => {
     const modal = document.getElementById("paywallModal");
     if (modal) modal.hidden = true;
+  });
+
+  document.getElementById("rdpVisionConfirmBtn")?.addEventListener("click", async () => {
+    const modal = document.getElementById("rdpVisionModal");
+    const label = modal?.dataset.label || "";
+    const sid = modal?.dataset.sessionId;
+    try {
+      await api("/api/rdp-vision/confirm", {
+        method: "POST",
+        body: JSON.stringify({
+          label,
+          session_id: sid ? Number(sid) : null,
+        }),
+      });
+      showToast(`Засчитано: ${label}`, "ok");
+    } catch (e) {
+      showToast(e.message || "Не удалось подтвердить", "error");
+    }
+    if (modal) modal.hidden = true;
+    _rdpVisionShownKey = "";
+    lastStatusKey = "";
+    lastSummaryKey = "";
+    await refreshStatus().catch(() => {});
+    await refreshSummary().catch(() => {});
+  });
+  document.getElementById("rdpVisionSkipBtn")?.addEventListener("click", async () => {
+    try {
+      await api("/api/rdp-vision/skip", { method: "POST", body: "{}" });
+    } catch (_) {}
+    const modal = document.getElementById("rdpVisionModal");
+    if (modal) modal.hidden = true;
+    _rdpVisionShownKey = "";
+    lastStatusKey = "";
   });
 }
 

@@ -6,7 +6,7 @@ from datetime import datetime
 from typing import Callable
 
 from deskline.capture import capture_screenshot
-from deskline.classify import extract_site_from_title, normalize_category, resolve_activity
+from deskline.classify import extract_site_from_title, is_rdp_client, normalize_category, resolve_activity
 from deskline.config import load_config, save_config
 from deskline.db import Database, parse_iso_datetime
 from deskline.hub_client import push_sessions_to_hub
@@ -26,6 +26,16 @@ def _shots_allowed(cfg: dict) -> bool:
         return False
 
 
+def _is_pro(cfg: dict) -> bool:
+    try:
+        from deskline.entitlements import resolve_entitlements
+        from deskline.license_store import load_license
+
+        return resolve_entitlements(cfg, load_license()).is_pro
+    except Exception:
+        return False
+
+
 class Tracker:
     def __init__(self, db: Database | None = None) -> None:
         self.db = db or Database()
@@ -37,6 +47,7 @@ class Tracker:
         self._current_category: str = "neutral"
         self._current_label: str | None = None
         self._current_app_path: str | None = None
+        self._rdp_vision_label: str | None = None
         self._distracting_since: float | None = None
         self._last_poor_notify: dict[str, float] = {}
         self._still_working_prompting = False
@@ -114,7 +125,16 @@ class Tracker:
             "task_name": (task or {}).get("name") or "",
             "session_elapsed_sec": round(elapsed, 1),
             "show_mini_tracker": bool(self.cfg.get("show_mini_tracker", True)),
+            "rdp_vision_pending": self._rdp_pending_public(),
         }
+
+    def _rdp_pending_public(self) -> dict | None:
+        try:
+            from deskline import rdp_vision
+
+            return rdp_vision.get_pending()
+        except Exception:
+            return None
 
     def _emit(self) -> None:
         st = self.status()
@@ -292,15 +312,31 @@ class Tracker:
                 )
                 self._session_started_at = now
                 try:
-                    from deskline.icons import ensure_app_icon
+                    from deskline.icons import ensure_app_icon, ensure_site_icon
 
                     ensure_app_icon(win.app_name, win.app_path)
+                    hint = meta.get("url_hint") or site
+                    if hint:
+                        ensure_site_icon(hint)
                 except Exception:
                     pass
                 self._current_key = key
                 self._current_app_path = win.app_path
                 self._current_category = normalize_category(meta["category"])
                 self._current_label = meta.get("activity_label") or meta.get("display_name")
+                if not is_rdp_client(win.app_name):
+                    self._rdp_vision_label = None
+                elif self._rdp_vision_label:
+                    # Keep confirmed remote label on same RDP host session
+                    self._current_label = self._rdp_vision_label
+                    try:
+                        self.db.update_session_activity(
+                            self._current_session_id,
+                            activity_label=self._rdp_vision_label,
+                            activity_kind="remote",
+                        )
+                    except Exception:
+                        pass
                 self._distracting_since = (
                     now if self._current_category == "distracting" else None
                 )
@@ -329,10 +365,65 @@ class Tracker:
                     self._shot_unlocked("interval")
                     self._last_screenshot_at = now
 
+            self._maybe_rdp_vision(cfg, win.app_name, win.window_title)
             self._maybe_poor_time(cfg, now)
             self._maybe_still_working(cfg, now)
 
         self._emit()
+
+    def _maybe_rdp_vision(self, cfg: dict, app_name: str | None, window_title: str | None) -> None:
+        if self._idle or self.paused:
+            return
+        if not is_rdp_client(app_name):
+            return
+        if self._rdp_vision_label:
+            return  # already confirmed for this stretch
+        if getattr(self, "_rdp_vision_thread", None) and self._rdp_vision_thread.is_alive():
+            return
+        from deskline import rdp_vision
+
+        if not rdp_vision.vision_enabled(cfg, is_pro=_is_pro(cfg)):
+            return
+        if rdp_vision.get_pending():
+            return
+
+        def worker() -> None:
+            try:
+                from deskline.classify import parse_rdp_host
+
+                rdp_vision.maybe_analyze_rdp(
+                    cfg,
+                    app_name=app_name,
+                    is_pro=_is_pro(cfg),
+                    session_id=self._current_session_id,
+                    host_hint=parse_rdp_host(window_title),
+                )
+                self._emit()
+            except Exception:
+                pass
+
+        self._rdp_vision_thread = threading.Thread(
+            target=worker, name="deskline-rdp-vision", daemon=True
+        )
+        self._rdp_vision_thread.start()
+
+    def apply_rdp_vision_label(self, label: str, session_id: int | None = None) -> bool:
+        """Confirm a vision suggestion: relabel session; focus % still from local categories."""
+        text = (label or "").strip()
+        if not text:
+            return False
+        sid = session_id or self._current_session_id
+        if not sid:
+            return False
+        ok = self.db.update_session_activity(
+            sid, activity_label=text, activity_kind="remote"
+        )
+        if ok:
+            self._rdp_vision_label = text
+            if sid == self._current_session_id:
+                self._current_label = text
+            self._emit()
+        return ok
 
     def _handle_sleep_wake(self, prev_tick: float, now: float) -> None:
         """Close session at last awake moment; reset idle/prompt state. Do not pause."""

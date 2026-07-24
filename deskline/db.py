@@ -309,6 +309,37 @@ class Database:
                 (_iso(ended), duration, session_id),
             )
 
+    def update_session_activity(
+        self,
+        session_id: int,
+        *,
+        activity_label: str,
+        activity_kind: str | None = None,
+        display_name: str | None = None,
+    ) -> bool:
+        """Relabel an open/closed session after RDP vision confirm (does not change duration)."""
+        label = (activity_label or "").strip()
+        if not label or session_id <= 0:
+            return False
+        with self.connect() as conn:
+            row = conn.execute("SELECT id FROM sessions WHERE id=?", (session_id,)).fetchone()
+            if not row:
+                return False
+            fields = ["activity_label=?"]
+            vals: list[Any] = [label]
+            if activity_kind:
+                fields.append("activity_kind=?")
+                vals.append(activity_kind)
+            if display_name:
+                fields.append("display_name=?")
+                vals.append(display_name)
+            vals.append(session_id)
+            conn.execute(
+                f"UPDATE sessions SET {', '.join(fields)} WHERE id=?",
+                tuple(vals),
+            )
+            return True
+
     def add_screenshot(
         self, path: str, reason: str, session_id: int | None, taken_at: datetime | None = None
     ) -> int:
@@ -500,6 +531,11 @@ class Database:
         app_path_by_exe: dict[str, str] = {}
         activity_app_secs: dict[str, dict[str, float]] = {}
         activity_site_secs: dict[str, dict[str, float]] = {}
+        # app_label → activity_label → seconds (for Time Doctor–style grouping)
+        activity_by_app: dict[str, dict[str, float]] = {}
+        activity_kind_by_app: dict[str, dict[str, str]] = {}
+        activity_cat_by_app: dict[str, dict[str, str]] = {}
+        activity_site_by_app: dict[str, dict[str, str | None]] = {}
         by_kind: dict[str, float] = {}
         activity_cats: dict[str, str] = {}
         app_cats: dict[str, str] = {}
@@ -560,6 +596,10 @@ class Database:
                 activity_cats[act] = cat
             bucket = activity_app_secs.setdefault(act, {})
             bucket[exe] = bucket.get(exe, 0.0) + dur
+            app_acts = activity_by_app.setdefault(app_label, {})
+            app_acts[act] = app_acts.get(act, 0.0) + dur
+            activity_kind_by_app.setdefault(app_label, {}).setdefault(act, kind)
+            activity_cat_by_app.setdefault(app_label, {}).setdefault(act, cat)
             by_kind[kind] = by_kind.get(kind, 0.0) + dur
             site = meta["url_hint"]
             if site:
@@ -568,6 +608,9 @@ class Database:
                     site_cats[site] = cat
                 site_bucket = activity_site_secs.setdefault(act, {})
                 site_bucket[site] = site_bucket.get(site, 0.0) + dur
+                activity_site_by_app.setdefault(app_label, {})[act] = site
+            elif act not in activity_site_by_app.setdefault(app_label, {}):
+                activity_site_by_app[app_label][act] = None
             pid = meta.get("project_id")
             pid_key = int(pid) if pid is not None else None
             by_project[pid_key] = by_project.get(pid_key, 0.0) + dur
@@ -596,6 +639,61 @@ class Database:
         # Do not download/extract icons during summary aggregation — that can
         # block the API for tens of seconds (favicon timeouts × many sites).
         # The UI resolves /api/icons lazily when rows are rendered.
+
+        by_app_grouped: list[dict[str, Any]] = []
+        for app_label, app_sec in by_app.items():
+            if app_sec < MIN_DISPLAY_SEC:
+                continue
+            exe = app_exe_by_label.get(app_label, "unknown.exe")
+            children_raw = activity_by_app.get(app_label) or {}
+            children: list[dict[str, Any]] = []
+            for act_name, act_sec in children_raw.items():
+                if act_sec < MIN_DISPLAY_SEC:
+                    continue
+                site = activity_site_by_app.get(app_label, {}).get(act_name)
+                if not site:
+                    site = _top_site(act_name) or site_for_activity_label(act_name)
+                children.append(
+                    {
+                        "name": act_name,
+                        "sec": act_sec,
+                        "kind": activity_kind_by_app.get(app_label, {}).get(
+                            act_name, activity_kinds.get(act_name, "other")
+                        ),
+                        "category": activity_cat_by_app.get(app_label, {}).get(
+                            act_name, activity_cats.get(act_name, "neutral")
+                        ),
+                        "site": site,
+                        "icon_url": resolve_icon_url(site=site, app_name=exe),
+                    }
+                )
+            children.sort(key=lambda x: x["sec"], reverse=True)
+            # Single child with same name as parent → no expand row
+            if (
+                len(children) == 1
+                and children[0]["name"].casefold() == app_label.casefold()
+            ):
+                children = []
+            by_app_grouped.append(
+                {
+                    "name": app_label,
+                    "sec": app_sec,
+                    "kind": app_kinds.get(app_label, "other"),
+                    "category": app_cats.get(app_label, "neutral"),
+                    "app_name": exe,
+                    "icon_url": icon_url_for_app(exe),
+                    "children": children,
+                }
+            )
+        by_app_grouped.sort(key=lambda x: x["sec"], reverse=True)
+
+        # Remember exe→path so /media/icons can re-extract without a blank path.
+        try:
+            from deskline.icons import remember_app_paths
+
+            remember_app_paths(app_path_by_exe)
+        except Exception:
+            pass
 
         focus = by_cat["productive"]
         focus_pct = (focus / tracked * 100.0) if tracked else 0.0
@@ -645,6 +743,7 @@ class Database:
                 key=lambda x: x["sec"],
                 reverse=True,
             ),
+            "by_app_grouped": by_app_grouped,
             "by_site": sorted(
                 [
                     {

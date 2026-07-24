@@ -78,6 +78,13 @@ DEFAULT_CONFIG: dict[str, Any] = {
     # Freemium / trial
     "first_run_at": "",
     "onboarding_done": False,
+    # Pro RDP vision (opt-in; never on by default)
+    "rdp_vision_enabled": False,
+    "rdp_vision_consent": False,
+    "rdp_vision_api_key": "",
+    "rdp_vision_interval_sec": 180,
+    "rdp_vision_base_url": "https://api.openai.com/v1",
+    "rdp_vision_model": "gpt-4o-mini",
 }
 
 

@@ -192,8 +192,12 @@
         </div>
       </div>
 
-      <h3 class="subhead">Топ занятий</h3>
-      <ol class="rank-list" id="topAppsToday"></ol>
+      <div class="rank-head">
+        <h3 class="subhead">Топ занятий</h3>
+        <input type="search" id="activitySearchToday" class="rank-search" placeholder="Поиск…" autocomplete="off" />
+      </div>
+      <ol class="rank-list rank-list-compact" id="topAppsToday"></ol>
+      <button type="button" class="linkish rank-more" id="topAppsTodayMore" hidden>Показать ещё</button>
     </section>
 
     <section id="panel-day" class="panel">
@@ -250,7 +254,9 @@
         <button type="button" class="seg-btn" data-usage="sites">Сайты</button>
       </div>
       <div class="usage-pane active" id="usage-activities" data-usage-pane="activities">
-        <ol class="rank-list" id="activitiesList"></ol>
+        <input type="search" id="activitySearchUsage" class="rank-search" placeholder="Поиск занятий…" autocomplete="off" />
+        <ol class="rank-list rank-list-compact" id="activitiesList"></ol>
+        <button type="button" class="linkish rank-more" id="activitiesListMore" hidden>Показать ещё</button>
       </div>
       <div class="usage-pane" id="usage-apps" data-usage-pane="apps" hidden>
         <ol class="rank-list" id="appsList"></ol>
@@ -359,6 +365,33 @@
           Мини-трекер поверх окон
         </label>
         <p class="hint settings-hint">Компактное окно с текущей задачей и временем записи (как в Time Doctor). Можно закрыть — снова включите здесь или из трея.</p>
+
+        <h3 class="subhead">RDP vision (Pro)</h3>
+        <p class="hint">Опционально: ИИ по скрину окна Remote Desktop угадывает приложение внутри сессии. Кадры уходят в ваш API (не наш). По умолчанию выкл. Неуверенные ответы оставляют «RDP · host». Focus % считается по локальным сессиям.</p>
+        <label class="check">
+          <input type="checkbox" name="rdp_vision_consent" />
+          Согласен отправлять кадры окна RDP в выбранный vision API
+        </label>
+        <label class="check">
+          <input type="checkbox" name="rdp_vision_enabled" />
+          Включить RDP vision (только при фокусе mstsc/msrdc, раз в 2–5 мин)
+        </label>
+        <label>
+          Ваш API-ключ
+          <input type="password" name="rdp_vision_api_key" autocomplete="off" spellcheck="false" placeholder="sk-…" />
+        </label>
+        <label>
+          Интервал, сек (120–300)
+          <input type="number" name="rdp_vision_interval_sec" min="120" max="300" step="30" value="180" />
+        </label>
+        <label>
+          Base URL
+          <input type="url" name="rdp_vision_base_url" placeholder="https://api.openai.com/v1" spellcheck="false" />
+        </label>
+        <label>
+          Модель
+          <input type="text" name="rdp_vision_model" placeholder="gpt-4o-mini" spellcheck="false" />
+        </label>
 
         <h3 class="subhead">Тариф и лицензия</h3>
         <div class="license-box" id="licenseBox">
@@ -502,6 +535,26 @@
       </ul>
       <p class="onboard-note">Пауза записи — в трее. <a href="/privacy">Политика конфиденциальности</a></p>
       <button type="button" class="btn onboard-cta" id="onboardDoneBtn">Начать работу</button>
+    </div>
+  </div>
+
+  <div class="paywall-modal" id="rdpVisionModal" hidden>
+    <div class="onboard-card paywall-card" role="dialog" aria-modal="true" aria-labelledby="rdpVisionTitle">
+      <div class="onboard-glow" aria-hidden="true"></div>
+      <div class="onboard-brand">
+        {% with size=44 %}
+          {% include "partials/logo_mark.html" %}
+        {% endwith %}
+        <div>
+          <p class="onboard-kicker">RDP vision</p>
+          <h2 id="rdpVisionTitle">Похоже на удалёнке</h2>
+        </div>
+      </div>
+      <p class="onboard-lead" id="rdpVisionMessage">Засчитать это занятие?</p>
+      <div class="onboard-actions">
+        <button type="button" class="btn onboard-cta" id="rdpVisionConfirmBtn">Засчитать</button>
+        <button type="button" class="btn onboard-ghost" id="rdpVisionSkipBtn">Оставить RDP · host</button>
+      </div>
     </div>
   </div>
 

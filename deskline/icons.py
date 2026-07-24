@@ -24,12 +24,23 @@ _SITE_ICON_PADDING = 2
 _APP_ICON_MAX_FILL = 0.94
 # Bump when extractor/size changes so old HTTP/disk caches are abandoned.
 _APP_ICON_REV = "v3"
+_APP_PATHS_FILE = "app_paths.v1.json"
+
+# Known install layouts when PATH/registry miss portable Electron apps.
+_KNOWN_APP_PATHS: dict[str, list[str]] = {
+    "cursor.exe": [
+        r"%LOCALAPPDATA%\Programs\cursor\Cursor.exe",
+        r"%LOCALAPPDATA%\Programs\Cursor\Cursor.exe",
+        r"%LOCALAPPDATA%\cursor\Cursor.exe",
+    ],
+}
 
 # Extra favicon URLs for hosts where generic fetchers fail (prefer larger sizes).
 _SITE_FAVICON_OVERRIDES: dict[str, list[str]] = {
     "messenger.yandex.ru": [
         "https://www.google.com/s2/favicons?domain=messenger.yandex.ru&sz=128",
         "https://favicon.yandex.net/favicon/v2/messenger.yandex.ru?size=120",
+        "https://yastatic.net/s3/frontend-lego/_/28eb84d5f4a5183816d57c61842cd5f0.png",
         "https://yandex.ru/favicon.ico",
     ],
     "mail.yandex.ru": [
@@ -203,6 +214,60 @@ def purge_placeholder_icons() -> int:
     return removed
 
 
+def remember_app_paths(mapping: dict[str, str] | None) -> None:
+    """Persist exe→path hints so lazy /media/icons can re-extract crisply."""
+    if not mapping:
+        return
+    ensure_data_dirs()
+    path = ICONS_DIR / _APP_PATHS_FILE
+    data: dict[str, str] = {}
+    if path.exists():
+        try:
+            import json
+
+            raw = json.loads(path.read_text(encoding="utf-8"))
+            if isinstance(raw, dict):
+                data = {str(k).lower(): str(v) for k, v in raw.items() if v}
+        except Exception:
+            data = {}
+    changed = False
+    for exe, app_path in mapping.items():
+        key = (exe or "").strip().lower()
+        val = (app_path or "").strip()
+        if not key or not val:
+            continue
+        if data.get(key) != val:
+            data[key] = val
+            changed = True
+    if not changed:
+        return
+    try:
+        import json
+
+        path.write_text(json.dumps(data, ensure_ascii=False, indent=0), encoding="utf-8")
+    except OSError:
+        pass
+
+
+def recalled_app_path(app_name: str | None) -> str | None:
+    key = (app_name or "").strip().lower()
+    if not key:
+        return None
+    path = ICONS_DIR / _APP_PATHS_FILE
+    if not path.exists():
+        return None
+    try:
+        import json
+
+        raw = json.loads(path.read_text(encoding="utf-8"))
+        if isinstance(raw, dict):
+            val = raw.get(key)
+            return str(val) if val else None
+    except Exception:
+        return None
+    return None
+
+
 def resolve_exe_path(app_name: str | None, app_path: str | None = None) -> Path | None:
     if app_path:
         candidate = Path(app_path)
@@ -217,6 +282,12 @@ def resolve_exe_path(app_name: str | None, app_path: str | None = None) -> Path 
     name = (app_name or "").strip()
     if not name:
         return None
+
+    # Known layouts (Cursor etc.) before slow filesystem walks.
+    for pattern in _KNOWN_APP_PATHS.get(name.lower(), []):
+        cand = Path(os.path.expandvars(pattern))
+        if cand.is_file():
+            return cand
 
     found = shutil.which(name)
     if found:
@@ -233,6 +304,13 @@ def resolve_exe_path(app_name: str | None, app_path: str | None = None) -> Path 
     via_reg = _resolve_via_registry(name)
     if via_reg:
         return via_reg
+
+    # Fall back to remembered path from a prior tracking session.
+    remembered = recalled_app_path(name)
+    if remembered:
+        rp = Path(remembered)
+        if rp.is_file():
+            return rp
 
     search_roots = [
         Path(os.environ.get("ProgramFiles", r"C:\Program Files")),
@@ -436,6 +514,8 @@ def _app_icon_too_tight(path: Path, margin: int = 1) -> bool:
 def ensure_app_icon(app_name: str | None, app_path: str | None = None) -> Path:
     """Extract and cache a crisp PNG icon. Returns cache path or shared placeholder."""
     ensure_data_dirs()
+    if app_path and app_name:
+        remember_app_paths({(app_name or "").lower(): app_path})
     out = icon_path_for_app(app_name)
     if out.exists() and not is_weak_icon_cache(out):
         return out
@@ -446,8 +526,10 @@ def ensure_app_icon(app_name: str | None, app_path: str | None = None) -> Path:
         except OSError:
             pass
 
-    resolved = resolve_exe_path(app_name, app_path)
+    resolved = resolve_exe_path(app_name, app_path or recalled_app_path(app_name))
     if resolved and _extract_exe_icon(resolved, out):
+        if app_name:
+            remember_app_paths({(app_name or "").lower(): str(resolved)})
         return out
 
     return shared_placeholder_path()
@@ -531,7 +613,7 @@ def _bytes_to_icon_png(data: bytes, out: Path, size: int | None = None) -> bool:
         # Reject tiny sources that only look sharp after heavy upscale.
         try:
             src_w, src_h = img.size
-            if max(src_w, src_h) < 24:
+            if max(src_w, src_h) < 32:
                 return False
         except Exception:
             pass

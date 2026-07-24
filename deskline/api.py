@@ -82,6 +82,12 @@ class SettingsUpdate(BaseModel):
     listen_host: str | None = Field(default=None, max_length=64)
     hub_url: str | None = Field(default=None, max_length=300)
     hub_ingest_token: str | None = Field(default=None, max_length=200)
+    rdp_vision_enabled: bool | None = None
+    rdp_vision_consent: bool | None = None
+    rdp_vision_api_key: str | None = Field(default=None, max_length=500)
+    rdp_vision_interval_sec: int | None = Field(default=None, ge=120, le=300)
+    rdp_vision_base_url: str | None = Field(default=None, max_length=300)
+    rdp_vision_model: str | None = Field(default=None, max_length=120)
 
 
 class EmployeeCreate(BaseModel):
@@ -124,6 +130,11 @@ class LicenseActivateBody(BaseModel):
 
 class OnboardingBody(BaseModel):
     done: bool = True
+
+
+class RdpVisionConfirmBody(BaseModel):
+    label: str | None = Field(default=None, max_length=80)
+    session_id: int | None = None
 
 
 class ExtensionEventBody(BaseModel):
@@ -751,7 +762,9 @@ def create_app(tracker: Tracker, db: Database | None = None) -> FastAPI:
             else:
                 stem = app_name_from_icon_filename(safe)
                 if stem and stem != "placeholder":
-                    path = ensure_app_icon(stem, None)
+                    from deskline.icons import recalled_app_path
+
+                    path = ensure_app_icon(stem, recalled_app_path(stem))
         if is_weak_icon_cache(path) or not path.exists():
             path = shared_placeholder_path()
         return FileResponse(path, media_type="image/png")
@@ -819,6 +832,26 @@ def create_app(tracker: Tracker, db: Database | None = None) -> FastAPI:
             data["listen_host"] = "127.0.0.1" if host == "localhost" else host
         if "hub_url" in data:
             data["hub_url"] = str(data["hub_url"] or "").strip().rstrip("/")
+        if data.get("rdp_vision_enabled"):
+            if not ent.is_pro:
+                raise HTTPException(
+                    status_code=402,
+                    detail={
+                        "code": "pro_required",
+                        "feature": "rdp_vision",
+                        "message": "RDP vision доступен в Pro",
+                        "entitlements": entitlements_public_dict(ent),
+                    },
+                )
+            consent = data.get("rdp_vision_consent", cfg.get("rdp_vision_consent"))
+            key = str(data.get("rdp_vision_api_key", cfg.get("rdp_vision_api_key") or "")).strip()
+            if not consent or not key:
+                raise HTTPException(
+                    400,
+                    "Для RDP vision нужны явное согласие и ваш API-ключ",
+                )
+        if "rdp_vision_interval_sec" in data and data["rdp_vision_interval_sec"] is not None:
+            data["rdp_vision_interval_sec"] = max(120, min(300, int(data["rdp_vision_interval_sec"])))
         cfg.update(data)
         saved = save_config(cfg)
         ensure_screenshots_dir(saved)
@@ -954,6 +987,33 @@ def create_app(tracker: Tracker, db: Database | None = None) -> FastAPI:
         deactivate_local()
         ent, _ = _load_entitlements()
         return {"ok": True, "entitlements": entitlements_public_dict(ent)}
+
+    @app.get("/api/rdp-vision/pending")
+    def rdp_vision_pending() -> dict[str, Any]:
+        from deskline import rdp_vision
+
+        return {"pending": rdp_vision.get_pending()}
+
+    @app.post("/api/rdp-vision/confirm")
+    def rdp_vision_confirm(body: RdpVisionConfirmBody | None = None) -> dict[str, Any]:
+        _pro_required("rdp_vision")
+        from deskline import rdp_vision
+
+        pending = rdp_vision.get_pending()
+        if not pending:
+            raise HTTPException(404, "Нет предложения RDP vision")
+        label = str((body.label if body else None) or pending["label"]).strip()
+        sid = (body.session_id if body else None) or pending.get("session_id")
+        ok = tracker.apply_rdp_vision_label(label, session_id=int(sid) if sid else None)
+        rdp_vision.clear_pending()
+        return {"ok": ok, "label": label, "status": tracker.status()}
+
+    @app.post("/api/rdp-vision/skip")
+    def rdp_vision_skip() -> dict[str, Any]:
+        from deskline import rdp_vision
+
+        rdp_vision.clear_pending()
+        return {"ok": True}
 
     @app.post("/api/onboarding/complete")
     def onboarding_complete(body: OnboardingBody) -> dict[str, Any]:
