@@ -2419,7 +2419,8 @@ html[data-theme="dark"] .tab-group {
 }
 
 .preview-card {
-  width: min(403px, 100%);
+  /* Stage 520 * zoom 0.72 ≈ 374 + horizontal padding. */
+  width: min(402px, 100%);
   border: 1px solid rgba(31, 107, 86, 0.16);
   background:
     linear-gradient(135deg, rgba(207, 232, 223, 0.45), transparent 45%),
@@ -2439,9 +2440,9 @@ html[data-theme="dark"] .tab-group {
 .preview-timeline { z-index: 2; }
 .preview-week { z-index: 1; }
 
-/* Design rich at ~560px, then zoom down so layout box shrinks with content. */
+/* Design rich, then zoom down so layout box shrinks with content. */
 .preview-stage {
-  width: 560px;
+  width: 520px;
   zoom: 0.72;
 }
 
@@ -2451,17 +2452,21 @@ html[data-theme="dark"] .tab-group {
   gap: 12px;
   align-items: baseline;
   margin-bottom: 14px;
+  min-width: 0;
 }
 
 .preview-card-head strong {
   font-family: var(--display);
-  font-size: 1.2rem;
+  font-size: 1.15rem;
   color: var(--ink);
+  min-width: 0;
 }
 
 .preview-card-head span {
+  flex: 0 0 auto;
   font-size: 0.82rem;
   color: var(--ink-soft);
+  white-space: nowrap;
 }
 
 .preview-gauge-row {
@@ -2722,28 +2727,27 @@ html[data-theme="dark"] .tab-group {
 .preview-week-col .stack-rich {
   width: 28px;
   height: 108px;
-  border-radius: 14px 14px 8px 8px;
+  border-radius: 14px;
   background:
     linear-gradient(180deg, rgba(31, 107, 86, 0.08), rgba(31, 107, 86, 0.03));
   box-shadow: inset 0 0 0 1px rgba(31, 107, 86, 0.08);
+  overflow: hidden;
+  isolation: isolate;
 }
 
 .preview-week-col .stack-rich i {
   display: block;
   width: 100%;
+  max-width: 100%;
   height: var(--h, 20%);
+  flex: 0 0 auto;
+  margin: 0;
+  border: 0;
   border-radius: 0;
+  box-shadow: none;
+  box-sizing: border-box;
+  transform-origin: bottom center;
   animation: preview-bar-rise 0.85s cubic-bezier(0.22, 1, 0.36, 1) both;
-}
-
-.preview-week-col:nth-child(2) .stack-rich i { animation-delay: 0.06s; }
-.preview-week-col:nth-child(3) .stack-rich i { animation-delay: 0.12s; }
-.preview-week-col:nth-child(4) .stack-rich i { animation-delay: 0.18s; }
-.preview-week-col:nth-child(5) .stack-rich i { animation-delay: 0.24s; }
-
-@keyframes preview-bar-rise {
-  from { transform: scaleY(0.15); opacity: 0.4; transform-origin: bottom; }
-  to { transform: scaleY(1); opacity: 1; transform-origin: bottom; }
 }
 
 .preview-week-col .stack-rich i.productive {
@@ -2753,6 +2757,8 @@ html[data-theme="dark"] .tab-group {
   background: linear-gradient(180deg, #cbd5e1, #64748b);
 }
 .preview-week-col .stack-rich i.distracting {
+  /* Same visual weight on every day (no uneven orange band). */
+  height: 14%;
   background: linear-gradient(180deg, #fb923c, #c2410c);
 }
 
