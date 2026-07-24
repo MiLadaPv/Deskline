@@ -16,9 +16,8 @@
   <button type="button" class="theme-toggle theme-toggle-float" id="themeToggle" title="Тема">Тема</button>
 
   <div class="boot-splash" id="bootSplash" aria-hidden="true">
-    {% with anim=true, size=80 %}
-      {% include "partials/logo_mark.html" %}
-    {% endwith %}
+    <img class="boot-logo-anim boot-logo-anim-light" src="/static/img/logo-anim/logo-grow.webp?v={{ version }}" alt="" width="176" height="202" />
+    <img class="boot-logo-anim boot-logo-anim-dark" src="/static/img/logo-anim/logo-grow-dark.webp?v={{ version }}" alt="" width="176" height="202" />
     <p class="boot-splash-title">Deskline</p>
   </div>
 
