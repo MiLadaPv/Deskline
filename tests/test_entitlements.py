@@ -99,7 +99,7 @@ def test_api_project_limit_and_license(tmp_path: Path, monkeypatch):
     tracker = Tracker(db)
     tracker.cfg["paused"] = True
     client = TestClient(create_app(tracker, db))
-    client.post("/api/auth/login", json={"password": "test-pass-1234", "remember": False})
+    client.post("/api/auth/login", json={"username": "owner", "password": "test-pass-1234", "remember": False})
 
     for i in range(FREE_MAX_PROJECTS):
         r = client.post("/api/projects", json={"name": f"P{i}", "color": "#123456"})

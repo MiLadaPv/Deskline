@@ -30,7 +30,7 @@ def _auth_client(tmp_path: Path, monkeypatch) -> tuple[TestClient, Database]:
     tracker.cfg["paused"] = True
     app = create_app(tracker, db)
     client = TestClient(app)
-    client.post("/api/auth/login", json={"password": "test-pass-1234", "remember": False})
+    client.post("/api/auth/login", json={"username": "owner", "password": "test-pass-1234", "remember": False})
     return client, db
 
 

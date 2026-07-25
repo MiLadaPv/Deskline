@@ -18,6 +18,7 @@ from deskline import __version__
 from deskline.auth import (
     COOKIE_NAME,
     SESSION_TTL_REMEMBER_SEC,
+    authenticate,
     change_password,
     create_session_token,
     ensure_recovery_code,
@@ -28,13 +29,15 @@ from deskline.auth import (
     is_password_set,
     is_public_path,
     link_google_account,
+    register_user,
     reset_password_with_recovery,
-    set_password,
+    session_username,
     setup_with_google,
     unlink_google_account,
+    username_exists,
+    username_for_google_sub,
     validate_session_token,
     verify_google_sub,
-    verify_password,
 )
 from deskline.google_oauth import (
     OAUTH_STATE_COOKIE,
@@ -221,11 +224,13 @@ class RuleUpdate(BaseModel):
 
 
 class PasswordBody(BaseModel):
+    username: str = Field(min_length=3, max_length=32)
     password: str = Field(min_length=4, max_length=128)
     remember: bool = False
 
 
 class RecoverPasswordBody(BaseModel):
+    username: str = Field(default="", max_length=32)
     recovery_code: str = Field(min_length=8, max_length=64)
     new_password: str = Field(min_length=4, max_length=128)
     remember: bool = False
@@ -416,14 +421,16 @@ def create_app(tracker: Tracker, db: Database | None = None) -> FastAPI:
     @app.get("/api/auth/status")
     def auth_status(request: Request) -> dict[str, Any]:
         token = request.cookies.get(COOKIE_NAME)
+        user = session_username(token)
         return {
             "password_set": is_password_set(),
             "auth_configured": is_auth_configured(),
             "authenticated": validate_session_token(token),
-            "has_recovery": has_recovery_code(),
+            "username": user,
+            "has_recovery": has_recovery_code(user) if user else has_recovery_code(),
             "google_configured": is_google_oauth_configured(),
-            "google_linked": is_google_linked(),
-            "google_email": google_email(),
+            "google_linked": is_google_linked(user) if user else is_google_linked(),
+            "google_email": google_email(user) if user else google_email(),
             "google_redirect_uri": redirect_uri() if is_google_oauth_configured() else None,
             "support_email": SUPPORT_EMAIL,
         }
@@ -454,7 +461,8 @@ def create_app(tracker: Tracker, db: Database | None = None) -> FastAPI:
         want_bind = bool(bind)
         if want_bind and not validate_session_token(request.cookies.get(COOKIE_NAME)):
             raise HTTPException(401, "Сначала войдите паролем, чтобы привязать Google")
-        if not want_bind and is_password_set() and not is_google_linked():
+        sess_user = session_username(request.cookies.get(COOKIE_NAME))
+        if not want_bind and is_password_set() and not is_google_linked(sess_user):
             return _oauth_error_redirect(
                 "Сначала войдите паролем, затем Настройки → Привязать Google"
             )
@@ -530,15 +538,18 @@ def create_app(tracker: Tracker, db: Database | None = None) -> FastAPI:
             return _oauth_error_redirect("Не удалось подтвердить аккаунт Google")
 
         recovery_code: str | None = None
+        session_user = session_username(request.cookies.get(COOKIE_NAME))
         try:
             if want_bind:
                 if not validate_session_token(request.cookies.get(COOKIE_NAME)):
                     return _oauth_error_redirect("Сначала войдите паролем")
-                link_google_account(sub, email)
+                link_google_account(sub, email, username=session_user)
+                login_as = session_user or ""
             elif verify_google_sub(sub):
-                pass
+                login_as = username_for_google_sub(sub) or session_user or ""
             elif not is_auth_configured():
                 recovery_code = setup_with_google(sub, email)
+                login_as = username_for_google_sub(sub) or ""
             elif is_google_linked():
                 return _oauth_error_redirect("Этот Google-аккаунт не привязан")
             else:
@@ -547,10 +558,10 @@ def create_app(tracker: Tracker, db: Database | None = None) -> FastAPI:
                 )
         except PermissionError:
             return _oauth_error_redirect("Уже привязан другой Google-аккаунт")
-        except ValueError:
-            return _oauth_error_redirect("Аккаунт уже настроен")
+        except ValueError as exc:
+            return _oauth_error_redirect(str(exc) or "Аккаунт уже настроен")
 
-        token = create_session_token(remember=True)
+        token = create_session_token(login_as, remember=True)
         if recovery_code:
             q = urllib.parse.urlencode({"google_recovery": recovery_code})
             response = RedirectResponse(url=f"/login?{q}", status_code=303)
@@ -566,36 +577,43 @@ def create_app(tracker: Tracker, db: Database | None = None) -> FastAPI:
     def auth_google_unlink(request: Request) -> dict[str, Any]:
         if not validate_session_token(request.cookies.get(COOKIE_NAME)):
             raise HTTPException(401, "authentication required")
+        user = session_username(request.cookies.get(COOKIE_NAME))
         if not is_password_set():
             raise HTTPException(
                 400,
                 "Сначала задайте пароль — иначе нельзя отвязать единственный способ входа",
             )
-        unlink_google_account()
+        unlink_google_account(username=user)
         return {"ok": True, "google_linked": False}
 
     @app.post("/api/auth/setup")
     def auth_setup(body: PasswordBody) -> Response:
-        if is_password_set():
-            raise HTTPException(400, "password already set")
         try:
-            recovery_code = set_password(body.password, issue_recovery=True)
+            if username_exists(body.username):
+                raise HTTPException(400, "Логин уже зарегистрирован")
+            recovery_code = register_user(body.username, body.password, issue_recovery=True)
+        except HTTPException:
+            raise
         except ValueError as exc:
             raise HTTPException(400, str(exc)) from exc
-        token = create_session_token(remember=body.remember)
+        token = create_session_token(body.username, remember=body.remember)
         response = JSONResponse({"ok": True, "recovery_code": recovery_code})
         _set_session_cookie(response, token, remember=body.remember)
         return response
 
     @app.post("/api/auth/login")
     def auth_login(body: PasswordBody) -> Response:
-        if not is_password_set():
-            raise HTTPException(400, "password not set")
-        if not verify_password(body.password):
-            raise HTTPException(401, "Неверный пароль")
-        issued = ensure_recovery_code()
-        token = create_session_token(remember=body.remember)
-        payload: dict[str, Any] = {"ok": True, "has_recovery": True}
+        try:
+            user = authenticate(body.username, body.password)
+        except LookupError as exc:
+            raise HTTPException(401, str(exc) or "Такого логина нет") from exc
+        except PermissionError as exc:
+            raise HTTPException(401, str(exc) or "Неверный пароль") from exc
+        except ValueError as exc:
+            raise HTTPException(400, str(exc)) from exc
+        issued = ensure_recovery_code(user)
+        token = create_session_token(user, remember=body.remember)
+        payload: dict[str, Any] = {"ok": True, "has_recovery": True, "username": user}
         if issued:
             payload["recovery_code"] = issued
         response = JSONResponse(payload)
@@ -605,12 +623,19 @@ def create_app(tracker: Tracker, db: Database | None = None) -> FastAPI:
     @app.post("/api/auth/recover")
     def auth_recover(body: RecoverPasswordBody) -> Response:
         try:
-            recovery_code = reset_password_with_recovery(body.recovery_code, body.new_password)
+            recovery_code = reset_password_with_recovery(
+                body.recovery_code,
+                body.new_password,
+                username=body.username or None,
+            )
+        except LookupError as exc:
+            raise HTTPException(401, str(exc) or "Такого логина нет") from exc
         except PermissionError as exc:
             raise HTTPException(401, "Неверный код восстановления") from exc
         except ValueError as exc:
             raise HTTPException(400, str(exc)) from exc
-        token = create_session_token(remember=body.remember)
+        user = (body.username or "").strip().lower()
+        token = create_session_token(user, remember=body.remember)
         response = JSONResponse({"ok": True, "recovery_code": recovery_code})
         _set_session_cookie(response, token, remember=body.remember)
         return response
@@ -622,9 +647,14 @@ def create_app(tracker: Tracker, db: Database | None = None) -> FastAPI:
         return response
 
     @app.post("/api/auth/change-password")
-    def auth_change_password(body: ChangePasswordBody) -> dict[str, Any]:
+    def auth_change_password(request: Request, body: ChangePasswordBody) -> dict[str, Any]:
+        user = session_username(request.cookies.get(COOKIE_NAME))
         try:
-            recovery_code = change_password(body.current_password, body.new_password)
+            recovery_code = change_password(
+                body.current_password,
+                body.new_password,
+                username=user,
+            )
         except PermissionError as exc:
             raise HTTPException(401, "Неверный текущий пароль") from exc
         except ValueError as exc:

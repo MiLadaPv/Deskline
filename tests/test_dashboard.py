@@ -24,7 +24,7 @@ def test_dashboard_index_ok(tmp_path, monkeypatch):
     from fastapi.testclient import TestClient
 
     client = TestClient(app)
-    client.post("/api/auth/login", json={"password": "test-pass"})
+    client.post("/api/auth/login", json={"username": "owner", "password": "test-pass"})
     res = client.get("/")
     assert res.status_code == 200
     assert "Deskline" in res.text

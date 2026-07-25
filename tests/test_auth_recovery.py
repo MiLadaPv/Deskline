@@ -53,6 +53,8 @@ def test_login_template_has_launch_and_forgot():
     html = (WEB_ROOT / "templates" / "login.html").read_text(encoding="utf-8")
     logo = (WEB_ROOT / "templates" / "partials" / "logo_mark.html").read_text(encoding="utf-8")
     assert "launch-hero" in html
+    assert "id=\"username\"" in html
+    assert "Логин" in html
     assert "Забыли пароль?" in html
     assert "recoverForm" in html
     assert "brand-lockup" in html
