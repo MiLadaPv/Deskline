@@ -2280,16 +2280,17 @@ html[data-theme="dark"] .rank-row-child {
   border: 0;
   border-radius: 0;
   box-shadow: none;
-  /* Soft shadow only — never a solid white plate behind the mark */
-  filter: drop-shadow(0 10px 22px rgba(0, 0, 0, 0.22));
+  /* Avoid heavy drop-shadow — it reads as edge “noise” on dark splash */
+  filter: none;
   image-rendering: auto;
+  shape-rendering: geometricPrecision;
 }
 
 .boot-logo-anim-dark { display: none; }
 html[data-theme="dark"] .boot-logo-anim-light { display: none; }
 html[data-theme="dark"] .boot-logo-anim-dark {
   display: block;
-  filter: drop-shadow(0 14px 28px rgba(0, 0, 0, 0.55));
+  filter: none;
 }
 
 .logo-mark {

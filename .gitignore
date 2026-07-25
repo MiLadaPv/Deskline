@@ -18,3 +18,9 @@ deskline-desktop/node_modules/
 client_secret*.json
 **/google-oauth*.json
 secrets/
+
+web/static/img/_trace_tmp/
+web/static/img/_*.png
+scripts/_preview_*
+scripts/_probe_*
+scripts/_render_*
