@@ -2271,19 +2271,46 @@ html[data-theme="dark"] .rank-row-child {
 }
 
 .boot-logo-anim {
-  width: min(240px, 48vw);
+  width: min(260px, 52vw);
   height: auto;
   display: block;
   margin: 0 auto;
-  object-fit: contain;
   background: transparent !important;
   border: 0;
   border-radius: 0;
   box-shadow: none;
-  /* Avoid heavy drop-shadow — it reads as edge “noise” on dark splash */
   filter: none;
   image-rendering: auto;
+}
+
+.boot-logo-anim .boot-logo-svg {
+  width: 100%;
+  height: auto;
+  display: block;
+  overflow: visible;
   shape-rendering: geometricPrecision;
+  text-rendering: geometricPrecision;
+}
+
+.boot-logo-anim .logo-d {
+  opacity: 0;
+  animation: boot-d-in 0.35s ease 0.04s forwards;
+}
+
+.boot-logo-anim .logo-bar-scale {
+  transform: scale(1, 0);
+  transform-origin: 0 0;
+  animation: boot-bar-grow 0.85s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  animation-delay: var(--bar-delay, 0.1s);
+}
+
+@keyframes boot-d-in {
+  to { opacity: 1; }
+}
+
+@keyframes boot-bar-grow {
+  from { transform: scale(1, 0); }
+  to { transform: scale(1, 1); }
 }
 
 .boot-logo-anim-dark { display: none; }

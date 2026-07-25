@@ -1,155 +1,116 @@
-"""Build a crisp geometric Deskline mark (smooth cubics, exact bar slots)."""
+"""Build crisp Deskline mark: smooth D + sharp rectangular bars."""
 
 from __future__ import annotations
 
-import re
-import subprocess
-import time
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 IMG = ROOT / "web" / "static" / "img"
+PARTIAL = ROOT / "web" / "templates" / "partials" / "boot_logo.html"
 
+# Sharp rectangles (no rounded ends)
 BARS = [
-    (155, 498, 85, 146, 42.5, "g1", "#4DB3FF", "#0A6CF0"),
-    (252, 407, 86, 236, 43.0, "g2", "#3ED6C4", "#0A9B9A"),
-    (352, 309, 86, 320, 43.0, "g3", "#B4EC3A", "#5FC218"),
+    (155, 498, 85, 146, "g1", "#4DB3FF", "#0A6CF0"),
+    (252, 407, 86, 236, "g2", "#3ED6C4", "#0A9B9A"),
+    (352, 309, 86, 320, "g3", "#B4EC3A", "#5FC218"),
 ]
 
-# Smooth bold D matched to official 664×761 artboard + bar slots.
-# Outer + inner hole (evenodd). Pure cubics — no traced polylines.
+# Smooth bold D — cubic curves only (evenodd outer + hole)
 D_PATH = (
-    "M168 48 "
-    "C168 40 174 36 184 36 "
-    "H312 "
-    "C478 36 604 168 604 380 "
-    "C604 592 478 725 312 725 "
-    "H184 "
-    "C174 725 168 720 168 712 "
-    "V638 "
-    "C128 630 92 590 92 540 "
-    "V210 "
-    "C92 160 128 120 168 112 "
-    "V48 "
+    "M170 50 "
+    "C170 42 176 36 186 36 "
+    "H310 "
+    "C482 36 606 170 606 380 "
+    "C606 590 482 725 310 725 "
+    "H186 "
+    "C176 725 170 718 170 710 "
+    "V640 "
+    "C126 632 90 590 90 538 "
+    "V212 "
+    "C90 160 126 118 170 110 "
+    "V50 "
     "Z "
-    "M248 152 "
-    "H314 "
-    "C430 152 498 240 498 380 "
-    "C498 520 430 610 314 610 "
+    "M248 154 "
+    "H312 "
+    "C432 154 500 242 500 380 "
+    "C500 518 432 608 312 608 "
     "H248 "
-    "V152 "
+    "V154 "
     "Z"
 )
 
 
-def build_svg(fill: str, prefix: str, animate: bool = False) -> str:
+def _grads_and_bars(prefix: str, animate: bool) -> tuple[str, str]:
     grads: list[str] = []
     body: list[str] = []
-    style = ""
-    if animate:
-        style = """  <style>
-    .logo-d { opacity: 0; animation: d-in 0.35s ease 0.05s forwards; }
-    .logo-bar {
-      transform-box: fill-box;
-      transform-origin: center bottom;
-      animation: bar-grow 0.85s cubic-bezier(0.22, 1, 0.36, 1) forwards;
-    }
-    .logo-bar-1 { transform: scaleY(0); animation-delay: 0.12s; }
-    .logo-bar-2 { transform: scaleY(0); animation-delay: 0.22s; }
-    .logo-bar-3 { transform: scaleY(0); animation-delay: 0.32s; }
-    @keyframes d-in { to { opacity: 1; } }
-    @keyframes bar-grow { from { transform: scaleY(0); } to { transform: scaleY(1); } }
-  </style>
-"""
-    for i, (x, y, w, h, rx, gid, c0, c1) in enumerate(BARS, 1):
+    for i, (x, y, w, h, gid, c0, c1) in enumerate(BARS, 1):
         uid = f"{prefix}{gid}"
         grads.append(
             f'    <linearGradient id="{uid}" x1="{x + w / 2:.1f}" y1="{y}" '
-            f'x2="{x + w / 2:.1f}" y2="{y + h}" gradientUnits="userSpaceOnUse">\n'
-            f'      <stop offset="0%" stop-color="{c0}"/>\n'
-            f'      <stop offset="100%" stop-color="{c1}"/>\n'
-            f"    </linearGradient>"
+            f'x2="{x + w / 2:.1f}" y2="{y + h}" gradientUnits="userSpaceOnUse">'
+            f'<stop offset="0%" stop-color="{c0}"/>'
+            f'<stop offset="100%" stop-color="{c1}"/>'
+            f"</linearGradient>"
         )
+        # rx=0 → square corners
         rect = (
             f'<rect class="logo-bar logo-bar-{i}" x="{x}" y="{y}" '
-            f'width="{w}" height="{h}" rx="{rx}" fill="url(#{uid})"/>'
+            f'width="{w}" height="{h}" rx="0" ry="0" fill="url(#{uid})"/>'
         )
         if animate:
             cx, by = x + w / 2, y + h
-            begin = {1: "0.12s", 2: "0.22s", 3: "0.32s"}[i]
-            smil = (
-                f'<animateTransform attributeName="transform" type="scale" '
-                f'dur="0.85s" begin="{begin}" fill="freeze" from="1 0" to="1 1" '
-                f'calcMode="spline" keySplines="0.22 1 0.36 1" keyTimes="0;1"/>'
-            )
+            begin = {1: "0.10s", 2: "0.20s", 3: "0.30s"}[i]
             body.append(
-                f'  <g transform="translate({cx} {by})">'
-                f'<g transform="scale(1 0)">{smil}'
-                f'<g transform="translate({-cx} {-by})">{rect}</g></g></g>'
+                f'<g class="logo-bar-grow" style="--bar-delay:{begin}">'
+                f'<g transform="translate({cx} {by})">'
+                f'<g class="logo-bar-scale">'
+                f'<g transform="translate({-cx} {-by})">{rect}</g>'
+                f"</g></g></g>"
             )
         else:
-            body.append(f"  {rect}")
+            body.append(rect)
+    return "\n".join(grads), "\n".join(body)
 
-    return (
-        '<?xml version="1.0" encoding="UTF-8"?>\n'
-        '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 664 761" '
-        'fill="none" shape-rendering="geometricPrecision" aria-hidden="true">\n'
-        f"{style}"
-        "  <defs>\n"
-        + "\n".join(grads)
-        + "\n  </defs>\n"
+
+def build_svg(fill: str, prefix: str, animate: bool = False, for_inline: bool = False) -> str:
+    grads, bars = _grads_and_bars(prefix, animate)
+    # Inline: no xml header; static file: full svg doc
+    open_tag = (
+        f'<svg class="boot-logo-svg" viewBox="0 0 664 761" fill="none" '
+        f'shape-rendering="geometricPrecision" aria-hidden="true" '
+        f'xmlns="http://www.w3.org/2000/svg">'
+    )
+    inner = (
+        f"{open_tag}\n"
+        f"  <defs>\n{grads}\n  </defs>\n"
         f'  <path class="logo-d" fill="{fill}" fill-rule="evenodd" d="{D_PATH}"/>\n'
-        + "\n".join(body)
-        + "\n</svg>\n"
+        f"  {bars}\n"
+        f"</svg>"
     )
+    if for_inline:
+        return inner
+    return '<?xml version="1.0" encoding="UTF-8"?>\n' + inner + "\n"
 
 
-def render_png(svg_path: Path, out: Path) -> None:
-    chrome = Path(r"C:\Program Files\Google\Chrome\Application\chrome.exe")
-    if not chrome.exists():
-        chrome = Path(r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe")
-    svg = svg_path.read_text(encoding="utf-8")
-    svg = re.sub(r"<\?xml[^>]*>", "", svg)
-    html = (
-        "<!doctype html><html><body style='margin:0;background:transparent'>"
-        f"{svg}</body></html>"
+def build_partial() -> str:
+    light = build_svg("#192232", "bl-", animate=True, for_inline=True)
+    dark = build_svg("#F4F7F5", "bd-", animate=True, for_inline=True)
+    return (
+        '{# Inline splash mark — vector AA at display size, sharp bars #}\n'
+        f'<div class="boot-logo-anim boot-logo-anim-light">{light}</div>\n'
+        f'<div class="boot-logo-anim boot-logo-anim-dark">{dark}</div>\n'
     )
-    html_path = ROOT / "scripts/_render_logo.html"
-    html_path.write_text(html, encoding="utf-8")
-    url = "file:///" + str(html_path).replace("\\", "/")
-    tmp = out.with_suffix(".shot.png")
-    subprocess.run(
-        [
-            str(chrome),
-            "--headless=new",
-            "--disable-gpu",
-            "--default-background-color=0",
-            "--window-size=664,761",
-            f"--screenshot={tmp}",
-            url,
-        ],
-        check=False,
-    )
-    time.sleep(1.2)
-    from PIL import Image
-
-    im = Image.open(tmp).convert("RGBA")
-    # Chrome screenshot may include window chrome; crop to content if needed
-    if im.size != (664, 761):
-        # center-crop / resize
-        im = im.resize((664, 761), Image.Resampling.LANCZOS)
-    im.save(out)
-    print("wrote", out.name, "corner", im.getpixel((0, 0)))
 
 
 def main() -> None:
     (IMG / "logo.svg").write_text(build_svg("#192232", "lg-"), encoding="utf-8")
     (IMG / "logo-dark.svg").write_text(build_svg("#F4F7F5", "dg-"), encoding="utf-8")
-    (IMG / "logo-splash.svg").write_text(build_svg("#192232", "ls-", True), encoding="utf-8")
-    (IMG / "logo-splash-dark.svg").write_text(build_svg("#F4F7F5", "lsd-", True), encoding="utf-8")
-    print("wrote geometric SVGs")
-    render_png(IMG / "logo.svg", IMG / "logo.png")
-    render_png(IMG / "logo-dark.svg", IMG / "logo-dark.png")
+    (IMG / "logo-splash.svg").write_text(build_svg("#192232", "ls-", animate=True), encoding="utf-8")
+    (IMG / "logo-splash-dark.svg").write_text(
+        build_svg("#F4F7F5", "lsd-", animate=True), encoding="utf-8"
+    )
+    PARTIAL.write_text(build_partial(), encoding="utf-8")
+    print("wrote SVGs +", PARTIAL.relative_to(ROOT))
 
 
 if __name__ == "__main__":

@@ -16,8 +16,7 @@
   <button type="button" class="theme-toggle theme-toggle-float" id="themeToggle" title="Тема">Тема</button>
 
   <div class="boot-splash" id="bootSplash" aria-hidden="true">
-    <img class="boot-logo-anim boot-logo-anim-light" src="/static/img/logo-splash.svg?v={{ version }}" alt="" width="220" height="252" />
-    <img class="boot-logo-anim boot-logo-anim-dark" src="/static/img/logo-splash-dark.svg?v={{ version }}" alt="" width="220" height="252" />
+    {% include "partials/boot_logo.html" %}
     <p class="boot-splash-title">Deskline</p>
   </div>
 

@@ -1,21 +1,12 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 664 761" fill="none" shape-rendering="geometricPrecision" aria-hidden="true">
+<svg class="boot-logo-svg" viewBox="0 0 664 761" fill="none" shape-rendering="geometricPrecision" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
   <defs>
-    <linearGradient id="lg-g1" x1="197.5" y1="498" x2="197.5" y2="644" gradientUnits="userSpaceOnUse">
-      <stop offset="0%" stop-color="#4DB3FF"/>
-      <stop offset="100%" stop-color="#0A6CF0"/>
-    </linearGradient>
-    <linearGradient id="lg-g2" x1="295.0" y1="407" x2="295.0" y2="643" gradientUnits="userSpaceOnUse">
-      <stop offset="0%" stop-color="#3ED6C4"/>
-      <stop offset="100%" stop-color="#0A9B9A"/>
-    </linearGradient>
-    <linearGradient id="lg-g3" x1="395.0" y1="309" x2="395.0" y2="629" gradientUnits="userSpaceOnUse">
-      <stop offset="0%" stop-color="#B4EC3A"/>
-      <stop offset="100%" stop-color="#5FC218"/>
-    </linearGradient>
+    <linearGradient id="lg-g1" x1="197.5" y1="498" x2="197.5" y2="644" gradientUnits="userSpaceOnUse"><stop offset="0%" stop-color="#4DB3FF"/><stop offset="100%" stop-color="#0A6CF0"/></linearGradient>
+    <linearGradient id="lg-g2" x1="295.0" y1="407" x2="295.0" y2="643" gradientUnits="userSpaceOnUse"><stop offset="0%" stop-color="#3ED6C4"/><stop offset="100%" stop-color="#0A9B9A"/></linearGradient>
+    <linearGradient id="lg-g3" x1="395.0" y1="309" x2="395.0" y2="629" gradientUnits="userSpaceOnUse"><stop offset="0%" stop-color="#B4EC3A"/><stop offset="100%" stop-color="#5FC218"/></linearGradient>
   </defs>
-  <path class="logo-d" fill="#192232" fill-rule="evenodd" d="M168 48 C168 40 174 36 184 36 H312 C478 36 604 168 604 380 C604 592 478 725 312 725 H184 C174 725 168 720 168 712 V638 C128 630 92 590 92 540 V210 C92 160 128 120 168 112 V48 Z M248 152 H314 C430 152 498 240 498 380 C498 520 430 610 314 610 H248 V152 Z"/>
-  <rect class="logo-bar logo-bar-1" x="155" y="498" width="85" height="146" rx="42.5" fill="url(#lg-g1)"/>
-  <rect class="logo-bar logo-bar-2" x="252" y="407" width="86" height="236" rx="43.0" fill="url(#lg-g2)"/>
-  <rect class="logo-bar logo-bar-3" x="352" y="309" width="86" height="320" rx="43.0" fill="url(#lg-g3)"/>
+  <path class="logo-d" fill="#192232" fill-rule="evenodd" d="M170 50 C170 42 176 36 186 36 H310 C482 36 606 170 606 380 C606 590 482 725 310 725 H186 C176 725 170 718 170 710 V640 C126 632 90 590 90 538 V212 C90 160 126 118 170 110 V50 Z M248 154 H312 C432 154 500 242 500 380 C500 518 432 608 312 608 H248 V154 Z"/>
+  <rect class="logo-bar logo-bar-1" x="155" y="498" width="85" height="146" rx="0" ry="0" fill="url(#lg-g1)"/>
+<rect class="logo-bar logo-bar-2" x="252" y="407" width="86" height="236" rx="0" ry="0" fill="url(#lg-g2)"/>
+<rect class="logo-bar logo-bar-3" x="352" y="309" width="86" height="320" rx="0" ry="0" fill="url(#lg-g3)"/>
 </svg>

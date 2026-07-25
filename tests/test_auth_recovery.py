@@ -58,10 +58,10 @@ def test_login_template_has_launch_and_forgot():
     assert "brand-lockup" in html
     assert "partials/logo_mark.html" in html
     assert "logo-anim" in logo
-    assert "logo.png" in logo
-    assert "logo-dark.png" in logo
-    assert "logo-splash.svg" in html
-    assert "logo-splash-dark.svg" in html
+    assert "logo.svg" in logo
+    assert "logo-dark.svg" in logo
+    assert "partials/boot_logo.html" in html or "boot_logo.html" in html
+    assert 'rx="0"' in (WEB_ROOT / "templates" / "partials" / "boot_logo.html").read_text(encoding="utf-8")
     assert "logo-grow.webp" not in html
     assert "preview-gauge" in html
     assert "preview-stage" in html

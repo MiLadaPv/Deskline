@@ -1,5 +1,5 @@
-{# Exact brand mark from source art — theme swaps light/dark PNG #}
+{# Exact brand mark — theme swaps light/dark SVG (crisp vectors, sharp bars) #}
 <span class="logo-mark{% if anim %} logo-anim{% endif %}{% if soft %} logo-anim-soft{% endif %}"{% if size %} style="width:{{ size }}px;height:{{ size }}px"{% endif %} aria-hidden="true">
-  <img class="logo-img logo-img-light" src="/static/img/logo.png?v={{ version }}" alt="" width="{{ size or 40 }}" height="{{ size or 40 }}" decoding="async" />
-  <img class="logo-img logo-img-dark" src="/static/img/logo-dark.png?v={{ version }}" alt="" width="{{ size or 40 }}" height="{{ size or 40 }}" decoding="async" />
+  <img class="logo-img logo-img-light" src="/static/img/logo.svg?v={{ version }}" alt="" width="{{ size or 40 }}" height="{{ size or 40 }}" decoding="async" />
+  <img class="logo-img logo-img-dark" src="/static/img/logo-dark.svg?v={{ version }}" alt="" width="{{ size or 40 }}" height="{{ size or 40 }}" decoding="async" />
 </span>

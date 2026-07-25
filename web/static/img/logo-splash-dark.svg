@@ -1,34 +1,12 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 664 761" fill="none" shape-rendering="geometricPrecision" aria-hidden="true">
-  <style>
-    .logo-d { opacity: 0; animation: d-in 0.35s ease 0.05s forwards; }
-    .logo-bar {
-      transform-box: fill-box;
-      transform-origin: center bottom;
-      animation: bar-grow 0.85s cubic-bezier(0.22, 1, 0.36, 1) forwards;
-    }
-    .logo-bar-1 { transform: scaleY(0); animation-delay: 0.12s; }
-    .logo-bar-2 { transform: scaleY(0); animation-delay: 0.22s; }
-    .logo-bar-3 { transform: scaleY(0); animation-delay: 0.32s; }
-    @keyframes d-in { to { opacity: 1; } }
-    @keyframes bar-grow { from { transform: scaleY(0); } to { transform: scaleY(1); } }
-  </style>
+<svg class="boot-logo-svg" viewBox="0 0 664 761" fill="none" shape-rendering="geometricPrecision" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
   <defs>
-    <linearGradient id="lsd-g1" x1="197.5" y1="498" x2="197.5" y2="644" gradientUnits="userSpaceOnUse">
-      <stop offset="0%" stop-color="#4DB3FF"/>
-      <stop offset="100%" stop-color="#0A6CF0"/>
-    </linearGradient>
-    <linearGradient id="lsd-g2" x1="295.0" y1="407" x2="295.0" y2="643" gradientUnits="userSpaceOnUse">
-      <stop offset="0%" stop-color="#3ED6C4"/>
-      <stop offset="100%" stop-color="#0A9B9A"/>
-    </linearGradient>
-    <linearGradient id="lsd-g3" x1="395.0" y1="309" x2="395.0" y2="629" gradientUnits="userSpaceOnUse">
-      <stop offset="0%" stop-color="#B4EC3A"/>
-      <stop offset="100%" stop-color="#5FC218"/>
-    </linearGradient>
+    <linearGradient id="lsd-g1" x1="197.5" y1="498" x2="197.5" y2="644" gradientUnits="userSpaceOnUse"><stop offset="0%" stop-color="#4DB3FF"/><stop offset="100%" stop-color="#0A6CF0"/></linearGradient>
+    <linearGradient id="lsd-g2" x1="295.0" y1="407" x2="295.0" y2="643" gradientUnits="userSpaceOnUse"><stop offset="0%" stop-color="#3ED6C4"/><stop offset="100%" stop-color="#0A9B9A"/></linearGradient>
+    <linearGradient id="lsd-g3" x1="395.0" y1="309" x2="395.0" y2="629" gradientUnits="userSpaceOnUse"><stop offset="0%" stop-color="#B4EC3A"/><stop offset="100%" stop-color="#5FC218"/></linearGradient>
   </defs>
-  <path class="logo-d" fill="#F4F7F5" fill-rule="evenodd" d="M168 48 C168 40 174 36 184 36 H312 C478 36 604 168 604 380 C604 592 478 725 312 725 H184 C174 725 168 720 168 712 V638 C128 630 92 590 92 540 V210 C92 160 128 120 168 112 V48 Z M248 152 H314 C430 152 498 240 498 380 C498 520 430 610 314 610 H248 V152 Z"/>
-  <g transform="translate(197.5 644)"><g transform="scale(1 0)"><animateTransform attributeName="transform" type="scale" dur="0.85s" begin="0.12s" fill="freeze" from="1 0" to="1 1" calcMode="spline" keySplines="0.22 1 0.36 1" keyTimes="0;1"/><g transform="translate(-197.5 -644)"><rect class="logo-bar logo-bar-1" x="155" y="498" width="85" height="146" rx="42.5" fill="url(#lsd-g1)"/></g></g></g>
-  <g transform="translate(295.0 643)"><g transform="scale(1 0)"><animateTransform attributeName="transform" type="scale" dur="0.85s" begin="0.22s" fill="freeze" from="1 0" to="1 1" calcMode="spline" keySplines="0.22 1 0.36 1" keyTimes="0;1"/><g transform="translate(-295.0 -643)"><rect class="logo-bar logo-bar-2" x="252" y="407" width="86" height="236" rx="43.0" fill="url(#lsd-g2)"/></g></g></g>
-  <g transform="translate(395.0 629)"><g transform="scale(1 0)"><animateTransform attributeName="transform" type="scale" dur="0.85s" begin="0.32s" fill="freeze" from="1 0" to="1 1" calcMode="spline" keySplines="0.22 1 0.36 1" keyTimes="0;1"/><g transform="translate(-395.0 -629)"><rect class="logo-bar logo-bar-3" x="352" y="309" width="86" height="320" rx="43.0" fill="url(#lsd-g3)"/></g></g></g>
+  <path class="logo-d" fill="#F4F7F5" fill-rule="evenodd" d="M170 50 C170 42 176 36 186 36 H310 C482 36 606 170 606 380 C606 590 482 725 310 725 H186 C176 725 170 718 170 710 V640 C126 632 90 590 90 538 V212 C90 160 126 118 170 110 V50 Z M248 154 H312 C432 154 500 242 500 380 C500 518 432 608 312 608 H248 V154 Z"/>
+  <g class="logo-bar-grow" style="--bar-delay:0.10s"><g transform="translate(197.5 644)"><g class="logo-bar-scale"><g transform="translate(-197.5 -644)"><rect class="logo-bar logo-bar-1" x="155" y="498" width="85" height="146" rx="0" ry="0" fill="url(#lsd-g1)"/></g></g></g></g>
+<g class="logo-bar-grow" style="--bar-delay:0.20s"><g transform="translate(295.0 643)"><g class="logo-bar-scale"><g transform="translate(-295.0 -643)"><rect class="logo-bar logo-bar-2" x="252" y="407" width="86" height="236" rx="0" ry="0" fill="url(#lsd-g2)"/></g></g></g></g>
+<g class="logo-bar-grow" style="--bar-delay:0.30s"><g transform="translate(395.0 629)"><g class="logo-bar-scale"><g transform="translate(-395.0 -629)"><rect class="logo-bar logo-bar-3" x="352" y="309" width="86" height="320" rx="0" ry="0" fill="url(#lsd-g3)"/></g></g></g></g>
 </svg>
