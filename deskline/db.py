@@ -1074,7 +1074,44 @@ class Database:
                     "icon_url": icon,
                 }
             )
-        return items
+        return self._merge_consecutive_timeline(items)
+
+    @staticmethod
+    def _timeline_merge_key(item: dict[str, Any]) -> tuple[Any, ...]:
+        return (
+            (item.get("name") or "").strip().casefold(),
+            (item.get("app_name") or "").strip().lower(),
+            item.get("project_id"),
+            item.get("employee_id"),
+        )
+
+    def _merge_consecutive_timeline(
+        self, items: list[dict[str, Any]], *, max_gap_sec: float = 8.0
+    ) -> list[dict[str, Any]]:
+        """Collapse back-to-back same activity (title churn → many short sessions)."""
+        if len(items) < 2:
+            return items
+        merged: list[dict[str, Any]] = [dict(items[0])]
+        for cur in items[1:]:
+            prev = merged[-1]
+            pe = _parse(str(prev.get("ended_at") or ""))
+            cs = _parse(str(cur.get("started_at") or ""))
+            gap = 0.0
+            if pe and cs:
+                gap = max(0.0, (cs - pe).total_seconds())
+            if self._timeline_merge_key(prev) == self._timeline_merge_key(cur) and gap <= max_gap_sec:
+                prev["ended_at"] = cur["ended_at"]
+                prev["sec"] = round(float(prev.get("sec") or 0) + float(cur.get("sec") or 0), 1)
+                prev["idle_sec"] = round(
+                    float(prev.get("idle_sec") or 0) + float(cur.get("idle_sec") or 0), 1
+                )
+                if not prev.get("site") and cur.get("site"):
+                    prev["site"] = cur["site"]
+                if not prev.get("icon_url") and cur.get("icon_url"):
+                    prev["icon_url"] = cur["icon_url"]
+            else:
+                merged.append(dict(cur))
+        return merged
 
     def ratings_for_day(self, day: date | None = None) -> list[dict[str, Any]]:
         """Apps and sites seen today with effective category for the ratings editor."""

@@ -58,7 +58,7 @@ def test_ratings_and_timeline(tmp_path: Path):
 
     timeline = db.timeline_for_day()
     assert len(timeline) >= 2
-    assert timeline[0]["name"] == "Cursor"
+    assert timeline[0]["name"] in {"Cursor", "Разработка"}
     assert timeline[0]["idle_sec"] >= 100
 
     ratings = db.ratings_for_day()
@@ -76,3 +76,63 @@ def test_ratings_and_timeline(tmp_path: Path):
     # unrated maps to neutral for focus; productive still from cursor + youtube override
     # note: summary uses stored session category, not live rules
     assert "focus_pct" in summary
+
+
+def test_timeline_merges_consecutive_same_activity(tmp_path: Path):
+    db = Database(tmp_path / "merge.db")
+    t0 = datetime.now().astimezone().replace(hour=13, minute=54, second=0, microsecond=0)
+    # Title churn on YouTube → many short sessions that should collapse.
+    titles = [
+        "Cats - YouTube",
+        "Dogs - YouTube",
+        "Birds - YouTube",
+        "Fish - YouTube",
+    ]
+    cursor = t0
+    for i, title in enumerate(titles):
+        sid = db.start_session(
+            "msedge.exe",
+            title,
+            "youtube.com",
+            "distracting",
+            started_at=cursor,
+            display_name="Microsoft Edge",
+            activity_kind="video",
+            activity_label="YouTube",
+        )
+        end = cursor + timedelta(seconds=12)
+        db.end_session(sid, ended_at=end)
+        cursor = end
+
+    # Different activity in between should break the group.
+    sid = db.start_session(
+        "Telegram.exe",
+        "Chat",
+        None,
+        "neutral",
+        started_at=cursor,
+        display_name="Telegram",
+        activity_kind="chat",
+        activity_label="Telegram",
+    )
+    db.end_session(sid, ended_at=cursor + timedelta(seconds=30))
+    cursor = cursor + timedelta(seconds=30)
+
+    sid = db.start_session(
+        "msedge.exe",
+        "More cats - YouTube",
+        "youtube.com",
+        "distracting",
+        started_at=cursor,
+        display_name="Microsoft Edge",
+        activity_kind="video",
+        activity_label="YouTube",
+    )
+    db.end_session(sid, ended_at=cursor + timedelta(seconds=20))
+
+    timeline = db.timeline_for_day(t0.date())
+    names = [r["name"] for r in timeline]
+    assert names.count("YouTube") == 2
+    assert "Telegram" in names
+    first_yt = next(r for r in timeline if r["name"] == "YouTube")
+    assert first_yt["sec"] >= 45

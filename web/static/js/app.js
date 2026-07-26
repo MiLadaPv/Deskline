@@ -2,8 +2,11 @@ const fmtDur = (sec) => {
   sec = Math.max(0, Math.round(sec || 0));
   const h = Math.floor(sec / 3600);
   const m = Math.floor((sec % 3600) / 60);
+  const s = sec % 60;
   if (h > 0) return `${h}ч ${m}м`;
-  return `${m}м`;
+  if (m > 0) return `${m}м`;
+  if (s > 0) return `${s}с`;
+  return "0с";
 };
 
 const fmtBytes = (n) => {
