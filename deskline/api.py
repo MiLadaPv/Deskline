@@ -830,13 +830,42 @@ def create_app(tracker: Tracker, db: Database | None = None) -> FastAPI:
     @app.get("/api/trends")
     def trends(
         days: int = 7,
+        from_day: str | None = Query(default=None, alias="from"),
+        to_day: str | None = Query(default=None, alias="to"),
         project_id: int | None = None,
         task_id: int | None = None,
         employee_id: int | None = None,
     ) -> list[dict[str, Any]]:
         ent, _ = _load_entitlements()
-        max_days = ent.history_days or 31
-        days = max(1, min(int(days), min(31, max_days)))
+        max_days = ent.history_days if ent.history_days is not None else 366
+        max_days = max(1, min(int(max_days), 366))
+
+        if from_day or to_day:
+            try:
+                end_d = date.fromisoformat(to_day) if to_day else date.today()
+                start_d = date.fromisoformat(from_day) if from_day else end_d
+            except ValueError as exc:
+                raise HTTPException(400, "Invalid from/to; use YYYY-MM-DD") from exc
+            if end_d < start_d:
+                start_d, end_d = end_d, start_d
+            oldest = date.today() - timedelta(days=max_days - 1)
+            if start_d < oldest:
+                start_d = oldest
+            if end_d < oldest:
+                end_d = oldest
+            if end_d > date.today():
+                end_d = date.today()
+            if (end_d - start_d).days + 1 > max_days:
+                start_d = end_d - timedelta(days=max_days - 1)
+            return db.daily_trends(
+                project_id=project_id,
+                task_id=task_id,
+                employee_id=employee_id,
+                start_day=start_d,
+                end_day=end_d,
+            )
+
+        days = max(1, min(int(days), max_days))
         return db.daily_trends(
             days=days, project_id=project_id, task_id=task_id, employee_id=employee_id
         )

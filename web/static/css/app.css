@@ -3334,6 +3334,7 @@ html[data-theme="dark"] .google-btn {
 
 .hours-line {
   min-height: 168px;
+  position: relative;
 }
 
 .hours-line-svg {
@@ -3360,10 +3361,56 @@ html[data-theme="dark"] .google-btn {
   stroke-linecap: round;
 }
 
+.hours-dot-hit {
+  fill: transparent;
+  stroke: none;
+  cursor: pointer;
+}
+
 .hours-dot {
   fill: #fff;
   stroke: var(--accent);
   stroke-width: 2.5;
+  transform-box: fill-box;
+  transform-origin: center;
+  transition: transform 0.16s ease, stroke-width 0.16s ease;
+  pointer-events: none;
+}
+
+.hours-point.is-hot .hours-dot,
+.hours-point:hover .hours-dot,
+.hours-point:focus-within .hours-dot {
+  transform: scale(1.45);
+  stroke-width: 3;
+}
+
+.hours-point:focus {
+  outline: none;
+}
+
+.hours-tip {
+  position: absolute;
+  z-index: 5;
+  transform: translate(-50%, calc(-100% - 12px));
+  padding: 6px 10px;
+  border-radius: 10px;
+  background: #15241f;
+  color: #f4faf7;
+  font-size: 0.78rem;
+  font-weight: 600;
+  white-space: nowrap;
+  pointer-events: none;
+  box-shadow: 0 10px 24px rgba(21, 36, 31, 0.22);
+}
+
+.hours-tip::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 100%;
+  transform: translateX(-50%);
+  border: 6px solid transparent;
+  border-top-color: #15241f;
 }
 
 .hours-axis {
@@ -3376,6 +3423,58 @@ html[data-theme="dark"] .google-btn {
   font-size: 11px;
   font-weight: 600;
   text-transform: lowercase;
+}
+
+.trends-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 12px 16px;
+  margin: 0 0 14px;
+}
+
+.trends-custom-range {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.trends-custom-range[hidden] {
+  display: none !important;
+}
+
+.trends-custom-range input[type="date"] {
+  font: inherit;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.9);
+  color: var(--ink);
+}
+
+.trends-custom-sep {
+  color: var(--ink-soft);
+}
+
+.trends-apply-btn {
+  padding: 8px 14px;
+}
+
+.prod-days-chart-wide.is-dense {
+  overflow-x: auto;
+  gap: 4px;
+  padding-bottom: 4px;
+}
+
+.prod-days-chart-wide.is-dense .prod-day-col {
+  min-width: 18px;
+  flex: 0 0 18px;
+}
+
+.prod-days-chart-wide.is-dense .hours-label,
+.prod-days-chart-wide.is-dense .hours-val {
+  font-size: 0.62rem;
 }
 
 .pulse-panel {

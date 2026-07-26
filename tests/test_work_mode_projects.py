@@ -157,6 +157,17 @@ def test_daily_trends_shape(tmp_path: Path, monkeypatch):
     assert "by_category" in trends[-1]
     assert trends[-1]["total_sec"] >= 3500
 
+    year = db.daily_trends(days=365)
+    assert len(year) == 365
+    assert year[-1]["day"] == date.today().isoformat()
+
+    start = date.today() - timedelta(days=9)
+    end = date.today() - timedelta(days=2)
+    custom = db.daily_trends(start_day=start, end_day=end)
+    assert len(custom) == 8
+    assert custom[0]["day"] == start.isoformat()
+    assert custom[-1]["day"] == end.isoformat()
+
 
 def test_screenshot_flag_distracting_only_in_work_mode(tmp_path: Path, monkeypatch):
     shots = tmp_path / "shots"

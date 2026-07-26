@@ -148,12 +148,30 @@
         </section>
 
         <p class="pulse-section-label">Тренды</p>
+        <div class="trends-toolbar">
+          <label class="filter-inline">
+            Период
+            <select id="trendsPeriod" aria-label="Период трендов">
+              <option value="7" selected>7 дней</option>
+              <option value="30">30 дней</option>
+              <option value="90">90 дней</option>
+              <option value="365">Год</option>
+              <option value="custom">Свой период…</option>
+            </select>
+          </label>
+          <div class="trends-custom-range" id="trendsCustomRange" hidden>
+            <input type="date" id="trendsFrom" aria-label="С даты" />
+            <span class="trends-custom-sep">—</span>
+            <input type="date" id="trendsTo" aria-label="По дату" />
+            <button type="button" class="btn trends-apply-btn" id="trendsApplyCustom">Показать</button>
+          </div>
+        </div>
         <div class="pulse-split">
           <section class="pulse-panel">
             <header class="pulse-head">
               <div>
                 <p class="pulse-kicker">Часы</p>
-                <h3>Часы за неделю</h3>
+                <h3 id="hoursTrendTitle">Часы за период</h3>
               </div>
               <span class="pulse-aside" id="hoursTrendAside">7 дн.</span>
             </header>

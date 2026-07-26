@@ -215,6 +215,7 @@ function applyEntitlements(ent) {
   const teamHint = document.getElementById("teamUpsellHint");
   if (teamHint) teamHint.hidden = !!ent.company_hub;
   ensureSelectedDay();
+  syncTrendsPeriodOptions();
 }
 
 let _paywallShownAt = 0;
@@ -977,12 +978,141 @@ function niceHoursCeiling(sec) {
   return Math.ceil(h / 6) * 6;
 }
 
+/** @type {"7"|"30"|"90"|"365"|"custom"} */
+let trendsPeriod = "7";
+let trendsCustomFrom = "";
+let trendsCustomTo = "";
+
+function trendsHistoryCap() {
+  const hist = currentEntitlements?.history_days;
+  if (hist == null) return 366;
+  return Math.max(1, Math.min(Number(hist) || 14, 366));
+}
+
+function syncTrendsPeriodOptions() {
+  const sel = document.getElementById("trendsPeriod");
+  if (!sel) return;
+  const cap = trendsHistoryCap();
+  for (const opt of sel.options) {
+    if (opt.value === "custom") {
+      opt.disabled = false;
+      continue;
+    }
+    const n = Number(opt.value);
+    opt.disabled = Number.isFinite(n) && n > cap;
+    if (opt.disabled && opt.selected) {
+      // Fall back to largest allowed preset.
+      const allowed = [...sel.options]
+        .map((o) => Number(o.value))
+        .filter((n) => Number.isFinite(n) && n <= cap);
+      const best = allowed.length ? String(Math.max(...allowed)) : "7";
+      sel.value = best;
+      trendsPeriod = best;
+    }
+  }
+  const from = document.getElementById("trendsFrom");
+  const to = document.getElementById("trendsTo");
+  const todayIso = localDayIso();
+  const oldestIso = shiftDayIso(todayIso, -(cap - 1));
+  if (from) {
+    from.min = oldestIso;
+    from.max = todayIso;
+  }
+  if (to) {
+    to.min = oldestIso;
+    to.max = todayIso;
+  }
+}
+
+function trendsQuery() {
+  const parts = [];
+  if (trendsPeriod === "custom" && trendsCustomFrom && trendsCustomTo) {
+    parts.push(`from=${encodeURIComponent(trendsCustomFrom)}`);
+    parts.push(`to=${encodeURIComponent(trendsCustomTo)}`);
+  } else {
+    const days = Number(trendsPeriod) || 7;
+    parts.push(`days=${encodeURIComponent(String(days))}`);
+  }
+  if (filterProjectId) parts.push(`project_id=${encodeURIComponent(filterProjectId)}`);
+  if (filterEmployeeId) parts.push(`employee_id=${encodeURIComponent(filterEmployeeId)}`);
+  return parts.length ? `?${parts.join("&")}` : "";
+}
+
+function trendsTitleForRows(rows) {
+  const n = rows?.length || 0;
+  if (trendsPeriod === "custom") return "Часы за период";
+  if (n <= 7) return "Часы за неделю";
+  if (n <= 31) return "Часы за месяц";
+  if (n <= 100) return "Часы за квартал";
+  return "Часы за год";
+}
+
+function shouldShowHoursXLabel(i, n) {
+  if (n <= 10) return true;
+  if (n <= 31) return i % 3 === 0 || i === n - 1;
+  if (n <= 100) return i % 7 === 0 || i === n - 1;
+  return i % 30 === 0 || i === 0 || i === n - 1;
+}
+
+function hoursXLabel(isoDay, n) {
+  const d = new Date(`${isoDay}T12:00:00`);
+  if (n <= 10) {
+    return d.toLocaleDateString("ru-RU", { weekday: "short" }).replace(".", "");
+  }
+  if (n <= 31) {
+    return d.toLocaleDateString("ru-RU", { day: "numeric", month: "short" });
+  }
+  return d.toLocaleDateString("ru-RU", { day: "numeric", month: "short" });
+}
+
+function bindHoursChartInteractions(el, points, tips) {
+  const tip = document.createElement("div");
+  tip.className = "hours-tip";
+  tip.hidden = true;
+  tip.setAttribute("role", "tooltip");
+  el.appendChild(tip);
+
+  const svg = el.querySelector(".hours-line-svg");
+  if (!svg) return;
+  const w = Number(svg.viewBox.baseVal.width) || 360;
+  const h = Number(svg.viewBox.baseVal.height) || 168;
+
+  const place = (i) => {
+    const [x, y] = points[i];
+    const svgRect = svg.getBoundingClientRect();
+    const hostRect = el.getBoundingClientRect();
+    const px = (x / w) * svgRect.width + (svgRect.left - hostRect.left);
+    const py = (y / h) * svgRect.height + (svgRect.top - hostRect.top);
+    tip.hidden = false;
+    tip.textContent = tips[i];
+    tip.style.left = `${px}px`;
+    tip.style.top = `${py}px`;
+  };
+
+  el.querySelectorAll(".hours-point").forEach((g, i) => {
+    const show = () => {
+      g.classList.add("is-hot");
+      place(i);
+    };
+    const hide = () => {
+      g.classList.remove("is-hot");
+      tip.hidden = true;
+    };
+    g.addEventListener("mouseenter", show);
+    g.addEventListener("mouseleave", hide);
+    g.addEventListener("focusin", show);
+    g.addEventListener("focusout", hide);
+  });
+}
+
 function renderHoursChart(trends) {
   const el = document.getElementById("hoursChart");
   if (!el) return;
   const rows = trends || [];
   const aside = document.getElementById("hoursTrendAside");
-  if (aside) aside.textContent = `${rows.length || 7} дн.`;
+  if (aside) aside.textContent = `${rows.length || 0} дн.`;
+  const title = document.getElementById("hoursTrendTitle");
+  if (title) title.textContent = trendsTitleForRows(rows);
   if (!rows.length) {
     el.innerHTML = `<p class="hint">Пока нет тренда по часам.</p>`;
     return;
@@ -991,7 +1121,7 @@ function renderHoursChart(trends) {
   const maxSec = Math.max(...vals, 1);
   const maxH = niceHoursCeiling(maxSec);
   const maxScale = maxH * 3600;
-  const w = 360;
+  const w = Math.max(360, Math.min(720, 40 + rows.length * (rows.length > 60 ? 2.2 : rows.length > 20 ? 8 : 36)));
   const h = 168;
   const padL = 36;
   const padR = 12;
@@ -1015,25 +1145,35 @@ function renderHoursChart(trends) {
   });
   const poly = pts.map(([x, y]) => `${x.toFixed(1)},${y.toFixed(1)}`).join(" ");
   const area = `${padL},${(padT + chartH).toFixed(1)} ${poly} ${(padL + chartW).toFixed(1)},${(padT + chartH).toFixed(1)}`;
+  const tips = rows.map((r, i) => {
+    const d = new Date(`${r.day}T12:00:00`);
+    return `${d.toLocaleDateString("ru-RU", {
+      weekday: "short",
+      day: "numeric",
+      month: "short",
+    })} · ${fmtDur(vals[i])}`;
+  });
   const dots = pts
     .map(([x, y], i) => {
-      const d = new Date(`${rows[i].day}T12:00:00`);
-      const label = d.toLocaleDateString("ru-RU", { weekday: "short" }).replace(".", "");
-      const tip = `${d.toLocaleDateString("ru-RU", { day: "numeric", month: "short" })} · ${fmtDur(vals[i])}`;
-      return `<g>
-        <circle cx="${x}" cy="${y}" r="4.5" class="hours-dot">
-          <title>${escapeHtml(tip)}</title>
-        </circle>
-        <text x="${x}" y="${h - 8}" text-anchor="middle" class="hours-axis hours-x">${escapeHtml(label)}</text>
+      const label = hoursXLabel(rows[i].day, rows.length);
+      const showLabel = shouldShowHoursXLabel(i, rows.length);
+      const labelSvg = showLabel
+        ? `<text x="${x}" y="${h - 8}" text-anchor="middle" class="hours-axis hours-x">${escapeHtml(label)}</text>`
+        : "";
+      return `<g class="hours-point" tabindex="0" aria-label="${escapeHtml(tips[i])}">
+        <circle cx="${x}" cy="${y}" r="12" class="hours-dot-hit"/>
+        <circle cx="${x}" cy="${y}" r="4.5" class="hours-dot"/>
+        ${labelSvg}
       </g>`;
     })
     .join("");
-  el.innerHTML = `<svg class="hours-line-svg" viewBox="0 0 ${w} ${h}" role="img" aria-label="Часы за неделю">
+  el.innerHTML = `<svg class="hours-line-svg" viewBox="0 0 ${w} ${h}" role="img" aria-label="${escapeHtml(trendsTitleForRows(rows))}">
     ${grid}
     <polygon class="hours-line-fill" points="${area}"/>
     <polyline class="hours-line-path" fill="none" points="${poly}"/>
     ${dots}
   </svg>`;
+  bindHoursChartInteractions(el, pts, tips);
 }
 
 function renderProdDaysChart(trends) {
@@ -1052,13 +1192,21 @@ function renderProdDaysChart(trends) {
       d.toLocaleDateString("ru-RU", { day: "numeric", month: "short" });
     foot.textContent = `${fmt(a)} — ${fmt(b)}`;
   }
+  el.classList.toggle("is-dense", rows.length > 21);
   el.innerHTML = rows
     .map((r) => {
       const total = r.total_sec || 0;
       const cats = r.by_category || {};
       const d = new Date(`${r.day}T12:00:00`);
       const isWeekend = d.getDay() === 0 || d.getDay() === 6;
-      const label = d.toLocaleDateString("ru-RU", { weekday: "short" });
+      const label =
+        rows.length > 21
+          ? d.toLocaleDateString("ru-RU", { day: "numeric" })
+          : d.toLocaleDateString("ru-RU", { weekday: "short" });
+      const tip = `${d.toLocaleDateString("ru-RU", {
+        day: "numeric",
+        month: "short",
+      })}: фокус ${Math.round(r.focus_pct || 0)}%`;
       const segs = [
         ["distracting", cats.distracting || 0],
         ["neutral", cats.neutral || 0],
@@ -1071,9 +1219,9 @@ function renderProdDaysChart(trends) {
             : "";
         })
         .join("");
-      return `<div class="prod-day-col${isWeekend ? " is-weekend" : ""}" title="${r.day}: фокус ${r.focus_pct}%">
+      return `<div class="prod-day-col${isWeekend ? " is-weekend" : ""}" title="${escapeHtml(tip)}">
         <div class="prod-day-stack">${total ? segs : `<span class="stack-seg empty" style="height:6%"></span>`}</div>
-        <span class="hours-label">${label}</span>
+        <span class="hours-label">${escapeHtml(label)}</span>
         <span class="hours-val">${Math.round(r.focus_pct || 0)}%</span>
       </div>`;
     })
@@ -1081,8 +1229,7 @@ function renderProdDaysChart(trends) {
 }
 
 async function refreshTrends() {
-  const q = `?days=7${filterProjectId ? `&project_id=${encodeURIComponent(filterProjectId)}` : ""}${employeeQuerySuffix()}`;
-  const trends = await api(`/api/trends${q}`);
+  const trends = await api(`/api/trends${trendsQuery()}`);
   renderHoursChart(trends);
   renderProdDaysChart(trends);
 }
@@ -2564,6 +2711,51 @@ function wireUi() {
     usagePeriodSel.addEventListener("change", async () => {
       usagePeriod = usagePeriodSel.value || "today";
       await refreshUsageReport();
+    });
+  }
+
+  const trendsPeriodSel = document.getElementById("trendsPeriod");
+  const trendsCustomRange = document.getElementById("trendsCustomRange");
+  const trendsFrom = document.getElementById("trendsFrom");
+  const trendsTo = document.getElementById("trendsTo");
+  const trendsApply = document.getElementById("trendsApplyCustom");
+  const syncTrendsCustomVisibility = () => {
+    if (trendsCustomRange) {
+      trendsCustomRange.hidden = trendsPeriod !== "custom";
+    }
+  };
+  syncTrendsPeriodOptions();
+  syncTrendsCustomVisibility();
+  if (trendsPeriodSel) {
+    trendsPeriodSel.addEventListener("change", async () => {
+      trendsPeriod = trendsPeriodSel.value || "7";
+      syncTrendsCustomVisibility();
+      if (trendsPeriod === "custom") {
+        const today = localDayIso();
+        const weekAgo = shiftDayIso(today, -6);
+        if (trendsFrom && !trendsFrom.value) trendsFrom.value = weekAgo;
+        if (trendsTo && !trendsTo.value) trendsTo.value = today;
+        return;
+      }
+      await refreshTrends();
+    });
+  }
+  if (trendsApply) {
+    trendsApply.addEventListener("click", async () => {
+      trendsCustomFrom = trendsFrom?.value || "";
+      trendsCustomTo = trendsTo?.value || "";
+      if (!trendsCustomFrom || !trendsCustomTo) return;
+      if (trendsCustomFrom > trendsCustomTo) {
+        const tmp = trendsCustomFrom;
+        trendsCustomFrom = trendsCustomTo;
+        trendsCustomTo = tmp;
+        if (trendsFrom) trendsFrom.value = trendsCustomFrom;
+        if (trendsTo) trendsTo.value = trendsCustomTo;
+      }
+      trendsPeriod = "custom";
+      if (trendsPeriodSel) trendsPeriodSel.value = "custom";
+      syncTrendsCustomVisibility();
+      await refreshTrends();
     });
   }
 

@@ -558,32 +558,128 @@ class Database:
         project_id: int | None = None,
         task_id: int | None = None,
         employee_id: int | None = None,
+        *,
+        start_day: date | None = None,
+        end_day: date | None = None,
     ) -> list[dict[str, Any]]:
-        """Time Doctor–style Hours Tracked + productivity mix per day."""
-        days = max(1, min(int(days), 31))
+        """Hours tracked + productivity mix per day (up to ~1 year)."""
         today = date.today()
+        if start_day is not None or end_day is not None:
+            end_d = end_day or today
+            start_d = start_day or end_d
+            if end_d < start_d:
+                start_d, end_d = end_d, start_d
+            if (end_d - start_d).days + 1 > 366:
+                start_d = end_d - timedelta(days=365)
+        else:
+            days = max(1, min(int(days), 366))
+            end_d = today
+            start_d = today - timedelta(days=days - 1)
+
+        range_start = datetime.combine(start_d, datetime.min.time()).astimezone()
+        range_end = datetime.combine(end_d + timedelta(days=1), datetime.min.time()).astimezone()
+
+        buckets: dict[str, dict[str, float]] = {}
+        cursor = start_d
+        while cursor <= end_d:
+            buckets[cursor.isoformat()] = {
+                "total": 0.0,
+                "idle": 0.0,
+                "productive": 0.0,
+                "neutral": 0.0,
+                "distracting": 0.0,
+            }
+            cursor += timedelta(days=1)
+
+        from deskline.config import load_config
+
+        cfg = load_config()
+        work_mode = bool(cfg.get("work_mode"))
+        keywords = list(cfg.get("work_chat_keywords") or [])
+
+        with self.connect() as conn:
+            rows = conn.execute(
+                """
+                SELECT * FROM sessions
+                WHERE started_at < ? AND (ended_at IS NULL OR ended_at >= ?)
+                ORDER BY started_at
+                """,
+                (_iso(range_end), _iso(range_start)),
+            ).fetchall()
+
+        now = _utcnow()
+        for row in rows:
+            keys = set(row.keys())
+            s = _parse(row["started_at"]) or range_start
+            e = _parse(row["ended_at"]) or now
+            if e <= range_start or s >= range_end:
+                continue
+            meta = self._enrich(row, work_mode=work_mode, work_chat_keywords=keywords)
+            if meta["hidden"]:
+                continue
+            if project_id is not None and meta.get("project_id") != project_id:
+                continue
+            if task_id is not None and meta.get("task_id") != task_id:
+                continue
+            if employee_id is not None and meta.get("employee_id") != employee_id:
+                continue
+
+            raw_cat = normalize_category(meta["category"])
+            cat = "neutral" if raw_cat == "unrated" else raw_cat
+            if cat not in {"productive", "neutral", "distracting"}:
+                cat = "neutral"
+
+            full_span = max(0.0, (e - s).total_seconds())
+            idle_full = float(row["idle_sec"] or 0) if "idle_sec" in keys else 0.0
+            idle_full = min(max(0.0, idle_full), full_span) if full_span else 0.0
+
+            day_cursor = max(s, range_start).date()
+            last_day = min(e, range_end).date()
+            if last_day > end_d:
+                last_day = end_d
+            while day_cursor <= last_day:
+                if day_cursor < start_d:
+                    day_cursor += timedelta(days=1)
+                    continue
+                key = day_cursor.isoformat()
+                bucket = buckets.get(key)
+                if bucket is None:
+                    day_cursor += timedelta(days=1)
+                    continue
+                day_start = datetime.combine(day_cursor, datetime.min.time()).astimezone()
+                day_end = day_start + timedelta(days=1)
+                seg_start = max(s, day_start, range_start)
+                seg_end = min(e, day_end, range_end)
+                dur = max(0.0, (seg_end - seg_start).total_seconds())
+                if dur > 0:
+                    bucket["total"] += dur
+                    bucket[cat] += dur
+                    idle_part = idle_full * (dur / full_span) if full_span > 0 else 0.0
+                    bucket["idle"] += min(idle_part, dur)
+                day_cursor += timedelta(days=1)
+
         out: list[dict[str, Any]] = []
-        for i in range(days - 1, -1, -1):
-            day = today - timedelta(days=i)
-            s = self.summary_for_day(
-                day, project_id=project_id, task_id=task_id, employee_id=employee_id
-            )
-            by_cat = s.get("by_category") or {}
-            total = float(s.get("total_sec") or 0)
-            productive = float(by_cat.get("productive") or 0)
-            neutral = float(by_cat.get("neutral") or 0)
-            distracting = float(by_cat.get("distracting") or 0)
+        cursor = start_d
+        while cursor <= end_d:
+            key = cursor.isoformat()
+            b = buckets[key]
+            total = float(b["total"])
+            idle = min(float(b["idle"]), total)
+            productive = float(b["productive"])
+            neutral = float(b["neutral"])
+            distracting = float(b["distracting"])
+            active = max(0.0, total - idle)
             out.append(
                 {
-                    "day": day.isoformat(),
+                    "day": key,
                     "total_sec": total,
-                    "active_sec": float(s.get("active_sec") or 0),
-                    "idle_sec": float(s.get("idle_sec") or 0),
-                    "focus_sec": float(s.get("focus_sec") or 0),
-                    "focus_pct": float(s.get("focus_pct") or 0),
-                    "activity_pct": float(s.get("activity_pct") or 0),
+                    "active_sec": round(active, 1),
+                    "idle_sec": round(idle, 1),
+                    "focus_sec": productive,
+                    "focus_pct": round((productive / total * 100.0) if total else 0.0, 1),
+                    "activity_pct": round((active / total * 100.0) if total else 0.0, 1),
                     "unproductive_pct": round((distracting / total * 100.0) if total else 0.0, 1),
-                    "idle_pct": round((float(s.get("idle_sec") or 0) / total * 100.0) if total else 0.0, 1),
+                    "idle_pct": round((idle / total * 100.0) if total else 0.0, 1),
                     "by_category": {
                         "productive": productive,
                         "neutral": neutral,
@@ -591,6 +687,7 @@ class Database:
                     },
                 }
             )
+            cursor += timedelta(days=1)
         return out
 
     def summary_range(
