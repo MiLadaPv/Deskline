@@ -315,7 +315,13 @@
     </section>
 
     <section id="panel-shots" class="panel">
-      <h2>Скриншоты</h2>
+      <div class="panel-head">
+        <h2>Скриншоты</h2>
+        <div class="filter-bar">
+          <button type="button" class="btn" id="refreshShotsBtn" title="F5 или Ctrl+R">Обновить</button>
+        </div>
+      </div>
+      <p class="hint">В Desktop список не обновляется сам при каждом кадре — нажмите «Обновить» или F5 / Ctrl+R. Пока вкладка открыта, подгрузка идёт каждые 15 сек.</p>
       <div class="shots-grid" id="shotsGrid"></div>
     </section>
 

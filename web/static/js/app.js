@@ -319,6 +319,8 @@ function setActiveTab(name, { syncHash = true } = {}) {
       history.replaceState(null, "", next);
     }
   }
+  if (tab === "shots") startShotsPolling();
+  else stopShotsPolling();
 }
 
 function setUsageSlice(slice) {
@@ -2249,6 +2251,45 @@ function shotCaption(row) {
   return `${fmtShotWhen(row.taken_at)} · ${fmtShotReason(row.reason)}`;
 }
 
+let shotsPollTimer = null;
+const SHOTS_POLL_MS = 15000;
+
+function stopShotsPolling() {
+  if (shotsPollTimer) {
+    clearInterval(shotsPollTimer);
+    shotsPollTimer = null;
+  }
+}
+
+function startShotsPolling() {
+  stopShotsPolling();
+  shotsPollTimer = setInterval(() => {
+    if (document.querySelector(".tab.active")?.dataset.tab !== "shots") return;
+    if (document.hidden) return;
+    refreshShots().catch(() => {});
+  }, SHOTS_POLL_MS);
+}
+
+function currentTabName() {
+  return document.querySelector(".tab.active")?.dataset.tab || "today";
+}
+
+async function refreshCurrentView({ quiet = false } = {}) {
+  const tab = currentTabName();
+  try {
+    if (tab === "shots") await refreshShots();
+    else if (tab === "today") await refreshSummary();
+    else if (tab === "day") await refreshTimeline();
+    else if (tab === "usage") await refreshUsageReport();
+    else if (tab === "projects") await refreshProjects();
+    else if (tab === "ratings") await refreshRatings();
+    else if (tab === "settings") await loadSettings();
+    if (!quiet) showToast("Обновлено", "ok");
+  } catch (err) {
+    showToast(err?.message || "Не удалось обновить", "error");
+  }
+}
+
 async function refreshShots() {
   const grid = document.getElementById("shotsGrid");
   let rows;
@@ -2701,6 +2742,44 @@ function wireUi() {
       if (tab.dataset.tab === "projects") refreshProjects();
       if (tab.dataset.tab === "usage") refreshUsageReport();
     });
+  });
+
+  document.getElementById("refreshShotsBtn")?.addEventListener("click", async () => {
+    const btn = document.getElementById("refreshShotsBtn");
+    if (btn) {
+      btn.disabled = true;
+      btn.classList.add("is-busy");
+    }
+    try {
+      await refreshShots();
+      showToast("Скриншоты обновлены", "ok");
+    } catch (err) {
+      showToast(err?.message || "Не удалось обновить скриншоты", "error");
+    } finally {
+      if (btn) {
+        btn.disabled = false;
+        btn.classList.remove("is-busy");
+      }
+    }
+  });
+
+  document.addEventListener("keydown", (ev) => {
+    const box = document.getElementById("shotLightbox");
+    if (box && !box.hidden) return;
+    const tag = (ev.target && ev.target.tagName) || "";
+    if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || ev.target?.isContentEditable) {
+      return;
+    }
+    const refreshKey =
+      ev.key === "F5" || ((ev.ctrlKey || ev.metaKey) && (ev.key === "r" || ev.key === "R"));
+    if (!refreshKey) return;
+    ev.preventDefault();
+    refreshCurrentView().catch(() => {});
+  });
+
+  document.addEventListener("visibilitychange", () => {
+    if (document.hidden) return;
+    if (currentTabName() === "shots") refreshShots().catch(() => {});
   });
 
   window.addEventListener("hashchange", () => {
