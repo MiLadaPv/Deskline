@@ -1756,14 +1756,15 @@ html[data-theme="dark"] .rank-row-child {
 
 /* Entrance only on first paint — polling must not re-trigger this (flicker). */
 .donut-segs.is-enter .donut-seg {
-  animation: donutPop 0.55s cubic-bezier(0.22, 1, 0.36, 1) both;
-  animation-delay: calc(var(--i, 0) * 60ms);
+  animation: donutPop 0.7s cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation-delay: calc(var(--i, 0) * 28ms);
+  will-change: transform, opacity;
 }
 
 .donut-seg:hover,
 .donut-seg.is-hot,
 .donut-seg:focus-visible {
-  transform: scale(1.07);
+  transform: translateZ(0) scale(1.07);
   filter: brightness(1.08) saturate(1.08);
 }
 
@@ -1775,11 +1776,11 @@ html[data-theme="dark"] .rank-row-child {
 @keyframes donutPop {
   from {
     opacity: 0;
-    transform: scale(0.86);
+    transform: translateZ(0) scale(0.9);
   }
   to {
     opacity: 1;
-    transform: scale(1);
+    transform: translateZ(0) scale(1);
   }
 }
 
@@ -2273,7 +2274,9 @@ html[data-theme="dark"] .rank-row-child {
   filter: blur(28px);
   opacity: 0.55;
   pointer-events: none;
-  animation: boot-glow 1.6s ease both;
+  transform: translateZ(0);
+  will-change: transform, opacity;
+  animation: boot-glow 1.4s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
 @keyframes boot-glow {
@@ -2297,23 +2300,26 @@ html[data-theme="dark"] .rank-row-child {
   border: 0;
   border-radius: 0;
   box-shadow: none;
-  filter: drop-shadow(0 0 28px color-mix(in srgb, var(--accent) 22%, transparent));
+  /* Soft glow via shadow — avoids per-frame SVG/CSS filter thrash on WebP. */
+  filter: none;
   image-rendering: auto;
   position: relative;
   z-index: 1;
-  animation: boot-logo-in 1.15s cubic-bezier(0.22, 1, 0.36, 1) both;
+  transform: translateZ(0);
+  will-change: transform, opacity;
+  backface-visibility: hidden;
+  animation: boot-logo-in 0.9s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
 @keyframes boot-logo-in {
-  from { opacity: 0; transform: scale(0.88) translateY(14px); }
-  to { opacity: 1; transform: scale(1) translateY(0); }
+  from { opacity: 0; transform: translate3d(0, 10px, 0) scale(0.94); }
+  to { opacity: 1; transform: translate3d(0, 0, 0) scale(1); }
 }
 
 .boot-logo-anim-dark { display: none; }
 html[data-theme="dark"] .boot-logo-anim-light { display: none; }
 html[data-theme="dark"] .boot-logo-anim-dark {
   display: block;
-  filter: drop-shadow(0 0 34px rgba(94, 234, 212, 0.18));
 }
 
 .boot-splash-title {
