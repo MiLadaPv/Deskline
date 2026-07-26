@@ -1,24 +1,26 @@
 # Deskline
 
-Local-first Windows productivity tracker by **AndalusGames**. Activity stays on your PC.
+Local-first Windows productivity tracker by **AndalusGames**.
 
-## Try it (Time Doctor–style funnel)
+**One line:** Time Doctor–style focus tracking — data stays on your PC.
 
-1. **Chrome extension** — load [`extension/`](extension/) unpacked for browser-only tracking ([extension/README.md](extension/README.md)).
-2. **Desktop app** — native Windows window for all apps, optional screenshots, tray Recording/Paused.
+## Try it
 
-Sale one-pager: [docs/pitch.md](docs/pitch.md)
+1. **Chrome extension** — [extension/](extension/) (Web Store listing: [docs/CHROME_WEB_STORE.md](docs/CHROME_WEB_STORE.md)) or `scripts/pack_extension.ps1`.
+2. **Desktop** — download from [GitHub Releases](https://github.com/MiLadaPv/Deskline/releases/latest) or build with `scripts/prepare_release.ps1`.
+
+Sale / GTM: [docs/pitch.md](docs/pitch.md) · [docs/GTM_90.md](docs/GTM_90.md)
 
 ## Plans
 
-| | **Free** | **Pro** |
-|--|----------|---------|
-| Tracking, focus reports, tray | Yes | Yes |
-| History | 14 days | Unlimited |
-| Projects | Up to 3 | Unlimited |
-| Screenshots | No | Yes |
-| Export JSON/CSV | No | Yes |
-| Company LAN hub | Later (**Team**) | Later (**Team**) |
+| | **Free** | **Pro** | **Team** |
+|--|----------|---------|----------|
+| Tracking, focus reports, tray | Yes | Yes | Yes |
+| History | 14 days | Unlimited | Unlimited |
+| Projects | Up to 3 | Unlimited | Unlimited |
+| Screenshots | No | Yes | Yes |
+| Export JSON/CSV | No | Yes | Yes |
+| Company LAN hub | No | No | **Yes** |
 
 14-day **Pro trial** starts on first launch. Buy via Lemon Squeezy and paste the license key in Settings. See [docs/LEMON_SQUEEZY.md](docs/LEMON_SQUEEZY.md).
 
@@ -32,39 +34,24 @@ Deskline.bat
 
 Or: `powershell -ExecutionPolicy Bypass -File scripts\run_desktop.ps1`
 
-First-time script install (copies Tauri shell + Python venv):
-
-```bat
-install.bat
-```
-
-Requires a built shell (`cd deskline-desktop && npm run build`). If the backend fails, Deskline shows an error dialog and writes `%LOCALAPPDATA%\Deskline\desktop.log` — it will not open a blank window.
-
-Dashboard: http://127.0.0.1:8787 · Marketing: http://127.0.0.1:8787/welcome
-
-## Browser extension (Chrome)
-
-```text
-chrome://extensions → Developer mode → Load unpacked → extension/
-```
-
-Popup: Pause/Resume, today’s browser time, **Get Desktop** when the local API is offline. When Desktop is running on `:8787`, tab segments sync via `/api/extension/event`.
+Dashboard: http://127.0.0.1:8787 · Marketing: http://127.0.0.1:8787/welcome · Compare: http://127.0.0.1:8787/docs/compare
 
 ## Privacy
 
 - Data: `%LOCALAPPDATA%\Deskline`
-- No activity cloud sync; license validation only when activating Pro
-- Autostart off by default (`Deskline` Run key)
+- Policy: [docs/PRIVACY_POLICY.md](docs/PRIVACY_POLICY.md)
+- No activity cloud sync; license validation only when activating Pro/Team
+- Autostart off by default
 
-## Installer (buyer artifact)
+## Installer
 
 ```bat
 build_installer.bat
 ```
 
-Builds Tauri shell + PyInstaller backend, then Inno Setup → `release\DesklineSetup-*.exe`. Shortcuts launch **`deskline-desktop.exe`**. Sign before public release: [docs/SIGNING.md](docs/SIGNING.md). Publish checklist: [docs/PUBLISH_CHECKLIST.md](docs/PUBLISH_CHECKLIST.md).
+Or full prep: `powershell -ExecutionPolicy Bypass -File scripts\prepare_release.ps1`
 
-Extension zip for buyers: zip the `extension/` folder.
+Sign before public release: [docs/SIGNING.md](docs/SIGNING.md). Checklist: [docs/PUBLISH_CHECKLIST.md](docs/PUBLISH_CHECKLIST.md).
 
 ## Develop / test
 
@@ -76,3 +63,4 @@ python -m pytest -q
 
 - Keylogging / clipboard / mic
 - Stealth remote sync / mandatory cloud
+- DLP / live screen video walls

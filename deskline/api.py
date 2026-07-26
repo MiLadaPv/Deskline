@@ -152,6 +152,11 @@ class LicenseActivateBody(BaseModel):
     key: str = Field(min_length=4, max_length=200)
 
 
+class FunnelEventBody(BaseModel):
+    event: str = Field(min_length=2, max_length=64)
+    meta: dict[str, Any] | None = None
+
+
 class OnboardingBody(BaseModel):
     done: bool = True
 
@@ -320,7 +325,7 @@ def _team_required(feature: str) -> None:
         detail={
             "code": "team_required",
             "feature": feature,
-            "message": "Режим компании будет в Deskline Team",
+            "message": "Режим компании доступен в Deskline Team — активируйте ключ Team",
             "entitlements": entitlements_public_dict(ent),
         },
     )
@@ -376,11 +381,40 @@ def create_app(tracker: Tracker, db: Database | None = None) -> FastAPI:
 
     @app.get("/welcome", response_class=HTMLResponse)
     def welcome_page(request: Request) -> HTMLResponse:
+        try:
+            from deskline.funnel import record_funnel_event
+
+            record_funnel_event("welcome_view")
+        except Exception:
+            pass
         return templates.TemplateResponse(
             request,
             "welcome.html",
             brand_template_context(),
         )
+
+    @app.get("/docs/compare", response_class=HTMLResponse)
+    def compare_page(request: Request) -> HTMLResponse:
+        ctx = brand_template_context()
+        ctx["compare_cards"] = [
+            {
+                "title": "vs Time Doctor / Hubstaff",
+                "body": "Та же идея фокуса и картины дня, но активность не обязана жить в облаке вендора.",
+            },
+            {
+                "title": "vs RescueTime",
+                "body": "Личная продуктивность плюс нативный Windows desktop, проекты и Team LAN hub.",
+            },
+            {
+                "title": "vs Yaware / Kickidler",
+                "body": "Не видеоэкрана и не DLP — мягкий учёт фокуса для себя и маленькой команды.",
+            },
+            {
+                "title": "vs Toggl / Clockify",
+                "body": "Автотрекинг активного окна, а не ручные таймшиты и биллинг.",
+            },
+        ]
+        return templates.TemplateResponse(request, "compare.html", ctx)
 
     @app.get("/logos", response_class=HTMLResponse)
     def logos_page(request: Request) -> HTMLResponse:
@@ -1015,7 +1049,7 @@ def create_app(tracker: Tracker, db: Database | None = None) -> FastAPI:
                 detail={
                     "code": "team_required",
                     "feature": "company_hub",
-                    "message": "LAN hub будет в Deskline Team",
+                    "message": "LAN hub доступен в Deskline Team — активируйте ключ Team",
                     "entitlements": entitlements_public_dict(ent),
                 },
             )
@@ -1182,7 +1216,31 @@ def create_app(tracker: Tracker, db: Database | None = None) -> FastAPI:
         except ValueError as exc:
             raise HTTPException(400, str(exc)) from exc
         ent, _ = _load_entitlements()
+        try:
+            from deskline.funnel import record_funnel_event
+
+            if ent.is_team:
+                record_funnel_event("team_activate")
+            elif ent.is_pro:
+                record_funnel_event("pro_activate")
+        except Exception:
+            pass
         return {"ok": True, "entitlements": entitlements_public_dict(ent)}
+
+    @app.post("/api/funnel")
+    def funnel_post(body: FunnelEventBody) -> dict[str, Any]:
+        from deskline.funnel import record_funnel_event
+
+        ok = record_funnel_event(body.event, body.meta)
+        if not ok:
+            raise HTTPException(400, "Unknown or failed funnel event")
+        return {"ok": True}
+
+    @app.get("/api/funnel")
+    def funnel_get(limit: int = 50) -> dict[str, Any]:
+        from deskline.funnel import read_funnel_tail
+
+        return {"events": read_funnel_tail(limit)}
 
     @app.post("/api/license/deactivate")
     def license_deactivate() -> dict[str, Any]:

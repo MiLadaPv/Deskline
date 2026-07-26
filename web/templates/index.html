@@ -403,6 +403,7 @@
             <button type="button" class="btn primary" id="licenseActivateBtn">Активировать</button>
             <button type="button" class="btn" id="licenseDeactivateBtn">Снять ключ</button>
             <a class="btn" id="checkoutAnnual" href="/welcome#pricing" target="_blank" rel="noopener">Купить Pro</a>
+            <a class="btn" id="checkoutTeam" href="/welcome#pricing" target="_blank" rel="noopener">Купить Team</a>
           </div>
           <p class="hint">Оплата через Lemon Squeezy. После покупки вставьте ключ сюда. Trial Pro — 14 дней с первого запуска.</p>
         </div>
@@ -415,10 +416,15 @@
         <p class="hint">Экспорт — Pro. Очистка данных — внизу страницы настроек.</p>
 
         <h3 class="subhead">Компания (LAN hub)</h3>
-        <p class="hint" id="teamUpsellHint">Режим компании входит в будущий тариф Team. На Free/Pro кнопка ниже заблокирована.</p>
+        <p class="hint" id="teamUpsellHint">Режим компании входит в тариф <strong>Team</strong>. На Free/Pro кнопка ниже заблокирована — активируйте ключ Team в блоке лицензии.</p>
+        <ol class="hint hub-steps">
+          <li><strong>Хаб:</strong> активируйте Team → включите «Режим компании» → слушайте <code>0.0.0.0</code> → добавьте сотрудника и скопируйте токен.</li>
+          <li><strong>Агент:</strong> на другом ПК впишите URL hub (<code>http://&lt;IP-хаба&gt;:8787</code>) и ingest-токен ниже → сохраните.</li>
+          <li>Закрытые сессии агента появятся в сводке команды на хабе. Облако активности не требуется.</li>
+        </ol>
         <label class="check">
           <input type="checkbox" name="company_mode" id="companyModeToggle" />
-          Режим компании — принимать данные сотрудников по сети
+          Режим компании — этот ПК = hub (принимать данные по LAN)
         </label>
         <label>
           Название компании

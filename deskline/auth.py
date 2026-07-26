@@ -553,6 +553,7 @@ def is_public_path(path: str) -> bool:
     if path in {
         "/login",
         "/welcome",
+        "/docs/compare",
         "/logos",
         "/about",
         "/privacy",

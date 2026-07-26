@@ -1,0 +1,45 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  draft-release:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install deps
+        run: |
+          python -m pip install -U pip
+          pip install -e ".[dev]" 2>$null; if ($LASTEXITCODE -ne 0) { pip install -e .; pip install pytest }
+
+      - name: Tests
+        run: python -m pytest -q
+
+      - name: Pack extension
+        run: powershell -ExecutionPolicy Bypass -File scripts/pack_extension.ps1
+
+      - name: Upload extension artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: deskline-extension
+          path: release/Deskline-Extension-*.zip
+
+      - name: Create draft GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          $ver = $env:GITHUB_REF_NAME.TrimStart('v')
+          $zip = Get-ChildItem release/Deskline-Extension-*.zip | Select-Object -First 1
+          $notes = "Deskline $env:GITHUB_REF_NAME — local-first Windows focus tracker.`n`nExtension zip attached. Build and sign Setup.exe on the release machine (see docs/SIGNING.md), then edit this draft to attach DesklineSetup-$ver.exe + SHA256SUMS.txt."
+          gh release create $env:GITHUB_REF_NAME $zip.FullName --draft --title "Deskline $env:GITHUB_REF_NAME" --notes $notes

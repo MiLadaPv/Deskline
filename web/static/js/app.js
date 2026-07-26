@@ -204,6 +204,8 @@ function applyEntitlements(ent) {
   }
   const annual = document.getElementById("checkoutAnnual");
   if (annual && ent.checkout?.annual) annual.href = ent.checkout.annual;
+  const teamBuy = document.getElementById("checkoutTeam");
+  if (teamBuy && ent.checkout?.team) teamBuy.href = ent.checkout.team;
   const companyToggle = document.getElementById("companyModeToggle");
   if (companyToggle) {
     companyToggle.disabled = !ent.company_hub;

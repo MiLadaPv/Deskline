@@ -16,19 +16,50 @@
         background: #eef2f0;
         padding: 0.1em 0.35em;
       }
+      a.btn {
+        display: inline-block;
+        margin: 0.35rem 0.5rem 0.35rem 0;
+        padding: 0.55rem 0.9rem;
+        background: #1f6b56;
+        color: #fff;
+        text-decoration: none;
+        border-radius: 6px;
+        font-weight: 600;
+      }
+      a.btn.secondary {
+        background: #eef2f0;
+        color: #1c2421;
+      }
+      .muted { color: #5c6b64; font-size: 0.92rem; }
     </style>
   </head>
   <body>
     <h1>Deskline Desktop</h1>
     <p>
       The browser extension tracks tabs only. Install the Windows desktop app for
-      full app tracking, screenshots, tray controls, and the local dashboard.
+      full app tracking, optional screenshots, tray controls, and the local dashboard.
+      Activity stays on your PC — Time Doctor–style focus, privacy-first.
+    </p>
+    <p>
+      <a class="btn" href="https://github.com/MiLadaPv/Deskline/releases/latest" target="_blank" rel="noreferrer"
+        >Download Windows Setup</a
+      >
+      <a class="btn secondary" href="https://github.com/MiLadaPv/Deskline" target="_blank" rel="noreferrer"
+        >GitHub</a
+      >
     </p>
     <ol>
-      <li>Run <code>install.bat</code> or <code>release\DesklineSetup-*.exe</code> from the Deskline project.</li>
-      <li>Double-click the Desktop shortcut — a native window should open.</li>
-      <li>Return here: the popup will show <strong>Open dashboard</strong> when Desktop is online.</li>
+      <li>Install <code>DesklineSetup-*.exe</code> from the latest GitHub Release.</li>
+      <li>Launch Deskline — a native window opens (dashboard on <code>http://127.0.0.1:8787</code>).</li>
+      <li>Return here: the popup shows <strong>Open dashboard</strong> when Desktop is online.</li>
     </ol>
-    <p>Sale / product story: see <code>docs/pitch.md</code> in the repo.</p>
+    <p class="muted">
+      Privacy:
+      <a href="https://github.com/MiLadaPv/Deskline/blob/master/docs/PRIVACY_POLICY.md" target="_blank" rel="noreferrer"
+        >policy</a
+      >
+      · Support:
+      <a href="mailto:milanochka.llc@gmail.com">milanochka.llc@gmail.com</a>
+    </p>
   </body>
 </html>

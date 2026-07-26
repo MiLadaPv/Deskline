@@ -201,6 +201,10 @@ def checkout_urls() -> dict[str, str]:
             "DESKLINE_CHECKOUT_URL_LIFETIME",
             "https://andalusgames.lemonsqueezy.com/checkout/buy/deskline-pro-lifetime",
         ),
+        "team": os.environ.get(
+            "DESKLINE_CHECKOUT_URL_TEAM",
+            "https://andalusgames.lemonsqueezy.com/checkout/buy/deskline-team",
+        ),
         "pricing_page": "/welcome#pricing",
     }
 

@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Deskline · Сравнения</title>
+  <meta name="description" content="Deskline vs Time Doctor, RescueTime, Yaware, Kickidler, Toggl — local-first focus tracking." />
+  <link rel="canonical" href="{{ base_url }}/docs/compare" />
+  <script src="/static/js/theme.js?v={{ version }}"></script>
+  <link rel="stylesheet" href="/static/css/app.css?v={{ version }}" />
+  <link rel="icon" href="/static/img/logo.png" type="image/png" />
+</head>
+<body class="welcome-body">
+  <div class="atmosphere" aria-hidden="true"></div>
+  <header class="welcome-top">
+    <a class="brand-lockup welcome-lockup" href="/welcome">
+      <span class="brand-lockup-name">Deskline</span>
+    </a>
+    <nav class="welcome-nav">
+      <a href="/welcome#pricing">Тарифы</a>
+      <a class="btn primary" href="{{ download_setup_url }}" target="_blank" rel="noopener noreferrer">Скачать</a>
+    </nav>
+  </header>
+  <main class="welcome-main">
+    <section class="welcome-hero">
+      <p class="eyebrow">comparisons</p>
+      <h1>Чем мы не похожи на конкурентов</h1>
+      <p class="welcome-lead">
+        Time Doctor–style focus tracking — <strong>данные остаются на вашем ПК</strong>.
+      </p>
+    </section>
+    <section class="welcome-compare">
+      <div class="compare-grid">
+        {% for card in compare_cards %}
+        <article class="compare-card">
+          <h3>{{ card.title }}</h3>
+          <p>{{ card.body }}</p>
+        </article>
+        {% endfor %}
+      </div>
+      <p class="hint" style="margin-top:18px">
+        Полные заметки в репозитории:
+        <a href="{{ github_url }}/tree/master/docs/comparisons" target="_blank" rel="noopener noreferrer">docs/comparisons</a>
+      </p>
+    </section>
+  </main>
+  <footer class="welcome-foot">
+    <p><a href="/welcome">← Welcome</a> · <a href="/privacy">Privacy</a></p>
+  </footer>
+</body>
+</html>

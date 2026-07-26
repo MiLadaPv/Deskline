@@ -16,7 +16,7 @@ from deskline.config import (
 def test_brand_constants():
     assert COMPANY_NAME == "AndalusGames"
     assert SUPPORT_EMAIL == "milanochka.llc@gmail.com"
-    assert GITHUB_URL == "https://github.com/AndalusGames"
+    assert GITHUB_URL == "https://github.com/MiLadaPv/Deskline"
     assert "Jordan" in LEGAL_JURISDICTION
 
 
@@ -25,12 +25,22 @@ def test_brand_template_context_fields():
     assert ctx["company_name"] == COMPANY_NAME
     assert ctx["support_email"] == SUPPORT_EMAIL
     assert ctx["github_url"] == GITHUB_URL
+    assert ctx["download_setup_url"].endswith("/releases/latest")
     assert ctx["version"] == "9.9.9"
     assert ctx["copyright_year"] >= 2026
 
 
 def test_legal_paths_are_public():
-    for path in ("/about", "/privacy", "/terms", "/login", "/welcome", "/logos", "/static/css/app.css"):
+    for path in (
+        "/about",
+        "/privacy",
+        "/terms",
+        "/login",
+        "/welcome",
+        "/docs/compare",
+        "/logos",
+        "/static/css/app.css",
+    ):
         assert is_public_path(path)
     assert not is_public_path("/")
     assert not is_public_path("/api/settings")

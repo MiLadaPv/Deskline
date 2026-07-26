@@ -14,7 +14,8 @@ BASE_URL = f"http://{HOST}:{PORT}"
 # Public brand / legal (shown in footer and /about|/privacy|/terms)
 COMPANY_NAME = "AndalusGames"
 SUPPORT_EMAIL = "milanochka.llc@gmail.com"
-GITHUB_URL = "https://github.com/AndalusGames"
+GITHUB_URL = "https://github.com/MiLadaPv/Deskline"
+GITHUB_RELEASES_URL = f"{GITHUB_URL}/releases"
 LEGAL_JURISDICTION = "Hashemite Kingdom of Jordan"
 
 PACKAGE_ROOT = Path(__file__).resolve().parent
@@ -162,6 +163,9 @@ def brand_template_context(*, version: str | None = None, base_url: str | None =
         "company_name": COMPANY_NAME,
         "support_email": SUPPORT_EMAIL,
         "github_url": GITHUB_URL,
+        "github_releases_url": GITHUB_RELEASES_URL,
+        "download_setup_url": f"{GITHUB_URL}/releases/latest",
+        "privacy_policy_url": f"{GITHUB_URL}/blob/master/docs/PRIVACY_POLICY.md",
         "legal_jurisdiction": LEGAL_JURISDICTION,
         "copyright_year": datetime.now().astimezone().year,
     }

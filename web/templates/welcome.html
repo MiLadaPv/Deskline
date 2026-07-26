@@ -4,7 +4,16 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Deskline · Local focus tracker by {{ company_name }}</title>
-  <meta name="description" content="Deskline — локальный трекер фокуса для Windows. Free навсегда, Pro — скриншоты, история и экспорт. Данные остаются на вашем ПК." />
+  <meta name="description" content="Time Doctor–style focus tracking — данные остаются на вашем ПК. Free, Pro и Team (LAN hub) для Windows." />
+  <link rel="canonical" href="{{ base_url }}/welcome" />
+  <meta property="og:type" content="website" />
+  <meta property="og:title" content="Deskline — local-first focus tracker" />
+  <meta property="og:description" content="Time Doctor–style focus tracking. Data stays on your PC. Windows Free / Pro / Team." />
+  <meta property="og:url" content="{{ base_url }}/welcome" />
+  <meta property="og:image" content="{{ base_url }}/static/img/logo.png" />
+  <meta name="twitter:card" content="summary" />
+  <meta name="twitter:title" content="Deskline — local-first focus tracker" />
+  <meta name="twitter:description" content="Focus tracking without a mandatory activity cloud." />
   <script src="/static/js/theme.js?v={{ version }}"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -23,37 +32,62 @@
     </a>
     <nav class="welcome-nav">
       <button type="button" class="theme-toggle" id="themeToggle" title="Тема">Тема</button>
+      <a href="#compare">Сравнение</a>
       <a href="#pricing">Тарифы</a>
       <a href="/privacy">Privacy</a>
       <a href="/terms">Terms</a>
-      <a class="btn primary" href="/login">Открыть приложение</a>
+      <a class="btn primary" href="{{ download_setup_url }}" target="_blank" rel="noopener noreferrer">Скачать</a>
     </nav>
   </header>
 
   <main class="welcome-main">
     <section class="welcome-hero">
       <p class="eyebrow">by {{ company_name }} · Windows · local-first</p>
-      <h1>Верни контроль над рабочим днём</h1>
+      <h1>Deskline</h1>
       <p class="welcome-lead">
-        Deskline считает фокус на вашем ПК. Без облака активности, без кейлоггера —
-        понятная картина дня и спокойствие вечером.
+        Time Doctor–style focus tracking — <strong>данные остаются на вашем ПК</strong>.
+        Без обязательного облака активности, без кейлоггера.
       </p>
       <div class="welcome-cta">
-        <a class="btn primary" href="/login">Запустить Deskline</a>
-        <a class="btn" href="/logos">Галерея логотипов</a>
-        <a class="btn" href="{{ github_url }}" target="_blank" rel="noopener noreferrer">GitHub / Releases</a>
+        <a class="btn primary" href="{{ download_setup_url }}" target="_blank" rel="noopener noreferrer">Скачать Windows Setup</a>
+        <a class="btn" href="/login">Открыть приложение</a>
+        <a class="btn" href="{{ github_releases_url }}" target="_blank" rel="noopener noreferrer">GitHub Releases</a>
       </div>
       <ul class="welcome-bullets">
         <li>Трекинг приложений и сайтов локально</li>
         <li>14 дней Pro trial с первого запуска</li>
-        <li>Free навсегда для базового фокуса</li>
+        <li>Free / Pro / Team (LAN hub)</li>
       </ul>
     </section>
 
+    <section class="welcome-compare" id="compare">
+      <h2>Чем Deskline отличается</h2>
+      <p class="welcome-lead">Мы не шпион и не простой таймер — фокус и privacy на Windows.</p>
+      <div class="compare-grid">
+        <article class="compare-card">
+          <h3>vs Time Doctor / Hubstaff</h3>
+          <p>Похожая картина дня и фокус%, но активность не обязана уходить в облако вендора. Deskline — local-first.</p>
+        </article>
+        <article class="compare-card">
+          <h3>vs RescueTime</h3>
+          <p>Тоже про личную продуктивность, плюс нативный Windows desktop, проекты, Pro-скрины и Team LAN hub.</p>
+        </article>
+        <article class="compare-card">
+          <h3>vs Yaware / Kickidler</h3>
+          <p>Не видеоэкрана и не DLP. Мягкий учёт фокуса для себя и маленькой команды — без «тотального контроля».</p>
+        </article>
+        <article class="compare-card">
+          <h3>vs Toggl / Clockify</h3>
+          <p>Не ручные таймшиты. Автотрекинг активного окна и браузера с отчётом фокуса.</p>
+        </article>
+      </div>
+      <p class="hint"><a href="/docs/compare">Подробные сравнения</a> · <a href="{{ privacy_policy_url }}" target="_blank" rel="noopener noreferrer">Privacy policy</a></p>
+    </section>
+
     <section class="welcome-pricing" id="pricing">
-      <h2>Free и Pro</h2>
+      <h2>Free, Pro и Team</h2>
       <p class="welcome-lead">Оплата через Lemon Squeezy (Merchant of Record). Ключ активируется в настройках.</p>
-      <div class="pricing-grid">
+      <div class="pricing-grid pricing-grid-3">
         <article class="price-card">
           <h3>Free</h3>
           <p class="price-amount">$0</p>
@@ -76,8 +110,19 @@
             <li>Неограниченные проекты</li>
             <li>Экспорт JSON / CSV</li>
           </ul>
-          <a class="btn primary" href="/login">Активировать в приложении</a>
-          <p class="hint">Team (LAN hub) — следующий SKU после Pro.</p>
+          <a class="btn primary" href="/login">Активировать Pro</a>
+        </article>
+        <article class="price-card price-card-team">
+          <h3>Team</h3>
+          <p class="price-amount">LAN hub</p>
+          <ul>
+            <li>Всё из Pro</li>
+            <li>Режим компании на вашем ПК</li>
+            <li>Сотрудники и ingest-токены</li>
+            <li>Сводка команды по LAN</li>
+            <li>Без обязательного облака активности</li>
+          </ul>
+          <a class="btn primary" href="/login">Активировать Team</a>
         </article>
       </div>
     </section>
@@ -86,15 +131,19 @@
       <h2>FAQ</h2>
       <details open>
         <summary>Это кейлоггер?</summary>
-        <p>Нет. Deskline не читает клавиатуру, буфер обмена и микрофон. Только активное окно и (в Pro) опциональные скриншоты.</p>
+        <p>Нет. Deskline не читает клавиатуру, буфер обмена и микрофон. Только активное окно и (в Pro/Team) опциональные скриншоты.</p>
       </details>
       <details>
         <summary>Куда уходят данные?</summary>
-        <p>Активность и скриншоты хранятся в %LOCALAPPDATA%\Deskline. В облако для оплаты уходит только проверка лицензии.</p>
+        <p>Активность и скриншоты хранятся в %LOCALAPPDATA%\Deskline. В облако для оплаты уходит только проверка лицензии (Lemon Squeezy).</p>
       </details>
       <details>
-        <summary>Как купить Pro?</summary>
-        <p>Оформите заказ в Lemon Squeezy, вставьте ключ в Настройки → Лицензия. Поддержка: <a href="mailto:{{ support_email }}">{{ support_email }}</a>.</p>
+        <summary>Как купить Pro или Team?</summary>
+        <p>Оформите заказ в Lemon Squeezy, вставьте ключ в Настройки → Лицензия. Dev/demo: см. docs. Поддержка: <a href="mailto:{{ support_email }}">{{ support_email }}</a>.</p>
+      </details>
+      <details>
+        <summary>Как работает Team?</summary>
+        <p>Один ПК — хаб в LAN; другие машины шлют сессии по ingest-токену. Облачный multi-tenant SaaS не требуется.</p>
       </details>
     </section>
   </main>

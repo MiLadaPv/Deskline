@@ -120,8 +120,39 @@ def test_api_project_limit_and_license(tmp_path: Path, monkeypatch):
     r = client.put("/api/settings", json={"company_mode": True})
     assert r.status_code == 402
 
+    r = client.post("/api/license/activate", json={"key": "DESKLINE-TEAM-DEV"})
+    assert r.status_code == 200
+    assert r.json()["entitlements"]["company_hub"] is True
+    r = client.put("/api/settings", json={"company_mode": True, "company_display_name": "Demo Co"})
+    assert r.status_code == 200
+    r = client.get("/api/company")
+    assert r.status_code == 200
+    assert r.json().get("company_mode") is True
 
-def test_welcome_public(tmp_path: Path, monkeypatch):
+
+def test_team_license_unlocks_hub(iso_now, monkeypatch, tmp_path: Path):
+    monkeypatch.setenv("DESKLINE_LICENSE_DEV", "1")
+    monkeypatch.setattr("deskline.config.DATA_ROOT", tmp_path)
+    monkeypatch.setattr("deskline.license_store.LICENSE_PATH", tmp_path / "license.json")
+    tmp_path.mkdir(parents=True, exist_ok=True)
+
+    clear_license()
+    activate_license("DESKLINE-TEAM-DEV")
+    lic = load_license()
+    assert lic and lic["tier"] == "team"
+    ent = resolve_entitlements(
+        {"first_run_at": (iso_now - timedelta(days=40)).isoformat()}, lic, now=iso_now
+    )
+    assert ent.is_team
+    assert ent.is_pro
+    assert ent.company_hub is True
+    from deskline.entitlements import checkout_urls
+
+    assert "team" in checkout_urls()
+    deactivate_local()
+
+
+def test_welcome_and_compare_public(tmp_path: Path, monkeypatch):
     monkeypatch.setattr("deskline.config.DATA_ROOT", tmp_path)
     monkeypatch.setattr("deskline.config.DB_PATH", tmp_path / "deskline.db")
     monkeypatch.setattr("deskline.config.SCREENSHOTS_DIR", tmp_path / "screenshots")
@@ -136,7 +167,24 @@ def test_welcome_public(tmp_path: Path, monkeypatch):
     client = TestClient(create_app(Tracker(db), db))
     r = client.get("/welcome")
     assert r.status_code == 200
-    assert "Free" in r.text and "Pro" in r.text
+    assert "Free" in r.text and "Pro" in r.text and "Team" in r.text
+    assert "releases/latest" in r.text
+    assert "og:title" in r.text
+    r2 = client.get("/docs/compare")
+    assert r2.status_code == 200
+    assert "Time Doctor" in r2.text
+
+
+def test_funnel_events(tmp_path: Path, monkeypatch):
+    monkeypatch.setattr("deskline.config.DATA_ROOT", tmp_path)
+    monkeypatch.setattr("deskline.funnel.DATA_ROOT", tmp_path)
+    tmp_path.mkdir(parents=True, exist_ok=True)
+    from deskline.funnel import read_funnel_tail, record_funnel_event
+
+    assert record_funnel_event("welcome_view")
+    assert not record_funnel_event("not_a_real_event")
+    rows = read_funnel_tail(10)
+    assert rows and rows[-1]["event"] == "welcome_view"
 
 
 def test_trial_active_helper(iso_now):

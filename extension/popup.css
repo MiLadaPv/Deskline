@@ -92,3 +92,15 @@ button {
   font-size: 0.75rem;
   line-height: 1.35;
 }
+
+.ext-foot {
+  margin-top: 14px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(232, 240, 236, 0.12);
+  font-size: 0.72rem;
+  color: var(--muted);
+}
+
+.ext-foot a {
+  color: #b6e0d0;
+}

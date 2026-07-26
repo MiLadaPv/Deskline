@@ -1,8 +1,9 @@
 {
   "manifest_version": 3,
   "name": "Deskline",
-  "version": "0.5.29",
-  "description": "Track browser focus time. Pair with Deskline Desktop for full Windows app tracking.",
+  "version": "0.5.30",
+  "description": "Track browser focus time. Pair with Deskline Desktop for full Windows app tracking — data stays on your PC.",
+  "homepage_url": "https://github.com/MiLadaPv/Deskline",
   "action": {
     "default_title": "Deskline",
     "default_popup": "popup.html",

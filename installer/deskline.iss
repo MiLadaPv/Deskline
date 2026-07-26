@@ -1,8 +1,8 @@
 ; Deskline Inno Setup script — Tauri shell + PyInstaller backend
 #define MyAppName "Deskline"
-#define MyAppVersion "0.5.29"
+#define MyAppVersion "0.5.30"
 #define MyAppPublisher "AndalusGames"
-#define MyAppURL "https://github.com/AndalusGames"
+#define MyAppURL "https://github.com/MiLadaPv/Deskline"
 #define MyAppExeName "deskline-desktop.exe"
 
 [Setup]
@@ -25,7 +25,7 @@ PrivilegesRequiredOverridesAllowed=dialog
 ArchitecturesInstallIn64BitMode=x64compatible
 UninstallDisplayIcon={app}\{#MyAppExeName}
 InfoBeforeFile=
-LicenseFile=
+LicenseFile=LICENSE.txt
 
 [Languages]
 Name: "english"; MessagesFile: "compiler:Default.isl"

@@ -14,24 +14,24 @@ SmartScreen warnings and block conversion.
 | Artifact | Path |
 |----------|------|
 | Tracker binary | `dist/Deskline/Deskline.exe` (+ DLLs if required by policy) |
-| Setup (Inno) | `release/DesklineSetup-0.5.0.exe` |
-| Tauri NSIS/MSI | `deskline-desktop/src-tauri/target/release/bundle/...` |
+| Setup (Inno) | `release/DesklineSetup-<version>.exe` |
+| Tauri shell | `deskline-desktop.exe` inside the staged app dir |
 
 ## Sign command (example)
 
 ```bat
-signtool sign /fd SHA256 /tr http://timestamp.digicert.com /td SHA256 /a DesklineSetup-0.5.0.exe
-signtool verify /pa /v DesklineSetup-0.5.0.exe
+signtool sign /fd SHA256 /tr http://timestamp.digicert.com /td SHA256 /a release\DesklineSetup-0.5.30.exe
+signtool verify /pa /v release\DesklineSetup-0.5.30.exe
 ```
 
 ## Release pipeline order
 
-1. Bump `__version__`, `pyproject.toml`, `installer/deskline.iss`, `tauri.conf.json` to the same version.
+1. Bump `__version__`, `pyproject.toml`, `installer/deskline.iss`, `tauri.conf.json`, `extension/manifest.json`.
 2. `python -m pytest -q`
-3. `scripts/build_installer.ps1` (or Tauri `npm run build`)
+3. `powershell -ExecutionPolicy Bypass -File scripts\prepare_release.ps1`
 4. Sign all shipping binaries
-5. Upload to GitHub Releases (`AndalusGames/Deskline`) with SHA256 checksums
-6. Update marketing `/welcome` download link
+5. Upload to GitHub Releases (`https://github.com/MiLadaPv/Deskline`) with `SHA256SUMS.txt`
+6. Confirm `/welcome` “Скачать” points at `releases/latest`
 
 ## Not done in-repo
 
