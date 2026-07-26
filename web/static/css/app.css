@@ -4240,6 +4240,34 @@ html[data-theme="dark"] .google-btn {
   font-size: 0.78rem;
 }
 
+.btn.icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  height: 42px;
+  padding: 0;
+  border-radius: 12px;
+}
+
+.btn.icon-btn .icon-refresh {
+  display: block;
+}
+
+.btn.icon-btn.is-busy .icon-refresh {
+  animation: iconSpin 0.7s linear infinite;
+}
+
+@keyframes iconSpin {
+  to { transform: rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .btn.icon-btn.is-busy .icon-refresh {
+    animation: none;
+  }
+}
+
 @media (max-width: 980px) {
   .pulse-overview {
     grid-template-columns: repeat(3, minmax(0, 1fr));
