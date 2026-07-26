@@ -2251,9 +2251,30 @@ html[data-theme="dark"] .rank-row-child {
   z-index: 1000;
   display: grid;
   place-content: center;
-  gap: 12px;
+  gap: 14px;
   background: var(--paper);
-  transition: opacity 0.45s ease, visibility 0.45s ease;
+  transition: opacity 0.55s ease, visibility 0.55s ease;
+}
+
+.boot-splash::before {
+  content: "";
+  position: absolute;
+  inset: 18% 28%;
+  border-radius: 50%;
+  background: radial-gradient(
+    circle,
+    color-mix(in srgb, var(--accent) 28%, transparent),
+    transparent 68%
+  );
+  filter: blur(28px);
+  opacity: 0.55;
+  pointer-events: none;
+  animation: boot-glow 1.6s ease both;
+}
+
+@keyframes boot-glow {
+  from { opacity: 0; transform: scale(0.7); }
+  to { opacity: 0.55; transform: scale(1); }
 }
 
 .boot-splash.is-done {
@@ -2263,7 +2284,7 @@ html[data-theme="dark"] .rank-row-child {
 }
 
 .boot-logo-anim {
-  width: min(280px, 54vw);
+  width: min(300px, 56vw);
   height: auto;
   display: block;
   margin: 0 auto;
@@ -2272,13 +2293,15 @@ html[data-theme="dark"] .rank-row-child {
   border: 0;
   border-radius: 0;
   box-shadow: none;
-  filter: none;
+  filter: drop-shadow(0 0 28px color-mix(in srgb, var(--accent) 22%, transparent));
   image-rendering: auto;
-  animation: boot-logo-in 1.05s cubic-bezier(0.22, 1, 0.36, 1) both;
+  position: relative;
+  z-index: 1;
+  animation: boot-logo-in 1.15s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 @keyframes boot-logo-in {
-  from { opacity: 0; transform: scale(0.9) translateY(10px); }
+  from { opacity: 0; transform: scale(0.88) translateY(14px); }
   to { opacity: 1; transform: scale(1) translateY(0); }
 }
 
@@ -2286,22 +2309,24 @@ html[data-theme="dark"] .rank-row-child {
 html[data-theme="dark"] .boot-logo-anim-light { display: none; }
 html[data-theme="dark"] .boot-logo-anim-dark {
   display: block;
-  filter: none;
+  filter: drop-shadow(0 0 34px rgba(94, 234, 212, 0.18));
 }
 
 .boot-splash-title {
   margin: 0;
   text-align: center;
   font-family: var(--display);
-  font-size: 1.75rem;
+  font-size: clamp(1.55rem, 3.2vw, 1.9rem);
   color: var(--ink);
-  letter-spacing: 0.02em;
-  animation: boot-title-in 0.7s ease 0.35s both;
+  letter-spacing: 0.04em;
+  position: relative;
+  z-index: 1;
+  animation: boot-title-in 0.85s ease 0.55s both;
 }
 
 @keyframes boot-title-in {
-  from { opacity: 0; transform: translateY(8px); }
-  to { opacity: 1; transform: translateY(0); }
+  from { opacity: 0; letter-spacing: 0.18em; transform: translateY(10px); }
+  to { opacity: 1; letter-spacing: 0.04em; transform: translateY(0); }
 }
 
 .logo-mark {
