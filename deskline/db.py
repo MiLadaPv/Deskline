@@ -353,6 +353,61 @@ class Database:
                 repaired += 1
         return repaired
 
+    def repair_phantom_overnight_sessions(
+        self,
+        *,
+        min_duration_sec: float = 8 * 3600,
+        max_idle_sec: float = 120.0,
+    ) -> int:
+        """Clip near-zero-idle sessions that span midnight.
+
+        When the PC dies on battery the process is killed with ended_at NULL.
+        An older bug resumed that row after unlock, so summaries painted solid
+        focus from 00:00 until the session finally closed — often with ~0 idle.
+        Keep the pre-midnight work; drop the overnight phantom tail.
+        """
+        repaired = 0
+        with self.connect() as conn:
+            rows = conn.execute(
+                """
+                SELECT id, started_at, ended_at, idle_sec, duration_sec
+                FROM sessions
+                WHERE ended_at IS NOT NULL
+                  AND duration_sec >= ?
+                  AND coalesce(idle_sec, 0) <= ?
+                """,
+                (float(min_duration_sec), float(max_idle_sec)),
+            ).fetchall()
+            for row in rows:
+                started = _parse(row["started_at"])
+                ended = _parse(row["ended_at"])
+                if not started or not ended or ended <= started:
+                    continue
+                midnight = datetime.combine(
+                    started.date() + timedelta(days=1),
+                    datetime.min.time(),
+                    tzinfo=started.tzinfo,
+                )
+                if ended <= midnight:
+                    continue
+                # Only clip when a large chunk sits after midnight (not a short wrap).
+                after = (ended - midnight).total_seconds()
+                if after < 3 * 3600:
+                    continue
+                duration = max(0.0, (midnight - started).total_seconds())
+                idle_full = float(row["idle_sec"] or 0)
+                idle_part = min(idle_full, duration)
+                conn.execute(
+                    """
+                    UPDATE sessions
+                    SET ended_at=?, duration_sec=?, idle_sec=?
+                    WHERE id=?
+                    """,
+                    (_iso(midnight), duration, idle_part, row["id"]),
+                )
+                repaired += 1
+        return repaired
+
     def update_session_activity(
         self,
         session_id: int,

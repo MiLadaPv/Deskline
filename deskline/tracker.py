@@ -62,19 +62,8 @@ class Tracker:
         self._session_started_at: float | None = None
         self.cfg = load_config()
 
-        # Hard power-off / kill leaves ended_at NULL; never resume stale orphans.
+        # Hard power-off / kill leaves ended_at NULL; never resume across restarts.
         self._reclaim_orphan_sessions()
-        open_sess = self.db.open_session()
-        if open_sess:
-            self._current_session_id = open_sess.id
-            self._current_key = (open_sess.app_name, open_sess.window_title)
-            self._current_category = normalize_category(open_sess.category)
-            self._current_label = open_sess.activity_label or open_sess.display_name
-            self._current_app_path = open_sess.app_path
-            try:
-                self._session_started_at = parse_iso_datetime(open_sess.started_at).timestamp()
-            except Exception:
-                self._session_started_at = time.time()
         self.purge_old_screenshots()
 
     @property
@@ -212,10 +201,17 @@ class Tracker:
         Sleep gaps only work while the process stays alive. Battery death kills
         the process with ended_at NULL; resuming that row until "now" invents
         overnight focus (solid green from 00:00).
+
+        Never resume an open row across process restarts — close at the last
+        heartbeat (or started_at if none) and let the next tick open a fresh one.
         """
         boot = system_boot_time()
         try:
             self.db.repair_sessions_spanning_boot(boot)
+        except Exception:
+            pass
+        try:
+            self.db.repair_phantom_overnight_sessions()
         except Exception:
             pass
 
@@ -224,33 +220,17 @@ class Tracker:
             clear_heartbeat()
             return
 
-        sleep_gap = float(self.cfg.get("sleep_gap_sec", DEFAULT_SLEEP_GAP_SEC))
-        now = time.time()
         try:
             started = parse_iso_datetime(open_sess.started_at).timestamp()
         except Exception:
-            started = now
+            started = time.time()
 
         hb = load_heartbeat()
-        end_ts: float | None = None
         if hb and int(hb["session_id"]) == int(open_sess.id):
-            hb_ts = float(hb["last_tick_at"])
-            if hb_ts < boot - 1.0:
-                # Last alive moment was before this boot (hard power-off).
-                end_ts = hb_ts
-            elif now - hb_ts >= sleep_gap:
-                end_ts = hb_ts
-        elif started < boot - 1.0:
-            # No heartbeat for this session; do not invent offline hours.
-            end_ts = started
-        elif now - started >= sleep_gap:
-            # Stale open row after a kill with no heartbeat file.
+            end_ts = max(float(hb["last_tick_at"]), started)
+        else:
             end_ts = started
 
-        if end_ts is None:
-            return
-
-        end_ts = max(end_ts, started)
         ended = datetime.fromtimestamp(end_ts).astimezone()
         self.db.end_session(open_sess.id, ended_at=ended)
         clear_heartbeat()

@@ -197,6 +197,71 @@ def test_hard_kill_orphan_closed_at_heartbeat(tmp_path: Path, monkeypatch):
     assert abs(ended.timestamp() - hb_ts) < 2.0
 
 
+def test_never_resume_open_session_on_init(tmp_path: Path, monkeypatch):
+    """Even a fresh heartbeat must not resume across process restart."""
+    from deskline.heartbeat import save_heartbeat
+
+    data = _deskline_tmp(tmp_path, monkeypatch)
+    db = Database(data / "deskline.db")
+    monkeypatch.setattr("deskline.tracker.system_boot_time", lambda: time.time() - 86400)
+
+    started = datetime.now().astimezone() - timedelta(minutes=30)
+    sid = db.start_session(
+        app_name="code.exe",
+        window_title="main.py",
+        url_hint=None,
+        category="productive",
+        display_name="VS Code",
+        activity_kind="work",
+        activity_label="VS Code",
+        started_at=started,
+    )
+    hb_ts = time.time() - 1.0
+    save_heartbeat(sid, hb_ts)
+
+    tracker = Tracker(db)
+    assert tracker._current_session_id is None
+    with db.connect() as conn:
+        row = conn.execute(
+            "SELECT ended_at FROM sessions WHERE id=?", (sid,)
+        ).fetchone()
+    assert row["ended_at"] is not None
+
+
+def test_repair_phantom_overnight_zero_idle(tmp_path: Path, monkeypatch):
+    data = _deskline_tmp(tmp_path, monkeypatch)
+    db = Database(data / "deskline.db")
+
+    started = datetime.now().astimezone().replace(
+        hour=21, minute=49, second=0, microsecond=0
+    ) - timedelta(days=1)
+    ended = started + timedelta(hours=15, minutes=20)  # crosses midnight, ~13h after
+    sid = db.start_session(
+        app_name="rg-soft.exe",
+        window_title="RG-Soft",
+        url_hint=None,
+        category="productive",
+        display_name="RG-Soft",
+        activity_kind="work",
+        activity_label="RG-Soft",
+        started_at=started,
+    )
+    db.end_session(sid, ended_at=ended)
+    with db.connect() as conn:
+        conn.execute("UPDATE sessions SET idle_sec=0 WHERE id=?", (sid,))
+
+    n = db.repair_phantom_overnight_sessions()
+    assert n == 1
+    with db.connect() as conn:
+        row = conn.execute(
+            "SELECT started_at, ended_at, duration_sec FROM sessions WHERE id=?", (sid,)
+        ).fetchone()
+    ended_fixed = datetime.fromisoformat(row["ended_at"])
+    assert ended_fixed.hour == 0 and ended_fixed.minute == 0
+    # Pre-midnight evening only (~2h11m)
+    assert 2 * 3600 < float(row["duration_sec"]) < 3 * 3600
+
+
 def test_repair_session_spanning_boot_clamps_start(tmp_path: Path, monkeypatch):
     """Already-closed inflated session (old resume bug) is clipped to boot."""
     data = _deskline_tmp(tmp_path, monkeypatch)
@@ -258,3 +323,33 @@ def test_tracker_init_repairs_spanning_boot_session(tmp_path: Path, monkeypatch)
             "SELECT duration_sec FROM sessions WHERE id=?", (sid,)
         ).fetchone()
     assert float(row["duration_sec"]) < 700
+
+
+def test_tracker_init_repairs_phantom_overnight(tmp_path: Path, monkeypatch):
+    data = _deskline_tmp(tmp_path, monkeypatch)
+    db = Database(data / "deskline.db")
+    monkeypatch.setattr("deskline.tracker.system_boot_time", lambda: time.time() - 86400 * 4)
+
+    started = datetime.now().astimezone().replace(
+        hour=21, minute=50, second=0, microsecond=0
+    ) - timedelta(days=1)
+    ended = started + timedelta(hours=15)
+    sid = db.start_session(
+        app_name="app.exe",
+        window_title="x",
+        url_hint=None,
+        category="productive",
+        display_name="App",
+        activity_kind="work",
+        activity_label="App",
+        started_at=started,
+    )
+    db.end_session(sid, ended_at=ended)
+    with db.connect() as conn:
+        conn.execute("UPDATE sessions SET idle_sec=0 WHERE id=?", (sid,))
+
+    Tracker(db)
+    day = datetime.now().astimezone().date()
+    s = db.summary_for_day(day)
+    # Overnight phantom removed — today should not show ~13h from that row
+    assert float(s.get("total_sec") or 0) < 3600
