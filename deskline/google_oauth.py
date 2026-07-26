@@ -25,6 +25,7 @@ OAUTH_STATE_COOKIE = "deskline_oauth"
 OAUTH_JSON_NAME = "google-oauth.json"
 REDIRECT_PATH = "/api/auth/google/callback"
 OAUTH_PENDING_DIRNAME = "oauth_pending"
+OAUTH_FINISH_DIRNAME = "oauth_finish"
 
 
 @dataclass(frozen=True)
@@ -90,6 +91,73 @@ def pop_oauth_pending(state: str) -> dict[str, Any] | None:
     except (TypeError, ValueError):
         return None
     if exp < int(time.time()):
+        return None
+    return raw
+
+
+def app_origin() -> str:
+    """Canonical UI origin (Tauri/tray use 127.0.0.1; OAuth callback uses localhost)."""
+    from deskline.config import BASE_URL
+
+    return BASE_URL.rstrip("/")
+
+
+def _finish_dir() -> Path:
+    ensure_data_dirs()
+    path = DATA_ROOT / OAUTH_FINISH_DIRNAME
+    path.mkdir(parents=True, exist_ok=True)
+    return path
+
+
+def save_oauth_finish_ticket(
+    *,
+    session_token: str,
+    recovery_code: str | None = None,
+    want_bind: bool = False,
+) -> str:
+    """One-time ticket so session cookie is set on app_origin, not localhost."""
+    ticket = secrets.token_urlsafe(32)
+    path = _finish_dir() / f"{ticket}.json"
+    path.write_text(
+        json.dumps(
+            {
+                "session_token": session_token,
+                "recovery_code": recovery_code,
+                "want_bind": bool(want_bind),
+                "exp": int(time.time()) + 120,
+            },
+            indent=2,
+        ),
+        encoding="utf-8",
+    )
+    return ticket
+
+
+def pop_oauth_finish_ticket(ticket: str) -> dict[str, Any] | None:
+    ticket = (ticket or "").strip()
+    if not ticket or "/" in ticket or "\\" in ticket or ".." in ticket:
+        return None
+    path = _finish_dir() / f"{ticket}.json"
+    if not path.is_file():
+        return None
+    try:
+        raw = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        raw = None
+    try:
+        path.unlink(missing_ok=True)
+    except OSError:
+        pass
+    if not isinstance(raw, dict):
+        return None
+    try:
+        exp = int(raw.get("exp") or 0)
+    except (TypeError, ValueError):
+        return None
+    if exp < int(time.time()):
+        return None
+    token = raw.get("session_token")
+    if not isinstance(token, str) or not token.strip():
         return None
     return raw
 

@@ -615,6 +615,7 @@ def is_public_path(path: str) -> bool:
         "/api/auth/recover",
         "/api/auth/google/start",
         "/api/auth/google/callback",
+        "/api/auth/google/finish",
         "/api/license/status",
         "/favicon.ico",
     }:

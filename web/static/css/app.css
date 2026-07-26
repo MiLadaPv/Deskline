@@ -1342,6 +1342,13 @@ html[data-theme="dark"] .rank-row-child {
   margin-top: 20px;
 }
 
+.login-form[hidden],
+.login-oauth[hidden],
+.login-forgot[hidden],
+.recovery-box[hidden] {
+  display: none !important;
+}
+
 .login-form label {
   display: grid;
   gap: 6px;

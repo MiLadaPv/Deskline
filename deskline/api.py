@@ -41,15 +41,18 @@ from deskline.auth import (
 )
 from deskline.google_oauth import (
     OAUTH_STATE_COOKIE,
+    app_origin,
     build_authorize_url,
     exchange_code,
     is_google_oauth_configured,
     load_google_oauth_config,
     make_oauth_state,
     make_pkce_pair,
+    pop_oauth_finish_ticket,
     pop_oauth_pending,
     redirect_uri,
     resolve_google_identity,
+    save_oauth_finish_ticket,
     save_oauth_pending,
 )
 from deskline.capture import resolve_screenshot_file, screenshots_storage_info
@@ -249,11 +252,12 @@ class ChangePasswordBody(BaseModel):
 def _set_session_cookie(response: Response, token: str, *, remember: bool = False) -> None:
     # Default: session cookie (cleared when the browser is closed).
     # Remember me: persist for SESSION_TTL_REMEMBER_SEC.
+    # Lax (not Strict): required so the cookie is sent after Google OAuth redirect.
     kwargs: dict[str, Any] = {
         "key": COOKIE_NAME,
         "value": token,
         "httponly": True,
-        "samesite": "strict",
+        "samesite": "lax",
         "path": "/",
     }
     if remember:
@@ -266,7 +270,7 @@ def _clear_session_cookie(response: Response) -> None:
         COOKIE_NAME,
         path="/",
         httponly=True,
-        samesite="strict",
+        samesite="lax",
     )
 
 
@@ -471,7 +475,8 @@ def create_app(tracker: Tracker, db: Database | None = None) -> FastAPI:
 
     def _oauth_error_redirect(message: str) -> RedirectResponse:
         q = urllib.parse.urlencode({"google_error": message})
-        return RedirectResponse(url=f"/login?{q}", status_code=303)
+        # Absolute app origin: OAuth callback runs on localhost, UI uses 127.0.0.1.
+        return RedirectResponse(url=f"{app_origin()}/login?{q}", status_code=303)
 
     def _google_error_message(error: str, description: str | None = None) -> str:
         err = (error or "").strip().lower()
@@ -585,15 +590,36 @@ def create_app(tracker: Tracker, db: Database | None = None) -> FastAPI:
             return _oauth_error_redirect(str(exc) or "Аккаунт уже настроен")
 
         token = create_session_token(login_as, remember=True)
-        if recovery_code:
-            q = urllib.parse.urlencode({"google_recovery": recovery_code})
+        # Bridge localhost (Google redirect_uri) → 127.0.0.1 (Tauri/dashboard)
+        # so the session cookie lands in the same cookie jar as the app UI.
+        ticket = save_oauth_finish_ticket(
+            session_token=token,
+            recovery_code=recovery_code,
+            want_bind=want_bind,
+        )
+        response = RedirectResponse(
+            url=f"{app_origin()}/api/auth/google/finish?ticket={urllib.parse.quote(ticket)}",
+            status_code=303,
+        )
+        response.delete_cookie(OAUTH_STATE_COOKIE, path="/")
+        return response
+
+    @app.get("/api/auth/google/finish")
+    def auth_google_finish(ticket: str | None = None) -> Response:
+        meta = pop_oauth_finish_ticket(ticket or "")
+        if meta is None:
+            return _oauth_error_redirect("Сессия Google устарела — попробуйте снова")
+        token = str(meta.get("session_token") or "")
+        recovery_code = meta.get("recovery_code")
+        want_bind = bool(meta.get("want_bind"))
+        if isinstance(recovery_code, str) and recovery_code.strip():
+            q = urllib.parse.urlencode({"google_recovery": recovery_code.strip()})
             response = RedirectResponse(url=f"/login?{q}", status_code=303)
         elif want_bind:
             response = RedirectResponse(url="/#settings", status_code=303)
         else:
             response = RedirectResponse(url="/", status_code=303)
         _set_session_cookie(response, token, remember=True)
-        response.delete_cookie(OAUTH_STATE_COOKIE, path="/")
         return response
 
     @app.post("/api/auth/google/unlink")

@@ -11,12 +11,21 @@ from deskline.tracker import Tracker
 
 def _patch_paths(tmp_path, monkeypatch):
     monkeypatch.setattr("deskline.config.DATA_ROOT", tmp_path)
+    monkeypatch.setattr("deskline.google_oauth.DATA_ROOT", tmp_path)
     monkeypatch.setattr("deskline.config.DB_PATH", tmp_path / "deskline.db")
     monkeypatch.setattr("deskline.config.SCREENSHOTS_DIR", tmp_path / "screenshots")
     monkeypatch.setattr("deskline.config.CONFIG_PATH", tmp_path / "config.json")
     monkeypatch.setattr("deskline.auth.AUTH_PATH", tmp_path / "auth.json")
     monkeypatch.setattr("deskline.capture.SCREENSHOTS_DIR", tmp_path / "screenshots")
 
+
+def _follow_google_finish(client, location: str):
+    from urllib.parse import urlparse
+
+    parsed = urlparse(location)
+    assert parsed.path.endswith("/api/auth/google/finish")
+    assert "ticket=" in (parsed.query or "")
+    return client.get(f"{parsed.path}?{parsed.query}", follow_redirects=False)
 
 def test_build_authorize_url_includes_pkce():
     cfg = GoogleOAuthConfig(client_id="cid.apps.googleusercontent.com", client_secret="sec")
@@ -115,7 +124,11 @@ def test_google_callback_login_linked(tmp_path, monkeypatch):
         follow_redirects=False,
     )
     assert cb.status_code in (302, 303)
-    assert cb.headers["location"] in ("/", "http://testserver/")
+    assert "/api/auth/google/finish" in cb.headers["location"]
+    assert not client.cookies.get("deskline_session")
+    finish = _follow_google_finish(client, cb.headers["location"])
+    assert finish.status_code in (302, 303)
+    assert finish.headers["location"] in ("/", "http://testserver/")
     assert client.cookies.get("deskline_session")
 
 
@@ -190,11 +203,11 @@ def test_google_callback_registers_new_user_alongside_password(tmp_path, monkeyp
         follow_redirects=False,
     )
     assert cb.status_code in (302, 303)
+    assert "/api/auth/google/finish" in cb.headers["location"]
+    finish = _follow_google_finish(client, cb.headers["location"])
+    assert finish.status_code in (302, 303)
     # New Google user gets a recovery code reveal on first signup.
-    assert "google_recovery=" in cb.headers["location"] or cb.headers["location"] in (
-        "/",
-        "http://testserver/",
-    )
+    assert "google_recovery=" in finish.headers["location"]
     assert client.cookies.get("deskline_session")
     assert is_google_linked()
     from deskline.auth import username_for_google_sub
