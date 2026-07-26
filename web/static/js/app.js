@@ -1050,7 +1050,7 @@ function trendsTitleForRows(rows) {
 function shouldShowHoursXLabel(i, n) {
   if (n <= 10) return true;
   if (n <= 31) return i % 3 === 0 || i === n - 1;
-  if (n <= 100) return i % 7 === 0 || i === n - 1;
+  if (n <= 100) return i % 14 === 0 || i === n - 1;
   return i % 30 === 0 || i === 0 || i === n - 1;
 }
 
@@ -1059,10 +1059,89 @@ function hoursXLabel(isoDay, n) {
   if (n <= 10) {
     return d.toLocaleDateString("ru-RU", { weekday: "short" }).replace(".", "");
   }
-  if (n <= 31) {
+  return d.toLocaleDateString("ru-RU", { day: "numeric", month: "short" });
+}
+
+function weekStartIso(isoDay) {
+  return startOfWeekMonday(isoDay);
+}
+
+function monthKey(isoDay) {
+  return isoDay.slice(0, 7);
+}
+
+/** Collapse many daily rows into weeks/months so focus bars stay readable. */
+function aggregateFocusRows(rows) {
+  const list = rows || [];
+  if (list.length <= 45) {
+    return { rows: list, unit: "day", label: `${list.length} дн.` };
+  }
+  const byMonth = list.length > 120;
+  /** @type {Map<string, any>} */
+  const map = new Map();
+  for (const r of list) {
+    const key = byMonth ? monthKey(r.day) : weekStartIso(r.day);
+    let bucket = map.get(key);
+    if (!bucket) {
+      bucket = {
+        day: key,
+        end_day: r.day,
+        total_sec: 0,
+        by_category: { productive: 0, neutral: 0, distracting: 0 },
+      };
+      map.set(key, bucket);
+    }
+    bucket.end_day = r.day;
+    bucket.total_sec += Number(r.total_sec || 0);
+    const cats = r.by_category || {};
+    bucket.by_category.productive += Number(cats.productive || 0);
+    bucket.by_category.neutral += Number(cats.neutral || 0);
+    bucket.by_category.distracting += Number(cats.distracting || 0);
+  }
+  const out = [...map.values()].map((b) => {
+    const total = b.total_sec || 0;
+    const productive = b.by_category.productive || 0;
+    return {
+      day: b.day,
+      end_day: b.end_day,
+      total_sec: total,
+      focus_pct: total ? (productive / total) * 100 : 0,
+      by_category: b.by_category,
+    };
+  });
+  return {
+    rows: out,
+    unit: byMonth ? "month" : "week",
+    label: byMonth ? `${out.length} мес.` : `${out.length} нед.`,
+  };
+}
+
+function focusBucketLabel(row, unit) {
+  const d = new Date(`${(row.end_day || row.day)}T12:00:00`);
+  if (unit === "month") {
+    return d.toLocaleDateString("ru-RU", { month: "short" }).replace(".", "");
+  }
+  if (unit === "week") {
     return d.toLocaleDateString("ru-RU", { day: "numeric", month: "short" });
   }
-  return d.toLocaleDateString("ru-RU", { day: "numeric", month: "short" });
+  const nDay = new Date(`${row.day}T12:00:00`);
+  return nDay.toLocaleDateString("ru-RU", { weekday: "short" });
+}
+
+function focusBucketTip(row, unit) {
+  const focus = Math.round(row.focus_pct || 0);
+  if (unit === "month") {
+    const d = new Date(`${row.day}-01T12:00:00`);
+    return `${d.toLocaleDateString("ru-RU", { month: "long", year: "numeric" })}: фокус ${focus}%`;
+  }
+  if (unit === "week") {
+    const a = new Date(`${row.day}T12:00:00`);
+    const b = new Date(`${(row.end_day || row.day)}T12:00:00`);
+    const fmt = (x) => x.toLocaleDateString("ru-RU", { day: "numeric", month: "short" });
+    return `${fmt(a)} — ${fmt(b)}: фокус ${focus}%`;
+  }
+  const d = new Date(`${row.day}T12:00:00`);
+  return `${d.toLocaleDateString("ru-RU", { day: "numeric", month: "short" })}: фокус ${focus}%`;
 }
 
 function bindHoursChartInteractions(el, points, tips) {
@@ -1113,6 +1192,8 @@ function renderHoursChart(trends) {
   if (aside) aside.textContent = `${rows.length || 0} дн.`;
   const title = document.getElementById("hoursTrendTitle");
   if (title) title.textContent = trendsTitleForRows(rows);
+  const split = document.querySelector(".pulse-split");
+  if (split) split.classList.toggle("is-long", rows.length > 45);
   if (!rows.length) {
     el.innerHTML = `<p class="hint">Пока нет тренда по часам.</p>`;
     return;
@@ -1121,7 +1202,8 @@ function renderHoursChart(trends) {
   const maxSec = Math.max(...vals, 1);
   const maxH = niceHoursCeiling(maxSec);
   const maxScale = maxH * 3600;
-  const w = Math.max(360, Math.min(720, 40 + rows.length * (rows.length > 60 ? 2.2 : rows.length > 20 ? 8 : 36)));
+  // Keep a stable viewBox so the SVG fills the card instead of exploding width.
+  const w = 560;
   const h = 168;
   const padL = 36;
   const padR = 12;
@@ -1153,6 +1235,9 @@ function renderHoursChart(trends) {
       month: "short",
     })} · ${fmtDur(vals[i])}`;
   });
+  const dense = rows.length > 60;
+  const dotR = dense ? 2.5 : 4.5;
+  const hitR = dense ? 8 : 12;
   const dots = pts
     .map(([x, y], i) => {
       const label = hoursXLabel(rows[i].day, rows.length);
@@ -1161,13 +1246,13 @@ function renderHoursChart(trends) {
         ? `<text x="${x}" y="${h - 8}" text-anchor="middle" class="hours-axis hours-x">${escapeHtml(label)}</text>`
         : "";
       return `<g class="hours-point" tabindex="0" aria-label="${escapeHtml(tips[i])}">
-        <circle cx="${x}" cy="${y}" r="12" class="hours-dot-hit"/>
-        <circle cx="${x}" cy="${y}" r="4.5" class="hours-dot"/>
+        <circle cx="${x}" cy="${y}" r="${hitR}" class="hours-dot-hit"/>
+        <circle cx="${x}" cy="${y}" r="${dotR}" class="hours-dot"/>
         ${labelSvg}
       </g>`;
     })
     .join("");
-  el.innerHTML = `<svg class="hours-line-svg" viewBox="0 0 ${w} ${h}" role="img" aria-label="${escapeHtml(trendsTitleForRows(rows))}">
+  el.innerHTML = `<svg class="hours-line-svg" viewBox="0 0 ${w} ${h}" preserveAspectRatio="xMidYMid meet" role="img" aria-label="${escapeHtml(trendsTitleForRows(rows))}">
     ${grid}
     <polygon class="hours-line-fill" points="${area}"/>
     <polyline class="hours-line-path" fill="none" points="${poly}"/>
@@ -1179,34 +1264,27 @@ function renderHoursChart(trends) {
 function renderProdDaysChart(trends) {
   const el = document.getElementById("prodDaysChart");
   if (!el) return;
-  const rows = trends || [];
+  const raw = trends || [];
+  const { rows, unit, label } = aggregateFocusRows(raw);
   const rangeEl = document.getElementById("prodDaysRange");
   const foot = document.getElementById("prodDaysFoot");
-  if (rows.length && rangeEl) {
-    rangeEl.textContent = `${rows.length} дн.`;
-  }
-  if (rows.length && foot) {
-    const a = new Date(`${rows[0].day}T12:00:00`);
-    const b = new Date(`${rows[rows.length - 1].day}T12:00:00`);
+  if (rangeEl) rangeEl.textContent = label;
+  if (raw.length && foot) {
+    const a = new Date(`${raw[0].day}T12:00:00`);
+    const b = new Date(`${raw[raw.length - 1].day}T12:00:00`);
     const fmt = (d) =>
       d.toLocaleDateString("ru-RU", { day: "numeric", month: "short" });
     foot.textContent = `${fmt(a)} — ${fmt(b)}`;
   }
-  el.classList.toggle("is-dense", rows.length > 21);
+  el.classList.toggle("is-dense", rows.length > 16);
+  el.classList.toggle("is-scroll", rows.length > 16);
   el.innerHTML = rows
     .map((r) => {
       const total = r.total_sec || 0;
       const cats = r.by_category || {};
-      const d = new Date(`${r.day}T12:00:00`);
-      const isWeekend = d.getDay() === 0 || d.getDay() === 6;
-      const label =
-        rows.length > 21
-          ? d.toLocaleDateString("ru-RU", { day: "numeric" })
-          : d.toLocaleDateString("ru-RU", { weekday: "short" });
-      const tip = `${d.toLocaleDateString("ru-RU", {
-        day: "numeric",
-        month: "short",
-      })}: фокус ${Math.round(r.focus_pct || 0)}%`;
+      const d = new Date(`${(r.end_day || r.day)}T12:00:00`);
+      const isWeekend = unit === "day" && (d.getDay() === 0 || d.getDay() === 6);
+      const tip = focusBucketTip(r, unit);
       const segs = [
         ["distracting", cats.distracting || 0],
         ["neutral", cats.neutral || 0],
@@ -1219,10 +1297,11 @@ function renderProdDaysChart(trends) {
             : "";
         })
         .join("");
+      const showVal = rows.length <= 20;
       return `<div class="prod-day-col${isWeekend ? " is-weekend" : ""}" title="${escapeHtml(tip)}">
         <div class="prod-day-stack">${total ? segs : `<span class="stack-seg empty" style="height:6%"></span>`}</div>
-        <span class="hours-label">${escapeHtml(label)}</span>
-        <span class="hours-val">${Math.round(r.focus_pct || 0)}%</span>
+        <span class="hours-label">${escapeHtml(focusBucketLabel(r, unit))}</span>
+        ${showVal ? `<span class="hours-val">${Math.round(r.focus_pct || 0)}%</span>` : ""}
       </div>`;
     })
     .join("");
