@@ -142,3 +142,119 @@ def test_still_working_no_pauses(tmp_path: Path, monkeypatch):
     monkeypatch.setattr("deskline.tracker.notify", lambda *a, **k: None)
     tracker._ask_still_working("Тест")
     assert tracker.paused is True
+
+
+def _deskline_tmp(tmp_path: Path, monkeypatch) -> Path:
+    data = tmp_path / "Deskline"
+    monkeypatch.setattr("deskline.config.DATA_ROOT", data)
+    monkeypatch.setattr("deskline.config.DB_PATH", data / "deskline.db")
+    monkeypatch.setattr("deskline.config.SCREENSHOTS_DIR", data / "screenshots")
+    monkeypatch.setattr("deskline.config.ICONS_DIR", data / "icons")
+    monkeypatch.setattr("deskline.config.CONFIG_PATH", data / "config.json")
+    monkeypatch.setattr("deskline.heartbeat.DATA_ROOT", data)
+    data.mkdir(parents=True)
+    (data / "screenshots").mkdir()
+    (data / "icons").mkdir()
+    return data
+
+
+def test_hard_kill_orphan_closed_at_heartbeat(tmp_path: Path, monkeypatch):
+    """Battery death: open session + stale heartbeat must not resume into 'now'."""
+    from deskline.heartbeat import save_heartbeat
+
+    data = _deskline_tmp(tmp_path, monkeypatch)
+    db = Database(data / "deskline.db")
+
+    boot = time.time() - 600  # rebooted 10 min ago
+    monkeypatch.setattr("deskline.tracker.system_boot_time", lambda: boot)
+
+    started = datetime.now().astimezone() - timedelta(hours=14)
+    sid = db.start_session(
+        app_name="rg-soft.exe",
+        window_title="RG-Soft",
+        url_hint=None,
+        category="productive",
+        display_name="RG-Soft",
+        activity_kind="work",
+        activity_label="RG-Soft",
+        started_at=started,
+    )
+    # Last tick before power loss — hours before this boot
+    hb_ts = boot - 3600
+    save_heartbeat(sid, hb_ts)
+
+    tracker = Tracker(db)
+    assert tracker._current_session_id is None
+
+    with db.connect() as conn:
+        row = conn.execute(
+            "SELECT ended_at, duration_sec FROM sessions WHERE id=?", (sid,)
+        ).fetchone()
+    assert row["ended_at"] is not None
+    # Closed at heartbeat, not stretched to now (~14h)
+    assert float(row["duration_sec"] or 0) < 14 * 3600 - 100
+    ended = datetime.fromisoformat(row["ended_at"])
+    assert abs(ended.timestamp() - hb_ts) < 2.0
+
+
+def test_repair_session_spanning_boot_clamps_start(tmp_path: Path, monkeypatch):
+    """Already-closed inflated session (old resume bug) is clipped to boot."""
+    data = _deskline_tmp(tmp_path, monkeypatch)
+    db = Database(data / "deskline.db")
+
+    boot = time.time() - 1800  # booted 30 min ago
+    started = datetime.fromtimestamp(boot - 12 * 3600).astimezone()
+    ended = datetime.fromtimestamp(boot + 900).astimezone()  # 15 min after boot
+    sid = db.start_session(
+        app_name="rg-soft.exe",
+        window_title="RG-Soft",
+        url_hint=None,
+        category="productive",
+        display_name="RG-Soft",
+        activity_kind="work",
+        activity_label="RG-Soft",
+        started_at=started,
+    )
+    db.end_session(sid, ended_at=ended)
+    with db.connect() as conn:
+        before = conn.execute(
+            "SELECT duration_sec FROM sessions WHERE id=?", (sid,)
+        ).fetchone()
+    assert float(before["duration_sec"]) > 10 * 3600
+
+    n = db.repair_sessions_spanning_boot(boot)
+    assert n == 1
+    with db.connect() as conn:
+        row = conn.execute(
+            "SELECT started_at, duration_sec FROM sessions WHERE id=?", (sid,)
+        ).fetchone()
+    assert abs(float(row["duration_sec"]) - 900) < 2.0
+    assert abs(datetime.fromisoformat(row["started_at"]).timestamp() - boot) < 2.0
+
+
+def test_tracker_init_repairs_spanning_boot_session(tmp_path: Path, monkeypatch):
+    data = _deskline_tmp(tmp_path, monkeypatch)
+    db = Database(data / "deskline.db")
+    boot = time.time() - 900
+    monkeypatch.setattr("deskline.tracker.system_boot_time", lambda: boot)
+
+    started = datetime.fromtimestamp(boot - 10 * 3600).astimezone()
+    ended = datetime.fromtimestamp(boot + 600).astimezone()
+    sid = db.start_session(
+        app_name="code.exe",
+        window_title="app",
+        url_hint=None,
+        category="productive",
+        display_name="VS Code",
+        activity_kind="work",
+        activity_label="VS Code",
+        started_at=started,
+    )
+    db.end_session(sid, ended_at=ended)
+
+    Tracker(db)
+    with db.connect() as conn:
+        row = conn.execute(
+            "SELECT duration_sec FROM sessions WHERE id=?", (sid,)
+        ).fetchone()
+    assert float(row["duration_sec"]) < 700

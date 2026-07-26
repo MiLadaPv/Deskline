@@ -9,10 +9,11 @@ from deskline.capture import capture_screenshot
 from deskline.classify import extract_site_from_title, is_rdp_client, normalize_category, resolve_activity
 from deskline.config import load_config, save_config
 from deskline.db import Database, parse_iso_datetime
+from deskline.heartbeat import clear_heartbeat, load_heartbeat, save_heartbeat
 from deskline.hub_client import push_sessions_to_hub
 from deskline.idle import is_idle, seconds_since_last_input
 from deskline.notify import ask_still_working, notify, still_working_body
-from deskline.power import DEFAULT_SLEEP_GAP_SEC, is_sleep_gap
+from deskline.power import DEFAULT_SLEEP_GAP_SEC, is_sleep_gap, system_boot_time
 from deskline.windows import get_active_window
 
 
@@ -61,6 +62,8 @@ class Tracker:
         self._session_started_at: float | None = None
         self.cfg = load_config()
 
+        # Hard power-off / kill leaves ended_at NULL; never resume stale orphans.
+        self._reclaim_orphan_sessions()
         open_sess = self.db.open_session()
         if open_sess:
             self._current_session_id = open_sess.id
@@ -203,6 +206,55 @@ class Tracker:
         self._last_purge_at = time.time()
         return result
 
+    def _reclaim_orphan_sessions(self) -> None:
+        """Close sessions left open across hard power-off / process kill.
+
+        Sleep gaps only work while the process stays alive. Battery death kills
+        the process with ended_at NULL; resuming that row until "now" invents
+        overnight focus (solid green from 00:00).
+        """
+        boot = system_boot_time()
+        try:
+            self.db.repair_sessions_spanning_boot(boot)
+        except Exception:
+            pass
+
+        open_sess = self.db.open_session()
+        if not open_sess:
+            clear_heartbeat()
+            return
+
+        sleep_gap = float(self.cfg.get("sleep_gap_sec", DEFAULT_SLEEP_GAP_SEC))
+        now = time.time()
+        try:
+            started = parse_iso_datetime(open_sess.started_at).timestamp()
+        except Exception:
+            started = now
+
+        hb = load_heartbeat()
+        end_ts: float | None = None
+        if hb and int(hb["session_id"]) == int(open_sess.id):
+            hb_ts = float(hb["last_tick_at"])
+            if hb_ts < boot - 1.0:
+                # Last alive moment was before this boot (hard power-off).
+                end_ts = hb_ts
+            elif now - hb_ts >= sleep_gap:
+                end_ts = hb_ts
+        elif started < boot - 1.0:
+            # No heartbeat for this session; do not invent offline hours.
+            end_ts = started
+        elif now - started >= sleep_gap:
+            # Stale open row after a kill with no heartbeat file.
+            end_ts = started
+
+        if end_ts is None:
+            return
+
+        end_ts = max(end_ts, started)
+        ended = datetime.fromtimestamp(end_ts).astimezone()
+        self.db.end_session(open_sess.id, ended_at=ended)
+        clear_heartbeat()
+
     def _loop(self) -> None:
         while not self._stop.is_set():
             try:
@@ -232,6 +284,9 @@ class Tracker:
             if is_sleep_gap(dt, sleep_gap):
                 self._handle_sleep_wake(prev_tick, now)
                 # Continue into normal tick so a fresh session starts after wake
+
+            if self._current_session_id is not None:
+                save_heartbeat(self._current_session_id, now)
 
             win = get_active_window()
             if not win:
@@ -311,6 +366,7 @@ class Tracker:
                     started_at=datetime.fromtimestamp(now).astimezone(),
                 )
                 self._session_started_at = now
+                save_heartbeat(self._current_session_id, now)
                 try:
                     from deskline.icons import ensure_app_icon, ensure_site_icon
 
@@ -432,6 +488,7 @@ class Tracker:
             sid = self._current_session_id
             self.db.end_session(sid, ended_at=ended)
             self._push_session_to_hub(sid)
+            clear_heartbeat()
             self._current_session_id = None
         self._session_started_at = None
         # Force a new session on the next focus sample
@@ -515,6 +572,7 @@ class Tracker:
             sid = self._current_session_id
             self.db.end_session(sid)
             self._push_session_to_hub(sid)
+            clear_heartbeat()
         self._current_session_id = None
         self._session_started_at = None
         self._current_key = None

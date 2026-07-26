@@ -309,6 +309,50 @@ class Database:
                 (_iso(ended), duration, session_id),
             )
 
+    def repair_sessions_spanning_boot(self, boot_time: float) -> int:
+        """Clamp sessions that started before OS boot and ended after it.
+
+        Hard power-off leaves `ended_at IS NULL`; on restart an older bug resumed
+        that session so offline hours were counted. Rewrite `started_at` to boot
+        so only post-boot time remains.
+        """
+        boot_dt = datetime.fromtimestamp(float(boot_time)).astimezone()
+        boot_iso = _iso(boot_dt)
+        repaired = 0
+        with self.connect() as conn:
+            rows = conn.execute(
+                """
+                SELECT id, started_at, ended_at, idle_sec FROM sessions
+                WHERE started_at < ?
+                  AND ended_at IS NOT NULL
+                  AND ended_at > ?
+                """,
+                (boot_iso, boot_iso),
+            ).fetchall()
+            for row in rows:
+                started = _parse(row["started_at"])
+                ended = _parse(row["ended_at"])
+                if not started or not ended or ended <= boot_dt:
+                    continue
+                full_span = max(0.0, (ended - started).total_seconds())
+                duration = max(0.0, (ended - boot_dt).total_seconds())
+                idle_full = float(row["idle_sec"] or 0)
+                idle_full = min(max(0.0, idle_full), full_span) if full_span else 0.0
+                idle_part = (
+                    idle_full * (duration / full_span) if full_span > 0 else 0.0
+                )
+                idle_part = min(idle_part, duration)
+                conn.execute(
+                    """
+                    UPDATE sessions
+                    SET started_at=?, duration_sec=?, idle_sec=?
+                    WHERE id=?
+                    """,
+                    (boot_iso, duration, idle_part, row["id"]),
+                )
+                repaired += 1
+        return repaired
+
     def update_session_activity(
         self,
         session_id: int,
