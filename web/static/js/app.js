@@ -3105,7 +3105,7 @@ async function boot() {
     window.setTimeout(() => {
       splash.classList.add("is-done");
       sessionStorage.setItem("deskline_splash_done", "1");
-    }, 1000);
+    }, 1750);
   } else if (splash) {
     splash.classList.add("is-done");
   }

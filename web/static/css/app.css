@@ -2262,16 +2262,8 @@ html[data-theme="dark"] .rank-row-child {
   pointer-events: none;
 }
 
-.boot-splash-title {
-  margin: 0;
-  text-align: center;
-  font-family: var(--display);
-  font-size: 1.6rem;
-  color: var(--ink);
-}
-
 .boot-logo-anim {
-  width: min(260px, 52vw);
+  width: min(280px, 54vw);
   height: auto;
   display: block;
   margin: 0 auto;
@@ -2282,12 +2274,12 @@ html[data-theme="dark"] .rank-row-child {
   box-shadow: none;
   filter: none;
   image-rendering: auto;
-  animation: boot-logo-fade 0.9s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation: boot-logo-in 1.05s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
-@keyframes boot-logo-fade {
-  from { opacity: 0; transform: scale(0.94); }
-  to { opacity: 1; transform: scale(1); }
+@keyframes boot-logo-in {
+  from { opacity: 0; transform: scale(0.9) translateY(10px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
 }
 
 .boot-logo-anim-dark { display: none; }
@@ -2295,6 +2287,21 @@ html[data-theme="dark"] .boot-logo-anim-light { display: none; }
 html[data-theme="dark"] .boot-logo-anim-dark {
   display: block;
   filter: none;
+}
+
+.boot-splash-title {
+  margin: 0;
+  text-align: center;
+  font-family: var(--display);
+  font-size: 1.75rem;
+  color: var(--ink);
+  letter-spacing: 0.02em;
+  animation: boot-title-in 0.7s ease 0.35s both;
+}
+
+@keyframes boot-title-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
 .logo-mark {
@@ -2490,6 +2497,19 @@ html[data-theme="dark"] .tab-group {
   max-width: 420px;
 }
 
+.launch-hero {
+  animation: launch-rise 0.85s cubic-bezier(0.22, 1, 0.36, 1) 0.15s both;
+}
+
+.launch-panel {
+  animation: launch-rise 0.9s cubic-bezier(0.22, 1, 0.36, 1) 0.28s both;
+}
+
+@keyframes launch-rise {
+  from { opacity: 0; transform: translateY(18px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
 .preview-card {
   /* Stage 520 * zoom 0.72 ≈ 374 + horizontal padding. */
   width: min(402px, 100%);
@@ -2502,6 +2522,16 @@ html[data-theme="dark"] .tab-group {
   border-radius: 18px;
   position: relative;
   overflow: hidden;
+  animation: preview-pop 0.75s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.preview-gauges { animation-delay: 0.35s; }
+.preview-timeline { animation-delay: 0.48s; }
+.preview-week { animation-delay: 0.6s; }
+
+@keyframes preview-pop {
+  from { opacity: 0; transform: translateY(14px) scale(0.97); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
 }
 
 .preview-card + .preview-card {
