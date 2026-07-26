@@ -1752,6 +1752,10 @@ html[data-theme="dark"] .rank-row-child {
   stroke: #fff;
   stroke-width: 2.5;
   outline: none;
+}
+
+/* Entrance only on first paint — polling must not re-trigger this (flicker). */
+.donut-segs.is-enter .donut-seg {
   animation: donutPop 0.55s cubic-bezier(0.22, 1, 0.36, 1) both;
   animation-delay: calc(var(--i, 0) * 60ms);
 }

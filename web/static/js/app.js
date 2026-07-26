@@ -44,6 +44,7 @@ const KIND_COLORS = [
 let lastSummaryKey = "";
 let lastStatusKey = "";
 let lastBarsKey = "";
+let lastDayViewKey = "";
 /** @type {string} YYYY-MM-DD — always defaults to today */
 let selectedDayIso = "";
 /** @type {any} */
@@ -107,6 +108,9 @@ function renderDayWeekStrip() {
   ensureSelectedDay();
   const today = localDayIso();
   const weekStart = startOfWeekMonday(selectedDayIso);
+  const navSig = `${selectedDayIso}|${today}|${weekStart}`;
+  if (el.dataset.navSig === navSig) return;
+  el.dataset.navSig = navSig;
   const chips = [];
   for (let i = 0; i < 7; i++) {
     const iso = shiftDayIso(weekStart, i);
@@ -800,9 +804,28 @@ function wireDonutHover(root) {
   });
 }
 
+function pieSignature(slices, total, emptyText) {
+  const usable = (slices || []).filter((s) => (s.sec || 0) > 0);
+  if (!usable.length || !total) return `empty:${emptyText || "Пока нет данных."}`;
+  return JSON.stringify({
+    totalMin: Math.floor(total / 60),
+    slices: usable.map((s) => [
+      String(s.key || s.label || ""),
+      Math.floor((s.sec || 0) / 60),
+      s.color || "",
+      s.label || "",
+    ]),
+  });
+}
+
 function renderPieChart(el, slices, total, emptyText) {
   if (!el) return;
   const usable = (slices || []).filter((s) => (s.sec || 0) > 0);
+  const sig = pieSignature(slices, total, emptyText);
+  if (el.dataset.pieSig === sig) return;
+  const animateEnter = !el.dataset.pieSig;
+  el.dataset.pieSig = sig;
+
   if (!usable.length || !total) {
     el.innerHTML = `<p class="hint">${emptyText || "Пока нет данных."}</p>`;
     return;
@@ -830,7 +853,8 @@ function renderPieChart(el, slices, total, emptyText) {
     .join("");
   const primary = usable[0];
   const primaryPct = Math.round((primary.sec / total) * 100);
-  const glowId = `donutGlow-${Math.random().toString(36).slice(2, 9)}`;
+  const glowId = `donutGlow-${el.id || "pie"}`;
+  const enterClass = animateEnter ? " is-enter" : "";
   el.innerHTML = `<div class="pie-layout">
     <div class="donut-wrap" role="group" aria-label="Диаграмма">
       <svg class="donut-svg" viewBox="0 0 220 220" width="220" height="220">
@@ -840,7 +864,7 @@ function renderPieChart(el, slices, total, emptyText) {
           </filter>
         </defs>
         <circle class="donut-track" cx="110" cy="110" r="77" fill="none"/>
-        <g class="donut-segs" filter="url(#${glowId})">${paths}</g>
+        <g class="donut-segs${enterClass}" filter="url(#${glowId})">${paths}</g>
       </svg>
       <div class="donut-center">
         <strong>${primaryPct}%</strong>
@@ -923,6 +947,9 @@ function renderDayKpis(summary) {
     { label: "Без ввода", value: `${idlePct}%`, sub: fmtDur(summary.idle_sec) },
     { label: "Фокус", value: `${summary.focus_pct ?? 0}%`, sub: fmtDur(summary.focus_sec) },
   ];
+  const sig = JSON.stringify(items);
+  if (el.dataset.kpiSig === sig) return;
+  el.dataset.kpiSig = sig;
   el.innerHTML = items
     .map(
       (it) => `<div class="kpi-card">
@@ -2158,6 +2185,15 @@ function syncDayDateInput() {
   renderDayWeekStrip();
 }
 
+function dayTimelineSignature(rows) {
+  return (rows || [])
+    .map(
+      (r) =>
+        `${r.started_at}|${r.ended_at || "open"}|${Math.floor((r.sec || 0) / 60)}|${r.name || ""}|${r.category || ""}`
+    )
+    .join(";");
+}
+
 async function refreshTimeline() {
   ensureSelectedDay();
   renderDayWeekStrip();
@@ -2183,6 +2219,16 @@ async function refreshTimeline() {
       console.error(rowsRes.reason);
       showToast("Не удалось загрузить ленту дня", "error");
     }
+
+    const viewKey = [
+      selectedDayIso,
+      filterEmployeeId || "",
+      gated ? "gated" : "ok",
+      summaryKey(summary),
+      dayTimelineSignature(rows),
+    ].join("|");
+    if (viewKey === lastDayViewKey) return;
+    lastDayViewKey = viewKey;
 
     const el = document.getElementById("timelineList");
     if (gated) {
@@ -2992,6 +3038,7 @@ function wireUi() {
   document.getElementById("clearBtn").addEventListener("click", async () => {
     if (!confirm("Удалить все локальные сессии и записи скриншотов?")) return;
     lastSummaryKey = "";
+    lastDayViewKey = "";
     lastBarsKey = "";
     await api("/api/data/clear", { method: "POST" });
     await refreshSummary();
@@ -3085,6 +3132,7 @@ function wireUi() {
     _rdpVisionShownKey = "";
     lastStatusKey = "";
     lastSummaryKey = "";
+    lastDayViewKey = "";
     await refreshStatus().catch(() => {});
     await refreshSummary().catch(() => {});
   });
