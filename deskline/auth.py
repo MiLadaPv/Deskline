@@ -151,15 +151,27 @@ def link_google_account(sub: str, email: str | None = None, *, username: str | N
         raise ValueError("missing google sub")
     data = _load_auth()
     user = normalize_username(username) if username else ""
-    if user and user in _users(data):
-        rec = dict(_users(data)[user])
+    if user:
+        other = username_for_google_sub(sub)
+        if other and other != user:
+            raise PermissionError("this google account is already linked to another user")
+        root = data.get("google_sub")
+        if (
+            isinstance(root, str)
+            and root.strip()
+            and root.strip() != sub
+            and not _users(data)
+        ):
+            raise PermissionError("another google account is already linked")
+        users = data.setdefault("users", {})
+        rec = dict(users.get(user) or {})
         existing = rec.get("google_sub")
         if isinstance(existing, str) and existing.strip() and existing.strip() != sub:
             raise PermissionError("another google account is already linked")
         rec["google_sub"] = sub
         if email:
             rec["google_email"] = email.strip()
-        data.setdefault("users", {})[user] = rec
+        users[user] = rec
     else:
         existing = data.get("google_sub")
         if isinstance(existing, str) and existing.strip() and existing.strip() != sub:
@@ -215,6 +227,30 @@ def username_for_google_sub(sub: str) -> str | None:
     return None
 
 
+def username_from_google_email(email: str | None) -> str:
+    """Derive a free local username from a Google email (anna@x → anna / anna1…)."""
+    local = (email or "google").split("@", 1)[0].lower()
+    cleaned = re.sub(r"[^a-z0-9._-]", "", local)
+    if not cleaned:
+        cleaned = "google"
+    if not cleaned[0].isalnum():
+        cleaned = "g" + cleaned
+    cleaned = cleaned[:28]
+    while len(cleaned) < 3:
+        cleaned += "0"
+    base = cleaned
+    candidate = base
+    n = 1
+    while username_exists(candidate):
+        suffix = str(n)
+        candidate = base[: max(1, 32 - len(suffix))] + suffix
+        n += 1
+        if n > 9999:
+            candidate = "g" + secrets.token_hex(4)
+            break
+    return validate_username(candidate)
+
+
 def setup_with_google(sub: str, email: str | None = None, *, username: str | None = None) -> str | None:
     """First-run via Google: create user shell if username given."""
     if is_auth_configured() and not username:
@@ -243,6 +279,20 @@ def setup_with_google(sub: str, email: str | None = None, *, username: str | Non
     data["recovery_hash"] = hash_password(_normalize_recovery_code(recovery_plain))
     _save_auth(data)
     return recovery_plain
+
+
+def login_or_register_with_google(sub: str, email: str | None = None) -> tuple[str, str | None]:
+    """Sign in with a known Google sub, or register a new local user from Google."""
+    existing = username_for_google_sub(sub)
+    if existing:
+        link_google_account(sub, email, username=existing)
+        return existing, None
+    if verify_google_sub(sub):
+        # Legacy root-level Google link (no per-user record).
+        return "", None
+    user = username_from_google_email(email)
+    recovery = setup_with_google(sub, email, username=user)
+    return user, recovery
 
 
 def has_recovery_code(username: str | None = None) -> bool:

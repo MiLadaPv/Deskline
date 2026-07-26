@@ -3086,9 +3086,15 @@ html[data-theme="dark"] .preview-timeline-legs i.void {
   display: inline-flex;
   justify-content: center;
   align-items: center;
+  gap: 10px;
   background: #fff;
   color: #1f1f1f;
   border: 1px solid var(--line);
+}
+
+.google-btn .google-icon {
+  flex-shrink: 0;
+  display: block;
 }
 
 .google-btn:hover {

@@ -29,10 +29,10 @@ from deskline.auth import (
     is_password_set,
     is_public_path,
     link_google_account,
+    login_or_register_with_google,
     register_user,
     reset_password_with_recovery,
     session_username,
-    setup_with_google,
     unlink_google_account,
     username_exists,
     username_for_google_sub,
@@ -495,11 +495,6 @@ def create_app(tracker: Tracker, db: Database | None = None) -> FastAPI:
         want_bind = bool(bind)
         if want_bind and not validate_session_token(request.cookies.get(COOKIE_NAME)):
             raise HTTPException(401, "Сначала войдите паролем, чтобы привязать Google")
-        sess_user = session_username(request.cookies.get(COOKIE_NAME))
-        if not want_bind and is_password_set() and not is_google_linked(sess_user):
-            return _oauth_error_redirect(
-                "Сначала войдите паролем, затем Настройки → Привязать Google"
-            )
         state = make_oauth_state()
         verifier, challenge = make_pkce_pair()
         save_oauth_pending(state, verifier=verifier, bind=want_bind)
@@ -581,15 +576,9 @@ def create_app(tracker: Tracker, db: Database | None = None) -> FastAPI:
                 login_as = session_user or ""
             elif verify_google_sub(sub):
                 login_as = username_for_google_sub(sub) or session_user or ""
-            elif not is_auth_configured():
-                recovery_code = setup_with_google(sub, email)
-                login_as = username_for_google_sub(sub) or ""
-            elif is_google_linked():
-                return _oauth_error_redirect("Этот Google-аккаунт не привязан")
             else:
-                return _oauth_error_redirect(
-                    "Привяжите Google в Настройках после входа по паролю"
-                )
+                # Standard Google sign-in / sign-up (no password-first gate).
+                login_as, recovery_code = login_or_register_with_google(sub, email)
         except PermissionError:
             return _oauth_error_redirect("Уже привязан другой Google-аккаунт")
         except ValueError as exc:
