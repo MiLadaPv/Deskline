@@ -3247,7 +3247,7 @@ html[data-theme="dark"] .google-btn {
 
 .pulse-split > .pulse-panel {
   min-width: 0;
-  overflow: hidden;
+  overflow: visible;
 }
 
 .pulse-split.is-long {
@@ -3346,7 +3346,7 @@ html[data-theme="dark"] .google-btn {
   position: relative;
   width: 100%;
   max-width: 100%;
-  overflow: hidden;
+  overflow: visible;
 }
 
 .hours-line-svg {
@@ -3403,7 +3403,7 @@ html[data-theme="dark"] .google-btn {
 
 .hours-tip {
   position: absolute;
-  z-index: 5;
+  z-index: 8;
   transform: translate(-50%, calc(-100% - 12px));
   padding: 6px 10px;
   border-radius: 10px;
@@ -3424,6 +3424,17 @@ html[data-theme="dark"] .google-btn {
   transform: translateX(-50%);
   border: 6px solid transparent;
   border-top-color: #15241f;
+}
+
+.hours-tip.is-below {
+  transform: translate(-50%, 14px);
+}
+
+.hours-tip.is-below::after {
+  top: auto;
+  bottom: 100%;
+  border-top-color: transparent;
+  border-bottom-color: #15241f;
 }
 
 .hours-axis {

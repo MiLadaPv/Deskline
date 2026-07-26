@@ -1163,10 +1163,20 @@ function bindHoursChartInteractions(el, points, tips) {
     const [x, y] = points[i];
     const svgRect = svg.getBoundingClientRect();
     const hostRect = el.getBoundingClientRect();
-    const px = (x / w) * svgRect.width + (svgRect.left - hostRect.left);
+    let px = (x / w) * svgRect.width + (svgRect.left - hostRect.left);
     const py = (y / h) * svgRect.height + (svgRect.top - hostRect.top);
     tip.hidden = false;
     tip.textContent = tips[i];
+    tip.classList.remove("is-below");
+    // Measure after paint so we can flip when the tip would clip at the top.
+    const tipW = tip.offsetWidth || 96;
+    const tipH = tip.offsetHeight || 32;
+    const roomAbove = py;
+    if (roomAbove < tipH + 16) {
+      tip.classList.add("is-below");
+    }
+    const half = tipW / 2;
+    px = Math.max(half + 4, Math.min(hostRect.width - half - 4, px));
     tip.style.left = `${px}px`;
     tip.style.top = `${py}px`;
   };
