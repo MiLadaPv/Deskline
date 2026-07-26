@@ -49,4 +49,5 @@ def test_index_has_day_nav_and_pies():
     assert 'id="kindPie"' in html
     assert 'id="dayCatPie"' in html
     assert "По часам" in html
-    assert "tab-group-label" in html
+    assert "app-nav-rail" in html
+    assert 'data-tab="today"' in html
