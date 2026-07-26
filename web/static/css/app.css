@@ -3547,6 +3547,37 @@ html[data-theme="dark"] .google-btn {
   font-weight: 600;
 }
 
+.pulse-aside-stack {
+  display: grid;
+  justify-items: end;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+.hours-avg-label {
+  color: var(--accent);
+  font-size: 0.78rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.hours-avg-line {
+  stroke: var(--accent);
+  stroke-width: 1.5;
+  stroke-dasharray: 5 4;
+  opacity: 0.85;
+  pointer-events: none;
+}
+
+.hours-avg-tag {
+  fill: var(--accent);
+  font-size: 10px;
+  font-weight: 700;
+  font-family: var(--sans, Manrope, system-ui, sans-serif);
+  pointer-events: none;
+}
+
 .pulse-actions {
   display: flex;
   justify-content: space-between;

@@ -1193,16 +1193,29 @@ function renderHoursChart(trends) {
   const rows = trends || [];
   const aside = document.getElementById("hoursTrendAside");
   if (aside) aside.textContent = `${rows.length || 0} дн.`;
+  const avgEl = document.getElementById("hoursTrendAvg");
   const title = document.getElementById("hoursTrendTitle");
   if (title) title.textContent = trendsTitleForRows(rows);
   const split = document.querySelector(".pulse-split");
   if (split) split.classList.toggle("is-long", rows.length > 45);
   if (!rows.length) {
+    if (avgEl) avgEl.textContent = "в среднем —";
     el.innerHTML = `<p class="hint">Пока нет тренда по часам.</p>`;
     return;
   }
   const vals = rows.map((r) => Number(r.active_sec || r.total_sec || 0));
-  const maxSec = Math.max(...vals, 1);
+  const activeVals = vals.filter((v) => v >= 60);
+  // Mean over days with ≥1м tracked — empty calendar days don't pull the average to zero.
+  const avgSec = activeVals.length
+    ? activeVals.reduce((a, b) => a + b, 0) / activeVals.length
+    : vals.reduce((a, b) => a + b, 0) / vals.length;
+  if (avgEl) {
+    avgEl.textContent = `в среднем ${fmtDur(avgSec)} / день`;
+    avgEl.title = activeVals.length
+      ? `Среднее по ${activeVals.length} дн. с активностью (≥1м)`
+      : "Среднее по всем дням периода";
+  }
+  const maxSec = Math.max(...vals, avgSec, 1);
   const maxH = niceHoursCeiling(maxSec);
   const maxScale = maxH * 3600;
   // Keep a stable viewBox so the SVG fills the card instead of exploding width.
@@ -1230,6 +1243,12 @@ function renderHoursChart(trends) {
   });
   const poly = pts.map(([x, y]) => `${x.toFixed(1)},${y.toFixed(1)}`).join(" ");
   const area = `${padL},${(padT + chartH).toFixed(1)} ${poly} ${(padL + chartW).toFixed(1)},${(padT + chartH).toFixed(1)}`;
+  const avgY = padT + chartH - (avgSec / maxScale) * chartH;
+  const avgLine =
+    avgSec > 0
+      ? `<line class="hours-avg-line" x1="${padL}" y1="${avgY.toFixed(1)}" x2="${(w - padR).toFixed(1)}" y2="${avgY.toFixed(1)}"/>
+         <text class="hours-avg-tag" x="${(w - padR).toFixed(1)}" y="${(avgY - 4).toFixed(1)}" text-anchor="end">ср. ${escapeHtml(fmtDur(avgSec))}</text>`
+      : "";
   const tips = rows.map((r, i) => {
     const d = new Date(`${r.day}T12:00:00`);
     return `${d.toLocaleDateString("ru-RU", {
@@ -1259,6 +1278,7 @@ function renderHoursChart(trends) {
     ${grid}
     <polygon class="hours-line-fill" points="${area}"/>
     <polyline class="hours-line-path" fill="none" points="${poly}"/>
+    ${avgLine}
     ${dots}
   </svg>`;
   bindHoursChartInteractions(el, pts, tips);
