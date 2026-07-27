@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Скачать Deskline · {{ company_name }}</title>
+  <meta name="description" content="Скачать Deskline для Windows: Setup, Chrome-расширение и silent-установка для IT. Данные остаются на вашем ПК." />
+  <link rel="canonical" href="{{ base_url }}/download" />
+  <meta property="og:type" content="website" />
+  <meta property="og:title" content="Скачать Deskline" />
+  <meta property="og:description" content="Windows Setup, Chrome extension, silent install. Local-first focus tracking." />
+  <meta property="og:url" content="{{ base_url }}/download" />
+  <meta property="og:image" content="{{ base_url }}/static/img/logo.png" />
+  <script src="/static/js/theme.js?v={{ version }}"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/static/css/app.css?v={{ version }}" />
+  <link rel="icon" href="/static/img/logo.png" type="image/png" />
+</head>
+<body class="welcome-body">
+  <div class="atmosphere" aria-hidden="true"></div>
+  <header class="welcome-top">
+    <a class="brand-lockup welcome-lockup" href="/welcome">
+      {% with anim=true, soft=true, size=44 %}
+        {% include "partials/logo_mark.html" %}
+      {% endwith %}
+      <span class="brand-lockup-name">Deskline</span>
+    </a>
+    <nav class="welcome-nav">
+      <button type="button" class="theme-toggle" id="themeToggle" title="Тема">Тема</button>
+      <a href="/welcome#pricing">Тарифы</a>
+      <a href="/privacy">Privacy</a>
+      <a href="/login">Открыть приложение</a>
+    </nav>
+  </header>
+
+  <main class="welcome-main dl-main">
+    <section class="dl-card" aria-labelledby="dlDesktopTitle">
+      <div class="dl-card-head">
+        <h1 id="dlDesktopTitle">Скачать и установить</h1>
+        <div class="dl-os-tabs" role="tablist" aria-label="Операционная система">
+          <button type="button" class="dl-os-tab is-active" role="tab" aria-selected="true" data-os="windows">Windows</button>
+          <button type="button" class="dl-os-tab" role="tab" aria-selected="false" data-os="chromeos">Chrome OS</button>
+          <button type="button" class="dl-os-tab" role="tab" aria-selected="false" data-os="mac" disabled title="Скоро">Mac OS X</button>
+          <button type="button" class="dl-os-tab" role="tab" aria-selected="false" data-os="ubuntu" disabled title="Скоро">Ubuntu</button>
+        </div>
+      </div>
+
+      <div class="dl-os-panel is-active" data-os-panel="windows">
+        <a
+          class="btn primary dl-primary-cta"
+          href="{{ download_setup_url }}"
+          target="_blank"
+          rel="noopener noreferrer"
+          data-funnel="download_click"
+          data-funnel-src="download_primary"
+        >Скачать Deskline для Windows</a>
+        <p class="dl-meta">v{{ version }} · Windows 10 или новее · подписанный Setup</p>
+        <p class="dl-privacy">Local-first: активность и скриншоты остаются на вашем ПК — без обязательного облака.</p>
+        <p class="dl-meta">
+          <a href="{{ download_sha256_url }}" target="_blank" rel="noopener noreferrer" data-funnel="download_click" data-funnel-src="download_sha256">SHA256 / Releases</a>
+          ·
+          <a href="{{ github_releases_url }}" target="_blank" rel="noopener noreferrer">Все версии</a>
+        </p>
+      </div>
+
+      <div class="dl-os-panel" data-os-panel="chromeos" hidden>
+        <p class="welcome-lead">На Chrome OS доступно расширение Chrome. Полный трекинг приложений — через Windows Desktop.</p>
+        <a class="btn primary dl-primary-cta" href="#dlExt" data-os-jump="ext">Установить расширение</a>
+        <p class="dl-meta">Desktop для Chrome OS — в планах. Пока используйте расширение + Windows-машину при необходимости.</p>
+      </div>
+
+      <div class="dl-os-panel" data-os-panel="mac" hidden>
+        <p class="welcome-lead">Сборка для Mac — скоро. Оставьте запрос на почту.</p>
+        <a class="btn" href="mailto:{{ support_email }}?subject=Deskline%20Mac%20waitlist">Написать {{ support_email }}</a>
+      </div>
+
+      <div class="dl-os-panel" data-os-panel="ubuntu" hidden>
+        <p class="welcome-lead">Сборка для Ubuntu — скоро. Оставьте запрос на почту.</p>
+        <a class="btn" href="mailto:{{ support_email }}?subject=Deskline%20Ubuntu%20waitlist">Написать {{ support_email }}</a>
+      </div>
+
+      <details class="dl-acc" id="dlExt">
+        <summary>Добавить Chrome-расширение (опционально)</summary>
+        <div class="dl-acc-body">
+          <p>
+            Расширение уточняет сайты в браузере и дополняет Desktop.
+            <strong>Нужно установленное приложение Deskline Desktop.</strong>
+          </p>
+          <div class="dl-acc-actions">
+            {% if chrome_web_store_url %}
+            <a
+              class="btn primary"
+              href="{{ chrome_web_store_url }}"
+              target="_blank"
+              rel="noopener noreferrer"
+              data-funnel="download_click"
+              data-funnel-src="download_ext_store"
+            >Chrome Web Store</a>
+            {% endif %}
+            <a
+              class="btn{% if not chrome_web_store_url %} primary{% endif %}"
+              href="{{ download_extension_url }}"
+              target="_blank"
+              rel="noopener noreferrer"
+              data-funnel="download_click"
+              data-funnel-src="download_ext_zip"
+            >Скачать zip (Chrome)</a>
+            <button type="button" class="btn" disabled title="Скоро">Firefox Add-ons — скоро</button>
+          </div>
+          <p class="dl-meta">В Releases возьмите <code>Deskline-Extension-*.zip</code>, затем Chrome → Расширения → Режим разработчика → Загрузить распакованное.</p>
+        </div>
+      </details>
+
+      <details class="dl-acc" id="dlMass">
+        <summary>Только для массовой установки</summary>
+        <div class="dl-acc-body">
+          <p>
+            Для сети / SCCM / GPO: скрипты скачивают последний <code>DesklineSetup-*.exe</code>
+            и ставят его с <code>/VERYSILENT /NORESTART</code>.
+            Отдельный MSI не публикуем — Setup уже silent-ready (полный Desktop + backend).
+          </p>
+          <div class="dl-acc-actions">
+            <a
+              class="btn primary"
+              href="{{ silent_install_bat_url }}"
+              download
+              data-funnel="download_click"
+              data-funnel-src="download_silent_bat"
+            >Скачать .BAT</a>
+            <a
+              class="btn primary"
+              href="{{ silent_install_ps1_url }}"
+              download
+              data-funnel="download_click"
+              data-funnel-src="download_silent_ps1"
+            >Скачать .PS1</a>
+            <a
+              class="btn"
+              href="{{ download_setup_url }}"
+              target="_blank"
+              rel="noopener noreferrer"
+              data-funnel="download_click"
+              data-funnel-src="download_silent_setup"
+            >Setup.exe для IT</a>
+          </div>
+          <p class="dl-warn">
+            Установки через silent-скрипты и Setup не обновляются автоматически.
+            Новую версию нужно ставить вручную при каждом релизе.
+          </p>
+        </div>
+      </details>
+    </section>
+
+    <section class="dl-card dl-mobile" aria-labelledby="dlMobileTitle">
+      <h2 id="dlMobileTitle">Mobile App</h2>
+      <p class="welcome-lead">
+        Мобильное приложение для команды — в разработке. Без фейковых кнопок сторов:
+        напишите нам, если нужен Android / iOS.
+      </p>
+      <a class="btn" href="mailto:{{ support_email }}?subject=Deskline%20Mobile%20waitlist">В waitlist · {{ support_email }}</a>
+    </section>
+  </main>
+
+  <footer class="welcome-foot">
+    <p>© {{ copyright_year }} {{ company_name }} · Deskline v{{ version }}</p>
+    <p><a href="/welcome">О продукте</a> · <a href="/privacy">Privacy</a> · <a href="/terms">Terms</a></p>
+  </footer>
+
+  <script>
+    (function () {
+      const btn = document.getElementById("themeToggle");
+      if (btn) {
+        const cycle = ["system", "light", "dark"];
+        const labels = { system: "Система", light: "Светлая", dark: "Тёмная" };
+        const sync = () => {
+          const pref = localStorage.getItem("deskline_theme") || "system";
+          btn.textContent = labels[pref] || "Тема";
+        };
+        sync();
+        btn.addEventListener("click", () => {
+          const pref = localStorage.getItem("deskline_theme") || "system";
+          const next = cycle[(cycle.indexOf(pref) + 1) % cycle.length];
+          localStorage.setItem("deskline_theme", next);
+          const resolved =
+            next === "system"
+              ? window.matchMedia("(prefers-color-scheme: dark)").matches
+                ? "dark"
+                : "light"
+              : next;
+          document.documentElement.setAttribute("data-theme", resolved);
+          document.documentElement.setAttribute("data-theme-pref", next);
+          sync();
+        });
+      }
+
+      const tabs = [...document.querySelectorAll(".dl-os-tab")];
+      const panels = [...document.querySelectorAll("[data-os-panel]")];
+      const showOs = (os) => {
+        tabs.forEach((t) => {
+          const on = t.dataset.os === os && !t.disabled;
+          t.classList.toggle("is-active", on);
+          t.setAttribute("aria-selected", on ? "true" : "false");
+        });
+        panels.forEach((p) => {
+          const on = p.dataset.osPanel === os;
+          p.classList.toggle("is-active", on);
+          p.hidden = !on;
+        });
+      };
+      tabs.forEach((t) => {
+        t.addEventListener("click", () => {
+          if (t.disabled) return;
+          showOs(t.dataset.os);
+        });
+      });
+      document.querySelectorAll("[data-os-jump='ext']").forEach((a) => {
+        a.addEventListener("click", () => {
+          const acc = document.getElementById("dlExt");
+          if (acc) acc.open = true;
+        });
+      });
+
+      const ping = (src) => {
+        try {
+          fetch("/api/funnel", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ event: "download_click", meta: { src: src || "download" } }),
+            keepalive: true,
+          }).catch(() => {});
+        } catch (_) {}
+      };
+      document.querySelectorAll("[data-funnel='download_click']").forEach((el) => {
+        el.addEventListener("click", () => ping(el.getAttribute("data-funnel-src")));
+      });
+    })();
+  </script>
+</body>
+</html>

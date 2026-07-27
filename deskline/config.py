@@ -16,6 +16,8 @@ COMPANY_NAME = "AndalusGames"
 SUPPORT_EMAIL = "milanochka.llc@gmail.com"
 GITHUB_URL = "https://github.com/MiLadaPv/Deskline"
 GITHUB_RELEASES_URL = f"{GITHUB_URL}/releases"
+# Empty until Chrome Web Store listing is live (see docs/CHROME_WEB_STORE.md).
+CHROME_WEB_STORE_URL = ""
 LEGAL_JURISDICTION = "Hashemite Kingdom of Jordan"
 
 PACKAGE_ROOT = Path(__file__).resolve().parent
@@ -158,15 +160,21 @@ def brand_template_context(*, version: str | None = None, base_url: str | None =
 
     from deskline import __version__
 
+    ver = version or __version__
     return {
         "app_name": APP_NAME,
-        "version": version or __version__,
+        "version": ver,
         "base_url": base_url if base_url is not None else BASE_URL,
         "company_name": COMPANY_NAME,
         "support_email": SUPPORT_EMAIL,
         "github_url": GITHUB_URL,
         "github_releases_url": GITHUB_RELEASES_URL,
         "download_setup_url": f"{GITHUB_URL}/releases/latest",
+        "download_sha256_url": f"{GITHUB_URL}/releases/latest",
+        "download_extension_url": f"{GITHUB_URL}/releases/latest",
+        "chrome_web_store_url": CHROME_WEB_STORE_URL,
+        "silent_install_bat_url": "/static/install/silent_install.bat",
+        "silent_install_ps1_url": "/static/install/silent_install.ps1",
         "privacy_policy_url": f"{GITHUB_URL}/blob/master/docs/PRIVACY_POLICY.md",
         "legal_jurisdiction": LEGAL_JURISDICTION,
         "copyright_year": datetime.now().astimezone().year,

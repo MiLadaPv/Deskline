@@ -15,6 +15,7 @@ ALLOWED = frozenset(
         "app_first_open",
         "trial_start",
         "welcome_view",
+        "download_view",
         "download_click",
         "pro_activate",
         "team_activate",

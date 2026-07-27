@@ -168,11 +168,19 @@ def test_welcome_and_compare_public(tmp_path: Path, monkeypatch):
     r = client.get("/welcome")
     assert r.status_code == 200
     assert "Free" in r.text and "Pro" in r.text and "Team" in r.text
-    assert "releases/latest" in r.text
+    assert 'href="/download"' in r.text
     assert "og:title" in r.text
     r2 = client.get("/docs/compare")
     assert r2.status_code == 200
     assert "Time Doctor" in r2.text
+    r3 = client.get("/download")
+    assert r3.status_code == 200
+    assert "Скачать Deskline для Windows" in r3.text
+    assert "silent_install.bat" in r3.text
+    assert 'data-os="windows"' in r3.text
+    bat = client.get("/static/install/silent_install.bat")
+    assert bat.status_code == 200
+    assert b"VERYSILENT" in bat.content or b"silent_install.ps1" in bat.content
 
 
 def test_funnel_events(tmp_path: Path, monkeypatch):

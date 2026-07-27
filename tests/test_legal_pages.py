@@ -37,9 +37,12 @@ def test_legal_paths_are_public():
         "/terms",
         "/login",
         "/welcome",
+        "/download",
         "/docs/compare",
         "/logos",
+        "/api/funnel",
         "/static/css/app.css",
+        "/static/install/silent_install.bat",
     ):
         assert is_public_path(path)
     assert not is_public_path("/")

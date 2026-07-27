@@ -397,6 +397,20 @@ def create_app(tracker: Tracker, db: Database | None = None) -> FastAPI:
             brand_template_context(),
         )
 
+    @app.get("/download", response_class=HTMLResponse)
+    def download_page(request: Request) -> HTMLResponse:
+        try:
+            from deskline.funnel import record_funnel_event
+
+            record_funnel_event("download_view", {"src": "download_page"})
+        except Exception:
+            pass
+        return templates.TemplateResponse(
+            request,
+            "download.html",
+            brand_template_context(),
+        )
+
     @app.get("/docs/compare", response_class=HTMLResponse)
     def compare_page(request: Request) -> HTMLResponse:
         ctx = brand_template_context()

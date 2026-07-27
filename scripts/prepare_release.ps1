@@ -43,6 +43,12 @@ Get-ChildItem $OutDir -File | Where-Object {
 }
 $lines | Set-Content -Encoding ascii $checksums
 Write-Host "Wrote $checksums"
+
+# Mass-install helpers (same scripts as /static/install and /download accordion)
+Copy-Item (Join-Path $Root "web\static\install\silent_install.bat") (Join-Path $OutDir "Deskline-SilentInstall.bat") -Force
+Copy-Item (Join-Path $Root "web\static\install\silent_install.ps1") (Join-Path $OutDir "Deskline-SilentInstall.ps1") -Force
+Write-Host "Copied Deskline-SilentInstall.bat / .ps1"
+
 Write-Host ""
 Write-Host "Next: sign binaries (docs/SIGNING.md), then:"
-Write-Host "  gh release create v$ver release/DesklineSetup-$ver.exe release/Deskline-Extension-$ver.zip release/SHA256SUMS.txt -F docs/RELEASE_NOTES.template.md"
+Write-Host "  gh release create v$ver release/DesklineSetup-$ver.exe release/Deskline-Extension-$ver.zip release/Deskline-SilentInstall.bat release/Deskline-SilentInstall.ps1 release/SHA256SUMS.txt -F docs/RELEASE_NOTES.template.md"
