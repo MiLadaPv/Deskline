@@ -1,11 +1,5 @@
-<#
-.SYNOPSIS
-  Download the latest DesklineSetup-*.exe from GitHub Releases and install silently.
-
-.NOTES
-  Silent installs do not auto-update. Re-run this script when a new version ships.
-  Requires network access to api.github.com and github.com.
-#>
+# Download the latest DesklineSetup-*.exe from GitHub Releases and install silently.
+# Silent installs do not auto-update. Re-run when a new version ships.
 [CmdletBinding()]
 param(
     [string]$Repo = "MiLadaPv/Deskline",
@@ -15,12 +9,24 @@ param(
 $ErrorActionPreference = "Stop"
 $ProgressPreference = "SilentlyContinue"
 
-Write-Host "Deskline silent install — fetching latest release from $Repo ..."
+Write-Host "Deskline silent install - fetching latest release from $Repo ..."
 $headers = @{ "User-Agent" = "Deskline-SilentInstall" }
-$rel = Invoke-RestMethod -Uri "https://api.github.com/repos/$Repo/releases/latest" -Headers $headers
+try {
+    $rel = Invoke-RestMethod -Uri "https://api.github.com/repos/$Repo/releases/latest" -Headers $headers
+} catch {
+    Write-Host "ERROR: No published GitHub release found for $Repo."
+    Write-Host "Publish a release with DesklineSetup-*.exe, then re-run this script."
+    Write-Host "Releases: https://github.com/$Repo/releases"
+    Write-Host $_.Exception.Message
+    exit 2
+}
+
 $asset = @($rel.assets) | Where-Object { $_.name -like "DesklineSetup-*.exe" } | Select-Object -First 1
 if (-not $asset) {
-    throw "No DesklineSetup-*.exe asset found on the latest GitHub release."
+    Write-Host "ERROR: Latest release '$($rel.tag_name)' has no DesklineSetup-*.exe asset."
+    Write-Host "Attach the Setup from scripts/prepare_release.ps1, then re-run."
+    Write-Host "Releases: https://github.com/$Repo/releases"
+    exit 3
 }
 
 $dest = Join-Path $OutDir $asset.name

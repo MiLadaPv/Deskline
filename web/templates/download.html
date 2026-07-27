@@ -42,8 +42,8 @@
         <div class="dl-os-tabs" role="tablist" aria-label="Операционная система">
           <button type="button" class="dl-os-tab is-active" role="tab" aria-selected="true" data-os="windows">Windows</button>
           <button type="button" class="dl-os-tab" role="tab" aria-selected="false" data-os="chromeos">Chrome OS</button>
-          <button type="button" class="dl-os-tab" role="tab" aria-selected="false" data-os="mac" disabled title="Скоро">Mac OS X</button>
-          <button type="button" class="dl-os-tab" role="tab" aria-selected="false" data-os="ubuntu" disabled title="Скоро">Ubuntu</button>
+          <button type="button" class="dl-os-tab is-soon" role="tab" aria-selected="false" data-os="mac" title="Скоро — waitlist">Mac OS X <em>скоро</em></button>
+          <button type="button" class="dl-os-tab is-soon" role="tab" aria-selected="false" data-os="ubuntu" title="Скоро — waitlist">Ubuntu <em>скоро</em></button>
         </div>
       </div>
 
@@ -59,7 +59,9 @@
         <p class="dl-meta">v{{ version }} · Windows 10 или новее · подписанный Setup</p>
         <p class="dl-privacy">Local-first: активность и скриншоты остаются на вашем ПК — без обязательного облака.</p>
         <p class="dl-meta">
-          <a href="{{ download_sha256_url }}" target="_blank" rel="noopener noreferrer" data-funnel="download_click" data-funnel-src="download_sha256">SHA256 / Releases</a>
+          <a href="{{ download_setup_asset_url }}" target="_blank" rel="noopener noreferrer" data-funnel="download_click" data-funnel-src="download_setup_direct">Прямая ссылка Setup.exe</a>
+          ·
+          <a href="{{ download_sha256_url }}" target="_blank" rel="noopener noreferrer" data-funnel="download_click" data-funnel-src="download_sha256">SHA256SUMS.txt</a>
           ·
           <a href="{{ github_releases_url }}" target="_blank" rel="noopener noreferrer">Все версии</a>
         </p>
@@ -199,7 +201,7 @@
       const panels = [...document.querySelectorAll("[data-os-panel]")];
       const showOs = (os) => {
         tabs.forEach((t) => {
-          const on = t.dataset.os === os && !t.disabled;
+          const on = t.dataset.os === os;
           t.classList.toggle("is-active", on);
           t.setAttribute("aria-selected", on ? "true" : "false");
         });
