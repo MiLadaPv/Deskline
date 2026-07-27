@@ -60,6 +60,8 @@ DEFAULT_CONFIG: dict[str, Any] = {
     "paused": False,
     # Compact always-on-top widget (Time Doctor-style)
     "show_mini_tracker": True,
+    "mini_tracker_x": -1,
+    "mini_tracker_y": -1,
     # UI theme: system | light | dark
     "theme": "system",
     # When True, messaging activities count as productive (unless user override)

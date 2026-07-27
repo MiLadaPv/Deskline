@@ -30,3 +30,19 @@ def test_rename_project_rejects_duplicate(tmp_path: Path) -> None:
 def test_fmt_elapsed() -> None:
     assert _fmt_elapsed(65) == "1:05"
     assert _fmt_elapsed(3661) == "1:01:01"
+
+
+def test_orient_for_position_flips_at_right_edge() -> None:
+    from deskline.mini_tracker import _orient_for_position
+
+    assert _orient_for_position(100, 272, 1280) == "horizontal"
+    assert _orient_for_position(1280 - 272 - 5, 272, 1280) == "vertical"
+    assert _orient_for_position(1280 - 60 - 8, 60, 1280) == "vertical"
+
+
+def test_focus_label_prefers_project() -> None:
+    from deskline.mini_tracker import _focus_label
+
+    snap = {"project_name": "RG-Soft", "task_name": "КРАСНЫЙ ЛУЧ RLS"}
+    assert "RG-Soft" in _focus_label(snap, vertical=False)
+    assert _focus_label(snap, vertical=True) == "RG-Soft"
