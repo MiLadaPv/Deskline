@@ -600,122 +600,6 @@ function bindPulseDayScrub(track, dayStartMs, spanMs) {
   });
 }
 
-function renderTodayTimelineStrip(rows, summary) {
-  const el = document.getElementById("todayTimelineStrip");
-  const meta = document.getElementById("todayTimelineMeta");
-  if (!el) return;
-  const list = rows || [];
-  const { dayStartMs, dayEndMs, spanMs } = dayBoundsFromRows(list);
-  if (meta) {
-    meta.textContent = fmtDur(summary?.total_sec || 0);
-  }
-  if (!list.length) {
-    el.innerHTML = `
-      <div class="pulse-ribbon-meta">
-        <span>00:00</span>
-        <span class="pulse-ribbon-total">0м</span>
-        <span>24:00</span>
-      </div>
-      <div class="pulse-hour-row">${[0, 3, 6, 9, 12, 15, 18, 21, 24]
-        .map((h) => `<span class="pulse-hour" style="left:${(h / 24) * 100}%"><b>${String(h).padStart(2, "0")}:00</b></span>`)
-        .join("")}</div>
-      <div class="pulse-track pulse-track-day" data-pulse-scrub="1"><div class="pulse-void-hint">Пустой день — пока нет сессий</div></div>
-      <div class="pulse-legend">
-        <span><i class="productive"></i>Фокус</span>
-        <span><i class="neutral"></i>Нейтрально</span>
-        <span><i class="distracting"></i>Отвлечения</span>
-        <span><i class="idle"></i>Простой в сессии</span>
-        <span><i class="void"></i>Пусто / нет трека</span>
-      </div>`;
-    bindPulseDayScrub(el.querySelector("[data-pulse-scrub]"), dayStartMs, spanMs);
-    return;
-  }
-
-  const hours = [0, 3, 6, 9, 12, 15, 18, 21, 24].map((h) => {
-    const label = h === 24 ? "24:00" : `${String(h).padStart(2, "0")}:00`;
-    return `<span class="pulse-hour" style="left:${(h / 24) * 100}%"><b>${label}</b></span>`;
-  });
-
-  const grid = Array.from({ length: 24 }, (_, h) => {
-    return `<span class="pulse-grid-line" style="left:${(h / 24) * 100}%"></span>`;
-  }).join("");
-
-  const voids = voidGapsForDay(list, dayStartMs, dayEndMs)
-    .map((g) => {
-      const durSec = (g.end - g.start) / 1000;
-      if (durSec < 60) return "";
-      const left = pctOnDay(g.start, dayStartMs, spanMs);
-      const width = ((g.end - g.start) / spanMs) * 100;
-      const tip = `Нет трека · ${fmtDur(durSec)} · ${fmtClockMs(g.start)}–${fmtClockMs(g.end)}`;
-      return `<span class="pulse-seg void-gap" style="left:${left}%;width:${Math.max(0.2, width)}%" title="${escapeHtml(tip)}"></span>`;
-    })
-    .join("");
-
-  const segs = [];
-  for (const r of list) {
-    const a = new Date(r.started_at).getTime();
-    const b = new Date(r.ended_at || Date.now()).getTime();
-    const clipped = clipToDay(a, b, dayStartMs, dayEndMs);
-    if (!clipped) continue;
-    const dur = clipped.end - clipped.start;
-    const idleMs = Math.min(dur, Math.max(0, Number(r.idle_sec || 0) * 1000));
-    const activeMs = Math.max(0, dur - idleMs);
-    const cat = categoryClass(r.category);
-    if (activeMs > 0) {
-      const left = pctOnDay(clipped.start, dayStartMs, spanMs);
-      const width = (activeMs / spanMs) * 100;
-      segs.push(
-        `<span class="pulse-seg ${cat}" style="left:${left}%;width:${Math.max(0.15, width)}%" title="${escapeHtml(r.name || "")}: ${fmtDur(activeMs / 1000)}"></span>`
-      );
-    }
-    if (idleMs > 0) {
-      const idleStart = clipped.start + activeMs;
-      const left = pctOnDay(idleStart, dayStartMs, spanMs);
-      const width = (idleMs / spanMs) * 100;
-      segs.push(
-        `<span class="pulse-seg idle" style="left:${left}%;width:${Math.max(0.15, width)}%" title="Простой: ${fmtDur(idleMs / 1000)}"></span>`
-      );
-    }
-  }
-
-  let nowMark = "";
-  const now = Date.now();
-  if (now >= dayStartMs && now <= dayEndMs) {
-    const left = pctOnDay(now, dayStartMs, spanMs);
-    nowMark = `<span class="pulse-now" style="left:${left}%" title="Сейчас"></span>`;
-  }
-
-  // First/last activity labels (not scale bounds)
-  const first = Math.min(...list.map((r) => new Date(r.started_at).getTime()));
-  const last = Math.max(...list.map((r) => new Date(r.ended_at || Date.now()).getTime()));
-
-  el.innerHTML = `
-    <div class="pulse-ribbon-meta">
-      <span>00:00</span>
-      <span class="pulse-ribbon-total">${fmtDur(summary?.total_sec || 0)}</span>
-      <span>24:00</span>
-    </div>
-    <div class="pulse-ribbon-sub">
-      <span>первая активность ${fmtClock(new Date(first).toISOString())}</span>
-      <span>последняя ${fmtClock(new Date(last).toISOString())}</span>
-    </div>
-    <div class="pulse-hour-row">${hours.join("")}</div>
-    <div class="pulse-track pulse-track-day" data-pulse-scrub="1">
-      ${grid}
-      ${voids}
-      ${segs.join("")}
-      ${nowMark}
-    </div>
-    <div class="pulse-legend">
-      <span><i class="productive"></i>Фокус</span>
-      <span><i class="neutral"></i>Нейтрально</span>
-      <span><i class="distracting"></i>Отвлечения</span>
-      <span><i class="idle"></i>Простой в сессии</span>
-      <span><i class="void"></i>Пусто / нет трека</span>
-    </div>`;
-  bindPulseDayScrub(el.querySelector("[data-pulse-scrub]"), dayStartMs, spanMs);
-}
-
 function donutSegmentPath(cx, cy, rOut, rIn, a0, a1) {
   const sweep = Math.max(0, Math.min(359.999, a1 - a0));
   if (sweep < 0.2) return "";
@@ -905,29 +789,21 @@ function kindPieSlices(byKind) {
     .slice(0, 8);
 }
 
-function renderDayKpis(summary) {
-  const el = document.getElementById("dayKpiStrip");
+function renderDaySummaryLine(summary, { gated = false } = {}) {
+  const el = document.getElementById("daySummaryLine");
   if (!el) return;
-  const total = summary.total_sec || 0;
-  const idlePct = total ? Math.round(((summary.idle_sec || 0) / total) * 100) : 0;
-  const items = [
-    { label: "Всего", value: fmtDur(total), sub: formatDayTitle(selectedDayIso) },
-    { label: "Активно", value: fmtDur(summary.active_sec), sub: `${summary.activity_pct ?? 0}%` },
-    { label: "Без ввода", value: `${idlePct}%`, sub: fmtDur(summary.idle_sec) },
-    { label: "Фокус", value: `${summary.focus_pct ?? 0}%`, sub: fmtDur(summary.focus_sec) },
-  ];
-  const sig = JSON.stringify(items);
-  if (el.dataset.kpiSig === sig) return;
-  el.dataset.kpiSig = sig;
-  el.innerHTML = items
-    .map(
-      (it) => `<div class="kpi-card">
-        <span class="kpi-label">${it.label}</span>
-        <strong class="kpi-value">${it.value}</strong>
-        <span class="kpi-sub">${escapeHtml(it.sub)}</span>
-      </div>`
-    )
-    .join("");
+  if (gated) {
+    el.textContent = "История дальше Free-лимита — доступно в Pro";
+    return;
+  }
+  const total = summary?.total_sec || 0;
+  if (!total) {
+    el.textContent = `${formatDayTitle(selectedDayIso)} · пока нет сессий`;
+    return;
+  }
+  const focus = summary.focus_pct ?? 0;
+  const active = summary.activity_pct ?? 0;
+  el.textContent = `${formatDayTitle(selectedDayIso)} · ${fmtDur(total)} · активно ${active}% · фокус ${focus}%`;
 }
 
 function weekdayShort(isoDay) {
@@ -1318,13 +1194,12 @@ function categoryClass(cat) {
 function renderDayGantt(rows) {
   const el = document.getElementById("dayGantt");
   if (!el) return;
+  const { dayStartMs, dayEndMs, spanMs } = dayBoundsFromRows(rows, selectedDayIso);
   if (!rows.length) {
     el.innerHTML = `<p class="hint">Пока нет сессий для этого дня.</p>`;
     return;
   }
 
-  const { dayStartMs, dayEndMs, spanMs } = dayBoundsFromRows(rows, selectedDayIso);
-  const hourCount = 24;
   const hours = [];
   for (let h = 0; h <= 24; h += 2) {
     const left = (h / 24) * 100;
@@ -1334,6 +1209,17 @@ function renderDayGantt(rows) {
       `<span class="gantt-hour${edge}" style="left:${left}%">${label}</span>`
     );
   }
+
+  const voids = voidGapsForDay(rows, dayStartMs, dayEndMs)
+    .map((g) => {
+      const durSec = (g.end - g.start) / 1000;
+      if (durSec < 60) return "";
+      const left = pctOnDay(g.start, dayStartMs, spanMs);
+      const width = ((g.end - g.start) / spanMs) * 100;
+      const tip = `Нет трека · ${fmtDur(durSec)} · ${fmtClockMs(g.start)}–${fmtClockMs(g.end)}`;
+      return `<div class="gantt-block void-gap is-narrow" style="left:${left}%;width:${Math.max(0.2, width)}%" title="${escapeHtml(tip)}"></div>`;
+    })
+    .join("");
 
   const blocks = [];
   for (const r of rows) {
@@ -1363,9 +1249,16 @@ function renderDayGantt(rows) {
     }
   }
 
+  let nowMark = "";
+  const now = Date.now();
+  if (now >= dayStartMs && now <= dayEndMs) {
+    const left = pctOnDay(now, dayStartMs, spanMs);
+    nowMark = `<div class="gantt-now" style="left:${left}%" title="Сейчас"></div>`;
+  }
+
   el.innerHTML = `
     <div class="gantt-scale">${hours.join("")}</div>
-    <div class="gantt-track gantt-track-fullday" style="--gantt-hours:${hourCount}">${blocks.join("")}</div>
+    <div class="gantt-track gantt-track-fullday" data-pulse-scrub="1" style="--gantt-hours:24">${voids}${blocks.join("")}${nowMark}</div>
     <div class="gantt-legend">
       <span class="stack-leg"><i class="productive"></i>Фокус</span>
       <span class="stack-leg"><i class="neutral"></i>Нейтрально</span>
@@ -1373,6 +1266,7 @@ function renderDayGantt(rows) {
       <span class="stack-leg"><i class="idle"></i>Простой</span>
       <span class="stack-leg"><i class="void"></i>Пусто</span>
     </div>`;
+  bindPulseDayScrub(el.querySelector("[data-pulse-scrub]"), dayStartMs, spanMs);
 }
 
 function kindLabel(kind) {
@@ -1990,10 +1884,9 @@ async function refreshSummary() {
   const q = summaryQuery();
   const { from, to } = periodBounds("today");
   const teamQ = `from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}${filterProjectId ? `&project_id=${encodeURIComponent(filterProjectId)}` : ""}`;
-  const [summary, team, timelineRows] = await Promise.all([
+  const [summary, team] = await Promise.all([
     api(`/api/summary/today${q}`),
     api(`/api/company/team?${teamQ}`, { quiet402: true }).catch(() => []),
-    api(`/api/timeline/today${q}`, { quiet402: true }).catch(() => []),
   ]);
   const key = summaryKey(summary) + `|p:${filterProjectId}|e:${filterEmployeeId}`;
   if (key === lastSummaryKey) return;
@@ -2012,7 +1905,6 @@ async function refreshSummary() {
   renderQuietPeople(team);
   renderKpis(summary, team);
   renderTopProjectsPulse(summary);
-  renderTodayTimelineStrip(timelineRows, summary);
   refreshTrends().catch(() => {});
 }
 
@@ -2020,6 +1912,18 @@ async function refreshUsageReport() {
   const q = periodQuery(usagePeriod, filterProjectId, filterTaskId, filterEmployeeId);
   const summary = await api(`/api/summary?${q}`);
   const total = summary.total_sec || 0;
+  renderPieChart(
+    document.getElementById("usageCatPie"),
+    categoryPieSlices(summary.by_category || {}),
+    total,
+    "Нет данных за период."
+  );
+  renderPieChart(
+    document.getElementById("usageKindPie"),
+    kindPieSlices(summary.by_kind || {}),
+    total,
+    "Нет типов занятий за период."
+  );
   groupedUsageCache = summary.by_app_grouped || [];
   renderGroupedList(
     document.getElementById("activitiesList"),
@@ -2472,9 +2376,7 @@ async function refreshTimeline() {
     const el = document.getElementById("timelineList");
     if (gated) {
       renderDayGantt([]);
-      renderDayKpis({});
-      renderPieChart(document.getElementById("dayCatPie"), [], 0, "Доступно в Pro");
-      renderPieChart(document.getElementById("dayKindPie"), [], 0, "Доступно в Pro");
+      renderDaySummaryLine({}, { gated: true });
       if (el) {
         el.innerHTML = `<li><span class="timeline-time">—</span><span class="rank-icon">•</span><span class="rank-name">История дальше Free-лимита — доступно в Pro</span><span class="rank-meta"></span></li>`;
       }
@@ -2482,20 +2384,7 @@ async function refreshTimeline() {
     }
 
     renderDayGantt(rows);
-    renderDayKpis(summary);
-    const total = summary.total_sec || 0;
-    renderPieChart(
-      document.getElementById("dayCatPie"),
-      categoryPieSlices(summary.by_category || {}),
-      total,
-      "Нет данных за этот день."
-    );
-    renderPieChart(
-      document.getElementById("dayKindPie"),
-      kindPieSlices(summary.by_kind || {}),
-      total,
-      "Нет типов занятий за этот день."
-    );
+    renderDaySummaryLine(summary);
 
     if (!el) return;
     if (!rows.length) {

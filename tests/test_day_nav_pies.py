@@ -40,17 +40,24 @@ def test_timeline_for_arbitrary_day(tmp_path: Path):
     assert "/api/timeline/today" in paths
 
 
-def test_index_has_day_nav_and_pies():
+def test_index_tabs_have_distinct_roles():
     from deskline.config import WEB_ROOT
 
     html = (WEB_ROOT / "templates" / "index.html").read_text(encoding="utf-8")
     assert 'id="dayNav"' in html
-    # Category/kind pies live on Day only — Today keeps pulse/trends (no duplicate pies).
-    assert 'id="catPie"' not in html
-    assert 'id="kindPie"' not in html
-    assert 'id="dayCatPie"' in html
-    assert 'id="dayKindPie"' in html
+    assert 'id="dayGantt"' in html
+    assert 'id="daySummaryLine"' in html
+    # No duplicate KPI cards / pies on Day; composition lives on Usage.
+    assert 'id="dayKpiStrip"' not in html
+    assert 'id="dayCatPie"' not in html
+    assert 'id="dayKindPie"' not in html
+    assert 'id="usageCatPie"' in html
+    assert 'id="usageKindPie"' in html
     assert 'id="topAppsToday"' not in html
-    assert "По часам" in html
+    assert 'id="todayTimelineStrip"' not in html
+    assert "Обзор" in html
+    assert "Лента" in html
+    assert "Где время" in html
+    assert "По часам" not in html
     assert "app-nav-rail" in html
     assert 'data-tab="today"' in html

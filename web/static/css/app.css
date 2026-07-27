@@ -1798,8 +1798,12 @@ html[data-theme="dark"] .rank-row-child {
   margin: 8px 0 18px;
 }
 
-#dayKpiStrip {
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+.day-summary-line {
+  margin: 0 0 14px;
+  color: var(--ink-soft);
+  font-size: 0.9rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
 }
 
 .kpi-card {
@@ -3765,6 +3769,16 @@ html[data-theme="dark"] .google-btn {
   margin-top: 12px;
 }
 
+.pulse-actions-inline {
+  justify-content: flex-start;
+  margin-top: 10px;
+  margin-bottom: 8px;
+}
+
+.pulse-actions-inline .pulse-link {
+  margin-left: 0;
+}
+
 .pulse-link {
   color: var(--accent);
   font-size: 0.86rem;
@@ -4161,6 +4175,27 @@ html[data-theme="dark"] .google-btn {
 
 .gantt-block.idle {
   background: #c4a484;
+}
+
+.gantt-block.void-gap {
+  background: transparent;
+  z-index: 0;
+}
+
+.gantt-block.void-gap:hover {
+  background: rgba(21, 36, 31, 0.08);
+}
+
+.gantt-now {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: #be123c;
+  z-index: 3;
+  transform: translateX(-1px);
+  box-shadow: 0 0 0 2px rgba(190, 18, 60, 0.15);
+  pointer-events: none;
 }
 
 .stack-leg i.void,

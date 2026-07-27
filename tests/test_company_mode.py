@@ -155,7 +155,7 @@ def test_index_has_layered_reports_and_company_settings():
 
     html = (WEB_ROOT / "templates" / "index.html").read_text(encoding="utf-8")
     assert 'id="teamGauges"' in html
-    assert 'id="todayTimelineStrip"' in html
+    assert 'id="dayGantt"' in html
     assert 'id="companyModeToggle"' in html
     assert 'name="hub_url"' in html
     assert 'id="filterEmployeeToday"' in html
