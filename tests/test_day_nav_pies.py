@@ -45,9 +45,12 @@ def test_index_has_day_nav_and_pies():
 
     html = (WEB_ROOT / "templates" / "index.html").read_text(encoding="utf-8")
     assert 'id="dayNav"' in html
-    assert 'id="catPie"' in html
-    assert 'id="kindPie"' in html
+    # Category/kind pies live on Day only — Today keeps pulse/trends (no duplicate pies).
+    assert 'id="catPie"' not in html
+    assert 'id="kindPie"' not in html
     assert 'id="dayCatPie"' in html
+    assert 'id="dayKindPie"' in html
+    assert 'id="topAppsToday"' not in html
     assert "По часам" in html
     assert "app-nav-rail" in html
     assert 'data-tab="today"' in html

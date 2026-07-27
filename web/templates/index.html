@@ -68,9 +68,9 @@
 
   <nav class="tabs app-nav" role="tablist" aria-label="Разделы">
     <div class="app-nav-rail">
-      <button class="tab active" data-tab="today" type="button">Сегодня</button>
-      <button class="tab" data-tab="day" type="button">По часам</button>
-      <button class="tab" data-tab="usage" type="button">Где время</button>
+      <button class="tab active" data-tab="today" type="button" title="Пульс и тренды">Сегодня</button>
+      <button class="tab" data-tab="day" type="button" title="Лента и сессии за день">По часам</button>
+      <button class="tab" data-tab="usage" type="button" title="Рейтинг занятий, приложений и сайтов">Где время</button>
       <span class="app-nav-divider" aria-hidden="true"></span>
       <button class="tab" data-tab="projects" type="button">Проекты</button>
       <button class="tab" data-tab="ratings" type="button">Рейтинги</button>
@@ -191,27 +191,6 @@
           </section>
         </div>
       </div>
-
-      <div class="charts-grid pies-grid">
-        <div class="chart-card">
-          <h3 class="subhead">Фокус и отвлечения</h3>
-          <div class="pie-chart" id="catPie" aria-label="Круговая диаграмма категорий"></div>
-          <div class="stack-bar" id="prodStack"></div>
-          <div class="cats" id="catBars"></div>
-        </div>
-        <div class="chart-card">
-          <h3 class="subhead">Чем занимались</h3>
-          <div class="pie-chart" id="kindPie" aria-label="Круговая диаграмма типов занятий"></div>
-          <div class="kind-bars" id="kindBars"></div>
-        </div>
-      </div>
-
-      <div class="rank-head">
-        <h3 class="subhead">Топ занятий</h3>
-        <input type="search" id="activitySearchToday" class="rank-search" placeholder="Поиск…" autocomplete="off" />
-      </div>
-      <ol class="rank-list rank-list-compact" id="topAppsToday"></ol>
-      <button type="button" class="linkish rank-more" id="topAppsTodayMore" hidden>Показать ещё</button>
     </section>
 
     <section id="panel-day" class="panel">

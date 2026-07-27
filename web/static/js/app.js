@@ -46,7 +46,6 @@ const KIND_COLORS = [
 
 let lastSummaryKey = "";
 let lastStatusKey = "";
-let lastBarsKey = "";
 let lastDayViewKey = "";
 /** @type {string} YYYY-MM-DD — always defaults to today */
 let selectedDayIso = "";
@@ -348,46 +347,6 @@ function listStructure(rows) {
     .slice(0, 15)
     .map((r) => `${r.name}|${r.icon_url || ""}`)
     .join(";");
-}
-
-function renderBars(byCategory, total, { animate = true } = {}) {
-  const order = [
-    ["productive", "Фокус"],
-    ["neutral", "Нейтрально"],
-    ["distracting", "Отвлечения"],
-  ];
-  const pcts = order.map(([key]) => {
-    const sec = byCategory[key] || 0;
-    return total ? Math.round((sec / total) * 100) : 0;
-  });
-  const barsKey = pcts.join(",");
-  if (barsKey === lastBarsKey) return;
-  const shouldAnimate = animate && lastBarsKey !== "";
-  lastBarsKey = barsKey;
-
-  const el = document.getElementById("catBars");
-  if (!el) return;
-  el.innerHTML = order
-    .map(([key, label], i) => {
-      const pct = pcts[i];
-      return `<div class="cat-row">
-        <span>${label}</span>
-        <div class="bar ${key}"><span style="width:${pct}%"></span></div>
-        <span>${pct}%</span>
-      </div>`;
-    })
-    .join("");
-
-  if (!shouldAnimate) return;
-  requestAnimationFrame(() => {
-    el.querySelectorAll(".bar > span").forEach((s) => {
-      const w = s.style.width;
-      s.style.width = "0";
-      requestAnimationFrame(() => {
-        s.style.width = w;
-      });
-    });
-  });
 }
 
 function renderKpis(summary, team) {
@@ -755,75 +714,6 @@ function renderTodayTimelineStrip(rows, summary) {
       <span><i class="void"></i>Пусто / нет трека</span>
     </div>`;
   bindPulseDayScrub(el.querySelector("[data-pulse-scrub]"), dayStartMs, spanMs);
-}
-
-function renderProdStack(byCategory, total) {
-  const el = document.getElementById("prodStack");
-  if (!el) return;
-  if (!total) {
-    el.innerHTML = `<div class="stack-empty">Нет данных за сегодня</div>`;
-    return;
-  }
-  const segs = [
-    ["productive", "Фокус", byCategory.productive || 0],
-    ["neutral", "Нейтрально", byCategory.neutral || 0],
-    ["distracting", "Отвлечения", byCategory.distracting || 0],
-  ].filter(([, , sec]) => sec > 0);
-  el.innerHTML =
-    `<div class="stack-track">` +
-    segs
-      .map(([key, label, sec]) => {
-        const pct = Math.max(1, Math.round((sec / total) * 100));
-        return `<span class="stack-seg ${key}" style="width:${pct}%" title="${label}: ${fmtDur(sec)} (${pct}%)"></span>`;
-      })
-      .join("") +
-    `</div>` +
-    `<div class="stack-legend">` +
-    segs
-      .map(
-        ([key, label, sec]) =>
-          `<span class="stack-leg"><i class="${key}"></i>${label} ${fmtDur(sec)}</span>`
-      )
-      .join("") +
-    `</div>`;
-}
-
-function renderKindBars(byKind, total) {
-  const el = document.getElementById("kindBars");
-  if (!el) return;
-  const KIND_LABELS = {
-    work: "Работа",
-    messaging: "Чаты",
-    email: "Почта",
-    video: "Видео",
-    social: "Соцсети",
-    search: "Поиск",
-    shopping: "Покупки",
-    remote: "Удалёнка",
-    system: "Система",
-    other: "Прочее",
-  };
-  const rows = Object.entries(byKind || {})
-    .map(([k, sec]) => ({ key: k, label: KIND_LABELS[k] || k, sec }))
-    .filter((r) => r.sec >= 60)
-    .sort((a, b) => b.sec - a.sec)
-    .slice(0, 8);
-  if (!rows.length) {
-    el.innerHTML = `<p class="hint">Пока нет данных по типам занятий.</p>`;
-    return;
-  }
-  const max = Math.max(...rows.map((r) => r.sec), 1);
-  el.innerHTML = rows
-    .map((r) => {
-      const pct = Math.round((r.sec / max) * 100);
-      const share = total ? Math.round((r.sec / total) * 100) : 0;
-      return `<div class="kind-row">
-        <span class="kind-name">${escapeHtml(r.label)}</span>
-        <div class="kind-bar"><span style="width:${pct}%"></span></div>
-        <span class="kind-meta">${fmtDur(r.sec)} · ${share}%</span>
-      </div>`;
-    })
-    .join("");
 }
 
 function donutSegmentPath(cx, cy, rOut, rIn, a0, a1) {
@@ -1510,9 +1400,7 @@ function kindSubtitle(kind) {
 
 const GROUPED_PAGE = 12;
 let expandedActivityGroups = new Set();
-let groupedTodayCache = [];
 let groupedUsageCache = [];
-let groupedTodayLimit = GROUPED_PAGE;
 let groupedUsageLimit = GROUPED_PAGE;
 
 function filterGroupedRows(rows, query) {
@@ -2125,29 +2013,7 @@ async function refreshSummary() {
   renderKpis(summary, team);
   renderTopProjectsPulse(summary);
   renderTodayTimelineStrip(timelineRows, summary);
-  renderPieChart(
-    document.getElementById("catPie"),
-    categoryPieSlices(summary.by_category || {}),
-    summary.total_sec || 0,
-    "Пока нет категорий за сегодня."
-  );
-  renderPieChart(
-    document.getElementById("kindPie"),
-    kindPieSlices(summary.by_kind || {}),
-    summary.total_sec || 0,
-    "Пока нет типов занятий."
-  );
-  renderProdStack(summary.by_category || {}, summary.total_sec || 0);
-  renderBars(summary.by_category, summary.total_sec, { animate: false });
-  renderKindBars(summary.by_kind || {}, summary.total_sec || 0);
   refreshTrends().catch(() => {});
-  groupedTodayCache = summary.by_app_grouped || [];
-  renderGroupedList(document.getElementById("topAppsToday"), groupedTodayCache, "Занятий пока нет", {
-    searchInput: document.getElementById("activitySearchToday"),
-    moreBtn: document.getElementById("topAppsTodayMore"),
-    limit: groupedTodayLimit,
-    cacheKey: "today",
-  });
 }
 
 async function refreshUsageReport() {
@@ -2719,15 +2585,7 @@ function wireGroupedLists() {
     if (!key) return;
     if (expandedActivityGroups.has(key)) expandedActivityGroups.delete(key);
     else expandedActivityGroups.add(key);
-    const total = 0;
-    if (key.startsWith("today:")) {
-      renderGroupedList(document.getElementById("topAppsToday"), groupedTodayCache, "Занятий пока нет", {
-        searchInput: document.getElementById("activitySearchToday"),
-        moreBtn: document.getElementById("topAppsTodayMore"),
-        limit: groupedTodayLimit,
-        cacheKey: "today",
-      });
-    } else if (key.startsWith("usage:")) {
+    if (key.startsWith("usage:")) {
       renderGroupedList(document.getElementById("activitiesList"), groupedUsageCache, "Занятий пока нет", {
         searchInput: document.getElementById("activitySearchUsage"),
         moreBtn: document.getElementById("activitiesListMore"),
@@ -2738,14 +2596,7 @@ function wireGroupedLists() {
       });
     }
   };
-  document.getElementById("topAppsToday")?.addEventListener("click", toggle);
   document.getElementById("activitiesList")?.addEventListener("click", toggle);
-  document.getElementById("topAppsToday")?.addEventListener("keydown", (ev) => {
-    if (ev.key === "Enter" || ev.key === " ") {
-      ev.preventDefault();
-      toggle(ev);
-    }
-  });
   document.getElementById("activitiesList")?.addEventListener("keydown", (ev) => {
     if (ev.key === "Enter" || ev.key === " ") {
       ev.preventDefault();
@@ -2753,15 +2604,6 @@ function wireGroupedLists() {
     }
   });
 
-  const searchToday = document.getElementById("activitySearchToday");
-  searchToday?.addEventListener("input", () => {
-    renderGroupedList(document.getElementById("topAppsToday"), groupedTodayCache, "Занятий пока нет", {
-      searchInput: searchToday,
-      moreBtn: document.getElementById("topAppsTodayMore"),
-      limit: groupedTodayLimit,
-      cacheKey: "today",
-    });
-  });
   const searchUsage = document.getElementById("activitySearchUsage");
   searchUsage?.addEventListener("input", () => {
     renderGroupedList(document.getElementById("activitiesList"), groupedUsageCache, "Занятий пока нет", {
@@ -2774,15 +2616,6 @@ function wireGroupedLists() {
     });
   });
 
-  document.getElementById("topAppsTodayMore")?.addEventListener("click", () => {
-    groupedTodayLimit += GROUPED_PAGE;
-    renderGroupedList(document.getElementById("topAppsToday"), groupedTodayCache, "Занятий пока нет", {
-      searchInput: document.getElementById("activitySearchToday"),
-      moreBtn: document.getElementById("topAppsTodayMore"),
-      limit: groupedTodayLimit,
-      cacheKey: "today",
-    });
-  });
   document.getElementById("activitiesListMore")?.addEventListener("click", () => {
     groupedUsageLimit += GROUPED_PAGE;
     renderGroupedList(document.getElementById("activitiesList"), groupedUsageCache, "Занятий пока нет", {
@@ -3495,7 +3328,6 @@ function wireUi() {
     if (!confirm("Удалить все локальные сессии и записи скриншотов?")) return;
     lastSummaryKey = "";
     lastDayViewKey = "";
-    lastBarsKey = "";
     await api("/api/data/clear", { method: "POST" });
     await refreshSummary();
     await refreshShots();
