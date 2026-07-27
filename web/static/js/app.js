@@ -584,6 +584,63 @@ function clipToDay(a, b, dayStartMs, dayEndMs) {
   return { start, end };
 }
 
+function fmtClockMs(ms) {
+  return new Date(ms).toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" });
+}
+
+/** Untracked gaps within the day (between / around session coverage). */
+function voidGapsForDay(rows, dayStartMs, dayEndMs) {
+  const intervals = [];
+  for (const r of rows || []) {
+    const a = new Date(r.started_at).getTime();
+    const b = new Date(r.ended_at || Date.now()).getTime();
+    const clipped = clipToDay(a, b, dayStartMs, dayEndMs);
+    if (clipped) intervals.push(clipped);
+  }
+  intervals.sort((a, b) => a.start - b.start);
+  const merged = [];
+  for (const iv of intervals) {
+    if (!merged.length || iv.start > merged[merged.length - 1].end) {
+      merged.push({ start: iv.start, end: iv.end });
+    } else {
+      merged[merged.length - 1].end = Math.max(merged[merged.length - 1].end, iv.end);
+    }
+  }
+  const gaps = [];
+  let cursor = dayStartMs;
+  for (const iv of merged) {
+    if (iv.start > cursor + 1000) gaps.push({ start: cursor, end: iv.start });
+    cursor = Math.max(cursor, iv.end);
+  }
+  if (dayEndMs > cursor + 1000) gaps.push({ start: cursor, end: dayEndMs });
+  return gaps;
+}
+
+function bindPulseDayScrub(track, dayStartMs, spanMs) {
+  if (!track) return;
+  let tip = track.querySelector(".pulse-scrub-tip");
+  if (!tip) {
+    tip = document.createElement("div");
+    tip.className = "pulse-scrub-tip";
+    tip.hidden = true;
+    track.appendChild(tip);
+  }
+  const place = (ev) => {
+    const rect = track.getBoundingClientRect();
+    if (!rect.width) return;
+    const t = Math.max(0, Math.min(1, (ev.clientX - rect.left) / rect.width));
+    const ms = dayStartMs + t * spanMs;
+    tip.hidden = false;
+    tip.textContent = fmtClockMs(ms);
+    tip.style.left = `${t * 100}%`;
+  };
+  track.addEventListener("mousemove", place);
+  track.addEventListener("mouseenter", place);
+  track.addEventListener("mouseleave", () => {
+    tip.hidden = true;
+  });
+}
+
 function renderTodayTimelineStrip(rows, summary) {
   const el = document.getElementById("todayTimelineStrip");
   const meta = document.getElementById("todayTimelineMeta");
@@ -603,7 +660,7 @@ function renderTodayTimelineStrip(rows, summary) {
       <div class="pulse-hour-row">${[0, 3, 6, 9, 12, 15, 18, 21, 24]
         .map((h) => `<span class="pulse-hour" style="left:${(h / 24) * 100}%"><b>${String(h).padStart(2, "0")}:00</b></span>`)
         .join("")}</div>
-      <div class="pulse-track pulse-track-day"><div class="pulse-void-hint">Пустой день — пока нет сессий</div></div>
+      <div class="pulse-track pulse-track-day" data-pulse-scrub="1"><div class="pulse-void-hint">Пустой день — пока нет сессий</div></div>
       <div class="pulse-legend">
         <span><i class="productive"></i>Фокус</span>
         <span><i class="neutral"></i>Нейтрально</span>
@@ -611,6 +668,7 @@ function renderTodayTimelineStrip(rows, summary) {
         <span><i class="idle"></i>Простой в сессии</span>
         <span><i class="void"></i>Пусто / нет трека</span>
       </div>`;
+    bindPulseDayScrub(el.querySelector("[data-pulse-scrub]"), dayStartMs, spanMs);
     return;
   }
 
@@ -622,6 +680,17 @@ function renderTodayTimelineStrip(rows, summary) {
   const grid = Array.from({ length: 24 }, (_, h) => {
     return `<span class="pulse-grid-line" style="left:${(h / 24) * 100}%"></span>`;
   }).join("");
+
+  const voids = voidGapsForDay(list, dayStartMs, dayEndMs)
+    .map((g) => {
+      const durSec = (g.end - g.start) / 1000;
+      if (durSec < 60) return "";
+      const left = pctOnDay(g.start, dayStartMs, spanMs);
+      const width = ((g.end - g.start) / spanMs) * 100;
+      const tip = `Нет трека · ${fmtDur(durSec)} · ${fmtClockMs(g.start)}–${fmtClockMs(g.end)}`;
+      return `<span class="pulse-seg void-gap" style="left:${left}%;width:${Math.max(0.2, width)}%" title="${escapeHtml(tip)}"></span>`;
+    })
+    .join("");
 
   const segs = [];
   for (const r of list) {
@@ -672,8 +741,9 @@ function renderTodayTimelineStrip(rows, summary) {
       <span>последняя ${fmtClock(new Date(last).toISOString())}</span>
     </div>
     <div class="pulse-hour-row">${hours.join("")}</div>
-    <div class="pulse-track pulse-track-day">
+    <div class="pulse-track pulse-track-day" data-pulse-scrub="1">
       ${grid}
+      ${voids}
       ${segs.join("")}
       ${nowMark}
     </div>
@@ -684,6 +754,7 @@ function renderTodayTimelineStrip(rows, summary) {
       <span><i class="idle"></i>Простой в сессии</span>
       <span><i class="void"></i>Пусто / нет трека</span>
     </div>`;
+  bindPulseDayScrub(el.querySelector("[data-pulse-scrub]"), dayStartMs, spanMs);
 }
 
 function renderProdStack(byCategory, total) {
