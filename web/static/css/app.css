@@ -4050,16 +4050,6 @@ html[data-theme="dark"] .google-btn {
   pointer-events: none;
 }
 
-.pulse-seg.void-gap {
-  background: transparent;
-  z-index: 0;
-  border-radius: 6px;
-}
-
-.pulse-seg.void-gap:hover {
-  background: rgba(21, 36, 31, 0.08);
-}
-
 .pulse-scrub-tip {
   position: absolute;
   top: -28px;
@@ -4091,8 +4081,17 @@ html[data-theme="dark"] .google-btn {
   position: absolute;
   top: 5px;
   bottom: 5px;
-  border-radius: 6px;
+  border-radius: 0;
   z-index: 1;
+}
+
+.pulse-seg.void-gap {
+  background: transparent;
+  z-index: 0;
+}
+
+.pulse-seg.void-gap:hover {
+  background: rgba(21, 36, 31, 0.08);
 }
 
 .pulse-seg.productive { background: var(--accent); }
