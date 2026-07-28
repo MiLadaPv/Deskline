@@ -12,7 +12,7 @@ from deskline.db import Database, parse_iso_datetime
 from deskline.heartbeat import clear_heartbeat, load_heartbeat, save_heartbeat
 from deskline.hub_client import push_sessions_to_hub
 from deskline.idle import is_idle, seconds_since_last_input
-from deskline.notify import ask_still_working, notify, still_working_body
+from deskline.notify import ask_still_working, ask_welcome_back, notify, still_working_body
 from deskline.power import DEFAULT_SLEEP_GAP_SEC, is_sleep_gap, system_boot_time
 from deskline.windows import get_active_window
 
@@ -53,6 +53,8 @@ class Tracker:
         self._last_poor_notify: dict[str, float] = {}
         self._still_working_prompting = False
         self._suppress_still_working_until = 0.0
+        self._welcome_back_prompting = False
+        self._suppress_welcome_back_until = 0.0
         self._idle_since: float | None = None
         self._last_screenshot_at = 0.0
         self._last_purge_at = 0.0
@@ -164,6 +166,7 @@ class Tracker:
             self._idle_since = None
             self._distracting_since = None
             self._still_working_prompting = False
+            self._welcome_back_prompting = False
         self._emit()
 
     def resume(self) -> None:
@@ -175,6 +178,7 @@ class Tracker:
             self._idle_since = None
             self._still_working_prompting = False
             self._suppress_still_working_until = 0.0
+            self._welcome_back_prompting = False
         self._emit()
 
     def reload_config(self) -> None:
@@ -273,11 +277,16 @@ class Tracker:
                 return
 
             idle_after = float(cfg.get("idle_after_sec", 180.0))
+            was_idle = self._idle
+            idle_since = self._idle_since
             self._idle = is_idle(idle_after, win.app_name)
             if self._idle:
                 if self._idle_since is None:
                     self._idle_since = now
             else:
+                if was_idle and idle_since is not None:
+                    away_sec = max(0.0, now - idle_since)
+                    self._maybe_welcome_back(cfg, away_sec, reason="idle")
                 self._idle_since = None
                 self._still_working_prompting = False
 
@@ -479,6 +488,98 @@ class Tracker:
         self._still_working_prompting = False
         # Suppress still-working prompt after wake (user just returned)
         self._suppress_still_working_until = now + 300.0
+        away_sec = max(0.0, now - prev_tick)
+        cfg = dict(self.cfg)
+        self._maybe_welcome_back(cfg, away_sec, reason="sleep")
+
+    def _maybe_welcome_back(self, cfg: dict, away_sec: float, *, reason: str) -> None:
+        if not cfg.get("welcome_back_enabled", True):
+            return
+        if self._welcome_back_prompting or self._still_working_prompting:
+            return
+        now = time.time()
+        if now < self._suppress_welcome_back_until:
+            return
+        need = float(cfg.get("welcome_back_after_sec", 600.0))
+        if away_sec < need:
+            return
+        self._welcome_back_prompting = True
+        self._suppress_welcome_back_until = now + 120.0
+        threading.Thread(
+            target=self._ask_welcome_back,
+            args=(away_sec, reason),
+            name="deskline-welcome-back",
+            daemon=True,
+        ).start()
+
+    def _ask_welcome_back(self, away_sec: float, reason: str) -> None:
+        cfg = load_config()
+        project_id = cfg.get("current_project_id")
+        task_id = cfg.get("current_task_id")
+        try:
+            project_id = int(project_id) if project_id is not None else None
+        except (TypeError, ValueError):
+            project_id = None
+        try:
+            task_id = int(task_id) if task_id is not None else None
+        except (TypeError, ValueError):
+            task_id = None
+        project = self.db.get_project(project_id) if project_id else None
+        task = self.db.get_task(task_id) if task_id else None
+        projects = [
+            {
+                "id": int(p["id"]),
+                "name": str(p.get("name") or ""),
+                "color": str(p.get("color") or "#1f6b56"),
+            }
+            for p in self.db.list_projects()
+        ]
+        payload = {
+            "away_sec": away_sec,
+            "reason": reason,
+            "project_id": project_id,
+            "project_name": (project or {}).get("name") if project else None,
+            "project_color": (project or {}).get("color") if project else "#1f6b56",
+            "task_id": task_id,
+            "task_name": (task or {}).get("name") if task else None,
+            "paused": bool(cfg.get("paused")),
+            "projects": projects,
+        }
+        notify("Deskline", "Снова за ПК — выберите проект")
+        answer = ask_welcome_back(payload, timeout_sec=60.0)
+        try:
+            action = str(answer.get("action") or "continue")
+            new_project = answer.get("project_id")
+            new_task = answer.get("task_id")
+            try:
+                new_project = int(new_project) if new_project is not None else None
+            except (TypeError, ValueError):
+                new_project = None
+            try:
+                new_task = int(new_task) if new_task is not None else None
+            except (TypeError, ValueError):
+                new_task = None
+
+            if action == "pause":
+                self.pause()
+                notify("Deskline", "Трекинг на паузе")
+                return
+
+            cfg = load_config()
+            if action == "clear":
+                cfg["current_project_id"] = None
+                cfg["current_task_id"] = None
+            elif action == "continue":
+                cfg["current_project_id"] = new_project
+                cfg["current_task_id"] = new_task
+            save_config(cfg)
+            self.apply_focus()
+            if self.paused:
+                self.resume()
+            notify("Deskline", "Трекинг продолжается")
+        finally:
+            with self._lock:
+                self._welcome_back_prompting = False
 
     def _maybe_poor_time(self, cfg: dict, now: float) -> None:
         if not cfg.get("poor_time_popup", True):

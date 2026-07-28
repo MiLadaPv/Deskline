@@ -46,6 +46,9 @@ DEFAULT_CONFIG: dict[str, Any] = {
     "idle_after_sec": 180.0,
     # After idle + this grace → "Are you still working?"
     "still_working_grace_sec": 60.0,
+    # After returning from long idle/sleep → welcome-back project panel
+    "welcome_back_enabled": True,
+    "welcome_back_after_sec": 600.0,
     # Wall-clock gap between ticks treated as sleep/suspend (not counted)
     "sleep_gap_sec": 120.0,
     "poor_time_popup": True,

@@ -87,6 +87,8 @@ class SettingsUpdate(BaseModel):
     min_session_sec: float | None = None
     idle_after_sec: float | None = Field(default=None, ge=30, le=3600)
     still_working_grace_sec: float | None = Field(default=None, ge=15, le=600)
+    welcome_back_enabled: bool | None = None
+    welcome_back_after_sec: float | None = Field(default=None, ge=120, le=14400)
     sleep_gap_sec: float | None = Field(default=None, ge=60, le=3600)
     poor_time_popup: bool | None = None
     poor_time_min_sec: float | None = Field(default=None, ge=15, le=3600)

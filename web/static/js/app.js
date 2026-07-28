@@ -2171,6 +2171,12 @@ async function loadSettings() {
   const cfg = await api("/api/settings");
   const form = document.getElementById("settingsForm");
   form.idle_after_sec.value = cfg.idle_after_sec ?? 180;
+  if (form.welcome_back_enabled) {
+    form.welcome_back_enabled.checked = cfg.welcome_back_enabled !== false;
+  }
+  if (form.welcome_back_after_sec) {
+    form.welcome_back_after_sec.value = cfg.welcome_back_after_sec ?? 600;
+  }
   form.poor_time_popup.checked = cfg.poor_time_popup !== false;
   form.blur_screenshots.checked = !!cfg.blur_screenshots;
   form.screenshot_interval_sec.value = cfg.screenshot_interval_sec ?? 300;
@@ -3010,6 +3016,10 @@ function wireUi() {
     const interval = Number(form.screenshot_interval_sec.value);
     const body = {
       idle_after_sec: Number(form.idle_after_sec.value),
+      welcome_back_enabled: form.welcome_back_enabled ? form.welcome_back_enabled.checked : true,
+      welcome_back_after_sec: form.welcome_back_after_sec
+        ? Number(form.welcome_back_after_sec.value)
+        : 600,
       poor_time_popup: form.poor_time_popup.checked,
       blur_screenshots: form.blur_screenshots.checked,
       screenshot_interval_sec: Number.isFinite(interval) ? Math.max(60, Math.min(3600, interval)) : 300,

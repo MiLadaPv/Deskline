@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import ctypes
+import json
 import subprocess
 import sys
 import threading
@@ -233,3 +234,45 @@ def _taskdialog_still_working(title: str, message: str) -> StillWorkingAnswer:
     if btn == _TD_PAUSE:
         return "no"
     return "timeout"
+
+
+def ask_welcome_back(payload: dict[str, Any], *, timeout_sec: float = 60.0) -> dict[str, Any]:
+    """
+    Show Deskline welcome-back project picker after long idle/sleep.
+    Returns action dict; on failure defaults to continue with previous focus.
+    """
+    import tempfile
+    from pathlib import Path
+
+    fallback = {
+        "action": "continue",
+        "project_id": payload.get("project_id"),
+        "task_id": payload.get("task_id"),
+    }
+    body = dict(payload)
+    body["timeout_sec"] = float(timeout_sec)
+    try:
+        with tempfile.TemporaryDirectory(prefix="deskline-welcome-") as tmp:
+            payload_path = Path(tmp) / "payload.json"
+            result_path = Path(tmp) / "result.json"
+            payload_path.write_text(json.dumps(body, ensure_ascii=False), encoding="utf-8")
+            proc = subprocess.run(
+                [
+                    sys.executable,
+                    "-m",
+                    "deskline.welcome_back_dialog",
+                    str(payload_path),
+                    str(result_path),
+                ],
+                capture_output=True,
+                timeout=max(45.0, timeout_sec + 45.0),
+                creationflags=0,
+            )
+            if result_path.is_file():
+                data = json.loads(result_path.read_text(encoding="utf-8"))
+                if isinstance(data, dict) and data.get("action") in ("continue", "pause", "clear"):
+                    return data
+            _ = proc.returncode
+    except Exception:
+        pass
+    return fallback
