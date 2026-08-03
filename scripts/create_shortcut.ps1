@@ -75,9 +75,27 @@ if (Test-Path -LiteralPath $od) {
 
 $desktopCandidates = $desktopCandidates | Select-Object -Unique
 $ok = $false
+$created = New-Object System.Collections.Generic.List[string]
 foreach ($desktop in $desktopCandidates) {
-  if (New-DesklineShortcut -Path (Join-Path $desktop 'Deskline.lnk') -Icon $icon) {
+  $lnkPath = Join-Path $desktop 'Deskline.lnk'
+  if (New-DesklineShortcut -Path $lnkPath -Icon $icon) {
     $ok = $true
+    [void]$created.Add($lnkPath)
+  }
+}
+
+# OneDrive "Рабочий стол" sometimes rejects WScript.Shell.Save — copy a good .lnk instead.
+$realDesktop = [Environment]::GetFolderPath('Desktop')
+if ($realDesktop -and (Test-Path -LiteralPath $realDesktop)) {
+  $realLnk = Join-Path $realDesktop 'Deskline.lnk'
+  if (-not (Test-Path -LiteralPath $realLnk) -and $created.Count -gt 0) {
+    try {
+      Copy-Item -LiteralPath $created[0] -Destination $realLnk -Force
+      Write-Host "Desktop shortcut (copied): $realLnk"
+      $ok = $true
+    } catch {
+      Write-Warning "Could not copy shortcut to real Desktop: $($_.Exception.Message)"
+    }
   }
 }
 
