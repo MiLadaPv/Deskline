@@ -3,16 +3,10 @@ from __future__ import annotations
 import ctypes
 from ctypes import wintypes
 
-# Apps where low keyboard/mouse input is normal (calls, presentations).
-MEETING_APPS = {
-    "teams.exe",
-    "ms-teams.exe",
-    "zoom.exe",
-    "skype.exe",
-    "webex.exe",
-    "ciscowebexstart.exe",
-    "slack.exe",  # huddles / calls
-}
+from deskline.meetings import MEETING_APP_EXES
+
+# Back-compat alias used across the codebase.
+MEETING_APPS = set(MEETING_APP_EXES)
 
 
 class _LASTINPUTINFO(ctypes.Structure):

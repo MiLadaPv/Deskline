@@ -72,6 +72,7 @@
       <button class="tab" data-tab="day" type="button" title="Хронология дня: лента и сессии">Лента</button>
       <button class="tab" data-tab="usage" type="button" title="Состав времени и рейтинги">Где время</button>
       <span class="app-nav-divider" aria-hidden="true"></span>
+      <button class="tab" data-tab="meetings" type="button" title="Время в Teams, Zoom, Meet…">Звонки</button>
       <button class="tab" data-tab="projects" type="button">Проекты</button>
       <button class="tab" data-tab="ratings" type="button">Рейтинги</button>
       <button class="tab" data-tab="shots" type="button">Скриншоты</button>
@@ -106,6 +107,7 @@
         <div class="pulse-actions pulse-actions-inline">
           <a class="pulse-link" href="#day" data-tab="day">Лента дня →</a>
           <a class="pulse-link" href="#usage" data-tab="usage">Состав времени →</a>
+          <a class="pulse-link" href="#meetings" data-tab="meetings">Звонки и встречи →</a>
         </div>
 
         <div class="pulse-split">
@@ -277,6 +279,49 @@
         <button type="submit" class="btn" aria-label="Создать проект">+</button>
       </form>
       <div class="pt-list" id="projectsList"></div>
+    </section>
+
+    <section id="panel-meetings" class="panel">
+      <div class="panel-head">
+        <h2>Звонки и встречи</h2>
+        <div class="filter-bar">
+          <label class="filter-inline">
+            Период
+            <select id="meetingsPeriod" aria-label="Период звонков">
+              <option value="today" selected>Сегодня</option>
+              <option value="7">7 дней</option>
+              <option value="30">30 дней</option>
+            </select>
+          </label>
+          <button type="button" class="btn icon-btn" id="refreshMeetingsBtn" title="Обновить" aria-label="Обновить звонки">
+            <svg class="icon-refresh" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" focusable="false">
+              <path fill="currentColor" d="M17.65 6.35A7.95 7.95 0 0 0 12 4a8 8 0 1 0 7.75 10h-2.1A6 6 0 1 1 12 6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35Z"/>
+            </svg>
+          </button>
+        </div>
+      </div>
+      <p class="hint meetings-note" id="meetingsNote"></p>
+      <div class="pulse-overview meetings-kpi" id="meetingsKpi" aria-label="Сводка по звонкам"></div>
+      <div class="pulse-split meetings-split">
+        <section class="pulse-panel">
+          <header class="pulse-head">
+            <div>
+              <p class="pulse-kicker">Каналы</p>
+              <h3>Где были встречи</h3>
+            </div>
+          </header>
+          <ol class="rank-list" id="meetingsTopList"></ol>
+        </section>
+        <section class="pulse-panel">
+          <header class="pulse-head">
+            <div>
+              <p class="pulse-kicker">Сессии</p>
+              <h3>Недавние окна</h3>
+            </div>
+          </header>
+          <ol class="timeline" id="meetingsSessions"></ol>
+        </section>
+      </div>
     </section>
 
     <section id="panel-ratings" class="panel">

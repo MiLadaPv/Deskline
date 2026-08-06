@@ -320,6 +320,7 @@ function setActiveTab(name, { syncHash = true } = {}) {
   }
   if (tab === "shots") startShotsPolling();
   else stopShotsPolling();
+  if (tab === "meetings") refreshMeetings().catch(() => {});
 }
 
 function setUsageSlice(slice) {
@@ -1954,6 +1955,120 @@ async function refreshUsageReport() {
   );
 }
 
+let meetingsPeriod = "today";
+let lastMeetingsKey = "";
+
+async function refreshMeetings() {
+  const periodSel = document.getElementById("meetingsPeriod");
+  if (periodSel) meetingsPeriod = periodSel.value || "today";
+  const emp = filterEmployeeId ? `&employee_id=${encodeURIComponent(filterEmployeeId)}` : "";
+  let report;
+  try {
+    report = await api(`/api/meetings?period=${encodeURIComponent(meetingsPeriod)}${emp}`, {
+      quiet402: true,
+    });
+  } catch (err) {
+    if (err?.code === "history_limit" || err?.code === "pro_required") {
+      const note = document.getElementById("meetingsNote");
+      if (note) note.textContent = "История дальше Free-лимита — доступно в Pro.";
+      const kpi = document.getElementById("meetingsKpi");
+      if (kpi) kpi.innerHTML = "";
+      const top = document.getElementById("meetingsTopList");
+      if (top) {
+        top.innerHTML = `<li class="empty-state"><span class="rank-icon">•</span><span class="rank-name">Нужен Pro для этого периода</span><span class="rank-meta">—</span></li>`;
+      }
+      const sess = document.getElementById("meetingsSessions");
+      if (sess) sess.innerHTML = "";
+      return;
+    }
+    throw err;
+  }
+
+  const key = [
+    meetingsPeriod,
+    filterEmployeeId || "",
+    report.total_sec,
+    (report.top || []).map((r) => `${r.key}:${Math.floor(r.sec / 60)}`).join(","),
+    (report.sessions || []).length,
+  ].join("|");
+  if (key === lastMeetingsKey) return;
+  lastMeetingsKey = key;
+
+  const note = document.getElementById("meetingsNote");
+  if (note) note.textContent = report.note || "";
+
+  const kpi = document.getElementById("meetingsKpi");
+  if (kpi) {
+    const total = report.total_sec || 0;
+    const share = report.share_pct ?? 0;
+    const channels = (report.top || []).length;
+    kpi.innerHTML = [
+      { label: "Во встречах", value: fmtDur(total), pct: share, tone: "productive" },
+      { label: "Доля дня", value: `${share}%`, pct: share, tone: "tracked" },
+      { label: "Каналы", value: String(channels), pct: null, tone: "active" },
+    ]
+      .map((it) => {
+        const meter =
+          it.pct == null
+            ? ""
+            : `<div class="pulse-ov-meter"><em>${it.pct}%</em><span><i style="width:${Math.max(it.pct, it.pct ? 3 : 0)}%"></i></span></div>`;
+        return `<article class="pulse-ov-card ${it.tone}">
+          <span class="pulse-ov-label">${it.label}</span>
+          <strong class="pulse-ov-value">${it.value}</strong>
+          ${meter}
+        </article>`;
+      })
+      .join("");
+  }
+
+  const topEl = document.getElementById("meetingsTopList");
+  if (topEl) {
+    const rows = report.top || [];
+    if (!rows.length) {
+      topEl.innerHTML = `<li class="empty-state"><span class="rank-icon">•</span><span class="rank-name">Пока нет времени в Teams, Zoom, Meet…</span><span class="rank-meta">—</span></li>`;
+    } else {
+      const total = report.total_sec || 0;
+      topEl.innerHTML = rows
+        .map((r) => {
+          const icon = r.icon_url
+            ? iconImgHtml(r.icon_url)
+            : `<span class="rank-icon" aria-hidden="true">•</span>`;
+          const share = total ? Math.round((r.sec / total) * 100) : 0;
+          const kind = r.source === "site" ? "сайт" : "приложение";
+          return `<li>
+            ${icon}
+            <span class="rank-name">${escapeHtml(r.name)} <span class="rank-kind">${kind}</span></span>
+            <span class="rank-meta">${fmtDur(r.sec)} · ${share}%</span>
+          </li>`;
+        })
+        .join("");
+    }
+  }
+
+  const sessEl = document.getElementById("meetingsSessions");
+  if (sessEl) {
+    const rows = report.sessions || [];
+    if (!rows.length) {
+      sessEl.innerHTML = `<li><span class="timeline-time">—</span><span class="rank-icon">•</span><span class="rank-name">Нет сессий за период</span><span class="rank-meta"></span></li>`;
+    } else {
+      sessEl.innerHTML = rows
+        .map((r) => {
+          const icon = r.icon_url
+            ? iconImgHtml(r.icon_url)
+            : `<span class="rank-icon">•</span>`;
+          const label = r.display_name || r.name || r.app_name || r.site || "Встреча";
+          return `<li>
+            <span class="timeline-time">${fmtClock(r.started_at)}</span>
+            ${icon}
+            <span class="rank-name">${escapeHtml(label)}</span>
+            <span class="rank-meta">${fmtDur(r.sec)}</span>
+          </li>`;
+        })
+        .join("");
+    }
+  }
+}
+
 function renderUsageList(el, rows, total, kind, emptyText) {
   if (!el) return;
   const sliced = (rows || []).slice(0, 20);
@@ -2812,9 +2927,13 @@ function wireUi() {
     filterEmployee.addEventListener("change", async () => {
       filterEmployeeId = filterEmployee.value || "";
       lastSummaryKey = "";
+      lastMeetingsKey = "";
       await refreshSummary();
       await refreshUsageReport();
       await refreshTimeline();
+      if (document.getElementById("panel-meetings")?.classList.contains("active")) {
+        await refreshMeetings().catch(() => {});
+      }
     });
   }
 
@@ -2825,6 +2944,19 @@ function wireUi() {
       await refreshUsageReport();
     });
   }
+
+  const meetingsPeriodSel = document.getElementById("meetingsPeriod");
+  if (meetingsPeriodSel) {
+    meetingsPeriodSel.addEventListener("change", async () => {
+      meetingsPeriod = meetingsPeriodSel.value || "today";
+      lastMeetingsKey = "";
+      await refreshMeetings();
+    });
+  }
+  document.getElementById("refreshMeetingsBtn")?.addEventListener("click", () => {
+    lastMeetingsKey = "";
+    refreshMeetings().catch(() => {});
+  });
 
   const trendsPeriodSel = document.getElementById("trendsPeriod");
   const trendsCustomRange = document.getElementById("trendsCustomRange");
@@ -3494,6 +3626,9 @@ async function boot() {
       if (selectedDayIso === localDayIso()) {
         refreshTimeline().catch(() => {});
       }
+    }
+    if (document.getElementById("panel-meetings")?.classList.contains("active")) {
+      refreshMeetings().catch(() => {});
     }
   }, 5000);
 }

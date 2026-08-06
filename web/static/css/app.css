@@ -3365,6 +3365,19 @@ html[data-theme="dark"] .google-btn {
   gap: 10px;
 }
 
+.meetings-kpi {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin: 0 0 18px;
+}
+
+.meetings-note {
+  margin: 0 0 14px;
+}
+
+.meetings-split {
+  margin-top: 4px;
+}
+
 .pulse-ov-card {
   background:
     var(--sheen),

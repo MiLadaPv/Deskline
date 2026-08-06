@@ -1076,6 +1076,119 @@ class Database:
             )
         return self._merge_consecutive_timeline(items)
 
+    def meetings_for_range(
+        self,
+        start: datetime,
+        end: datetime,
+        employee_id: int | None = None,
+    ) -> dict[str, Any]:
+        """Foreground time in meeting apps/sites for [start, end)."""
+        from deskline.config import load_config
+        from deskline.meetings import (
+            build_meetings_report,
+            is_meeting_app,
+            is_meeting_site,
+            meeting_app_label,
+            normalize_app_exe,
+            normalize_site_host,
+        )
+
+        cfg = load_config()
+        work_mode = bool(cfg.get("work_mode"))
+        keywords = list(cfg.get("work_chat_keywords") or [])
+        with self.connect() as conn:
+            rows = conn.execute(
+                """
+                SELECT * FROM sessions
+                WHERE started_at < ? AND (ended_at IS NULL OR ended_at >= ?)
+                ORDER BY started_at DESC
+                """,
+                (_iso(end), _iso(start)),
+            ).fetchall()
+
+        by_app: dict[str, dict[str, Any]] = {}
+        by_site: dict[str, dict[str, Any]] = {}
+        sessions: list[dict[str, Any]] = []
+        tracked = 0.0
+        now = _utcnow()
+
+        for row in rows:
+            keys = set(row.keys())
+            s = _parse(row["started_at"]) or start
+            e = _parse(row["ended_at"]) or now
+            seg_start = max(s, start)
+            seg_end = min(e, end)
+            dur = max(0.0, (seg_end - seg_start).total_seconds())
+            if dur < 1:
+                continue
+            meta = self._enrich(row, work_mode=work_mode, work_chat_keywords=keywords)
+            if meta["hidden"]:
+                continue
+            if employee_id is not None and meta.get("employee_id") != employee_id:
+                continue
+            tracked += dur
+            site = meta.get("url_hint") or site_for_activity_label(meta["activity_label"])
+            app = meta.get("app_name")
+            hit_app = is_meeting_app(app)
+            hit_site = is_meeting_site(site)
+            if not (hit_app or hit_site):
+                continue
+            full_span = max(0.0, (e - s).total_seconds()) or dur
+            idle_full = float(row["idle_sec"] or 0) if "idle_sec" in keys else 0.0
+            idle_part = min(dur, idle_full * (dur / full_span) if full_span else 0.0)
+            # Prefer desktop app over browser host so the same span is not double-counted.
+            icon = resolve_icon_url(site=site if (hit_site and not hit_app) else None, app_name=app)
+            if hit_app:
+                key = normalize_app_exe(app)
+                bucket = by_app.setdefault(
+                    key,
+                    {
+                        "app_name": key,
+                        "name": meeting_app_label(app, meta.get("display_name")),
+                        "sec": 0.0,
+                        "icon_url": icon,
+                    },
+                )
+                bucket["sec"] += dur
+                if not bucket.get("icon_url") and icon:
+                    bucket["icon_url"] = icon
+            else:
+                host = normalize_site_host(site)
+                bucket = by_site.setdefault(
+                    host,
+                    {
+                        "name": host,
+                        "site": host,
+                        "sec": 0.0,
+                        "icon_url": icon,
+                    },
+                )
+                bucket["sec"] += dur
+                if not bucket.get("icon_url") and icon:
+                    bucket["icon_url"] = icon
+            if len(sessions) < 60:
+                sessions.append(
+                    {
+                        "started_at": _iso(seg_start),
+                        "ended_at": _iso(seg_end),
+                        "sec": round(dur, 1),
+                        "idle_sec": round(idle_part, 1),
+                        "name": meta["activity_label"],
+                        "app_name": meta["app_name"],
+                        "display_name": meta["display_name"],
+                        "site": site,
+                        "category": normalize_category(meta["category"]),
+                        "icon_url": icon,
+                    }
+                )
+
+        return build_meetings_report(
+            by_app=list(by_app.values()),
+            by_site=list(by_site.values()),
+            sessions=sessions,
+            total_tracked_sec=tracked,
+        )
+
     @staticmethod
     def _timeline_merge_key(item: dict[str, Any]) -> tuple[Any, ...]:
         return (

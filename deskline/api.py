@@ -843,6 +843,32 @@ def create_app(tracker: Tracker, db: Database | None = None) -> FastAPI:
             start, end, project_id=project_id, task_id=task_id, employee_id=employee_id
         )
 
+    @app.get("/api/meetings")
+    def meetings_api(
+        period: str = "today",
+        employee_id: int | None = None,
+    ) -> dict[str, Any]:
+        """Foreground time in call/meeting apps and sites."""
+        now = datetime.now().astimezone()
+        key = (period or "today").strip().lower()
+        if key in ("today", "1"):
+            start = datetime.combine(now.date(), datetime.min.time()).astimezone()
+            end = now
+        elif key in ("7", "7d", "week"):
+            start = now - timedelta(days=7)
+            end = now
+        elif key in ("30", "30d", "month"):
+            start = now - timedelta(days=30)
+            end = now
+        else:
+            raise HTTPException(400, "period must be today, 7, or 30")
+        _assert_day_allowed(start.date())
+        report = db.meetings_for_range(start, end, employee_id=employee_id)
+        report["period"] = "today" if key in ("today", "1") else ("7" if key in ("7", "7d", "week") else "30")
+        report["from"] = start.isoformat()
+        report["to"] = end.isoformat()
+        return report
+
     @app.get("/api/trends")
     def trends(
         days: int = 7,
