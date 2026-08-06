@@ -1018,11 +1018,25 @@ def create_app(tracker: Tracker, db: Database | None = None) -> FastAPI:
         return db.activities_range(start, end, project_id=project_id, task_id=task_id)
 
     @app.get("/api/screenshots")
-    def screenshots(day: str | None = None) -> list[dict[str, Any]]:
+    def screenshots(
+        day: str | None = None,
+        app: str | None = None,
+    ) -> list[dict[str, Any]]:
         _pro_required("screenshots")
         d = date.fromisoformat(day) if day else date.today()
         _assert_day_allowed(d)
         rows = db.screenshots_for_date(d)
+        app_q = (app or "").strip().casefold()
+        if app_q in ("__none__", "none", "без сессии"):
+            rows = [r for r in rows if not r.get("session_id")]
+        elif app_q:
+            def _app_key(row: dict[str, Any]) -> str:
+                raw = str(row.get("app_name") or "").strip().casefold()
+                if raw.endswith(".exe"):
+                    raw = raw[:-4]
+                return raw
+
+            rows = [r for r in rows if _app_key(r) == app_q or _app_key(r) == app_q.removesuffix(".exe")]
         for row in rows:
             p = Path(row["path"])
             row["filename"] = p.name

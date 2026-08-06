@@ -2088,12 +2088,48 @@ function fmtShotReason(reason) {
   return map[reason] || reason || "Скриншот";
 }
 
-function shotCaption(row) {
-  return `${fmtShotWhen(row.taken_at)} · ${fmtShotReason(row.reason)}`;
+function shotAppKey(row) {
+  let raw = String(row?.app_name || "").trim().toLowerCase();
+  if (raw.endsWith(".exe")) raw = raw.slice(0, -4);
+  return raw;
+}
+
+function shotAppLabel(row) {
+  const name = String(row?.display_name || "").trim();
+  if (name) return name;
+  const key = shotAppKey(row);
+  if (!key) return "Без сессии";
+  return key.charAt(0).toUpperCase() + key.slice(1);
+}
+
+function truncateShotText(text, max = 48) {
+  const s = String(text || "").replace(/\s+/g, " ").trim();
+  if (!s) return "";
+  if (s.length <= max) return s;
+  return `${s.slice(0, max - 1)}…`;
+}
+
+function shotCaption(row, { details = false } = {}) {
+  const parts = [fmtShotWhen(row.taken_at), fmtShotReason(row.reason)];
+  const app = shotAppLabel(row);
+  if (app) parts.push(app);
+  if (details) {
+    const activity = truncateShotText(row.activity_label || "", 40);
+    const title = truncateShotText(row.window_title || "", 56);
+    if (activity && activity.toLowerCase() !== app.toLowerCase()) parts.push(activity);
+    if (title && title.toLowerCase() !== activity.toLowerCase() && title.toLowerCase() !== app.toLowerCase()) {
+      parts.push(title);
+    }
+  }
+  return parts.filter(Boolean).join(" · ");
 }
 
 let shotsPollTimer = null;
 const SHOTS_POLL_MS = 15000;
+/** @type {any[]} */
+let shotsCache = [];
+let shotsAppFilter = "";
+let shotsShowDetails = false;
 
 function stopShotsPolling() {
   if (shotsPollTimer) {
@@ -2115,6 +2151,116 @@ function currentTabName() {
   return document.querySelector(".tab.active")?.dataset.tab || "today";
 }
 
+function ensureShotsDayInput() {
+  const el = document.getElementById("shotsDay");
+  if (!el) return localDayIso();
+  if (!el.value) {
+    el.value = selectedDayIso || localDayIso();
+  }
+  return el.value || localDayIso();
+}
+
+function fillShotsAppFilter(rows) {
+  const sel = document.getElementById("shotsAppFilter");
+  if (!sel) return;
+  const prev = shotsAppFilter || sel.value || "";
+  const map = new Map();
+  let orphans = 0;
+  for (const r of rows || []) {
+    const key = shotAppKey(r);
+    if (!key) {
+      orphans += 1;
+      continue;
+    }
+    if (!map.has(key)) map.set(key, shotAppLabel(r));
+  }
+  const opts = [`<option value="">Все</option>`];
+  [...map.entries()]
+    .sort((a, b) => a[1].localeCompare(b[1], "ru"))
+    .forEach(([key, label]) => {
+      opts.push(`<option value="${escapeHtml(key)}">${escapeHtml(label)}</option>`);
+    });
+  if (orphans) {
+    opts.push(`<option value="__none__">Без сессии (${orphans})</option>`);
+  }
+  sel.innerHTML = opts.join("");
+  if (prev && [...sel.options].some((o) => o.value === prev)) sel.value = prev;
+  else sel.value = "";
+  shotsAppFilter = sel.value || "";
+}
+
+function filteredShotsRows() {
+  const q = shotsAppFilter;
+  if (!q) return shotsCache.slice();
+  if (q === "__none__") return shotsCache.filter((r) => !shotAppKey(r));
+  return shotsCache.filter((r) => shotAppKey(r) === q);
+}
+
+function renderShotsGrid() {
+  const grid = document.getElementById("shotsGrid");
+  const meta = document.getElementById("shotsFilterMeta");
+  if (!grid) return;
+  const rows = filteredShotsRows();
+  const details = !!shotsShowDetails;
+  lightboxItems = rows.map((r) => ({
+    url: r.url,
+    caption: shotCaption(r, { details }),
+    flag: !!r.flag_distracting,
+  }));
+  if (meta) {
+    if (!shotsCache.length) {
+      meta.hidden = true;
+      meta.textContent = "";
+    } else {
+      meta.hidden = false;
+      meta.textContent = rows.length === shotsCache.length
+        ? `${shotsCache.length} скриншотов`
+        : `Показано ${rows.length} из ${shotsCache.length}`;
+    }
+  }
+  if (!shotsCache.length) {
+    grid.innerHTML = `<p class="hint">За этот день скриншотов нет.</p>`;
+    return;
+  }
+  if (!rows.length) {
+    grid.innerHTML = `<p class="hint">Нет скриншотов для выбранного приложения.</p>`;
+    return;
+  }
+  grid.innerHTML = rows
+    .map((r, i) => {
+      const caption = shotCaption(r, { details });
+      const flag = r.flag_distracting ? "shot-distracting" : "";
+      return `<figure class="shot ${flag}" tabindex="0" role="button" data-index="${i}" data-url="${escapeHtml(r.url)}" data-caption="${escapeHtml(caption)}" data-flag="${r.flag_distracting ? "1" : "0"}">
+        <img src="${escapeHtml(r.url)}" alt="screenshot" loading="lazy" />
+        <figcaption>${escapeHtml(caption)}</figcaption>
+      </figure>`;
+    })
+    .join("");
+}
+
+async function refreshShots() {
+  const grid = document.getElementById("shotsGrid");
+  const day = ensureShotsDayInput();
+  let rows;
+  try {
+    const q = new URLSearchParams({ day });
+    rows = await api(`/api/screenshots?${q}`, { quiet402: true });
+  } catch (e) {
+    shotsCache = [];
+    lightboxItems = [];
+    if (e?.code === "pro_required" || e?.detail?.feature === "screenshots") {
+      if (grid) {
+        grid.innerHTML = `<p class="hint">Скриншоты доступны в Deskline Pro.</p>`;
+      }
+      return;
+    }
+    throw e;
+  }
+  shotsCache = Array.isArray(rows) ? rows : [];
+  fillShotsAppFilter(shotsCache);
+  renderShotsGrid();
+}
+
 async function refreshCurrentView({ quiet = false } = {}) {
   const tab = currentTabName();
   try {
@@ -2129,42 +2275,6 @@ async function refreshCurrentView({ quiet = false } = {}) {
   } catch (err) {
     showToast(err?.message || "Не удалось обновить", "error");
   }
-}
-
-async function refreshShots() {
-  const grid = document.getElementById("shotsGrid");
-  let rows;
-  try {
-    rows = await api("/api/screenshots", { quiet402: true });
-  } catch (e) {
-    lightboxItems = [];
-    if (e?.code === "pro_required" || e?.detail?.feature === "screenshots") {
-      if (grid) {
-        grid.innerHTML = `<p class="hint">Скриншоты доступны в Deskline Pro.</p>`;
-      }
-      return;
-    }
-    throw e;
-  }
-  lightboxItems = rows.map((r) => ({
-    url: r.url,
-    caption: shotCaption(r),
-    flag: !!r.flag_distracting,
-  }));
-  if (!rows.length) {
-    grid.innerHTML = `<p class="hint">Сегодня скриншотов нет.</p>`;
-    return;
-  }
-  grid.innerHTML = rows
-    .map((r, i) => {
-      const caption = shotCaption(r);
-      const flag = r.flag_distracting ? "shot-distracting" : "";
-      return `<figure class="shot ${flag}" tabindex="0" role="button" data-index="${i}" data-url="${escapeHtml(r.url)}" data-caption="${escapeHtml(caption)}" data-flag="${r.flag_distracting ? "1" : "0"}">
-        <img src="${escapeHtml(r.url)}" alt="screenshot" loading="lazy" />
-        <figcaption>${escapeHtml(caption)}</figcaption>
-      </figure>`;
-    })
-    .join("");
 }
 
 async function loadSettings() {
@@ -2560,6 +2670,18 @@ function wireUi() {
         btn.classList.remove("is-busy");
       }
     }
+  });
+
+  document.getElementById("shotsAppFilter")?.addEventListener("change", (ev) => {
+    shotsAppFilter = ev.currentTarget.value || "";
+    renderShotsGrid();
+  });
+  document.getElementById("shotsShowDetails")?.addEventListener("change", (ev) => {
+    shotsShowDetails = !!ev.currentTarget.checked;
+    renderShotsGrid();
+  });
+  document.getElementById("shotsDay")?.addEventListener("change", () => {
+    refreshShots().catch((err) => showToast(err?.message || "Не удалось загрузить скриншоты", "error"));
   });
 
   document.addEventListener("keydown", (ev) => {

@@ -287,7 +287,21 @@
     <section id="panel-shots" class="panel">
       <div class="panel-head">
         <h2>Скриншоты</h2>
-        <div class="filter-bar">
+        <div class="filter-bar shots-filters">
+          <label class="filter-inline">
+            День
+            <input type="date" id="shotsDay" aria-label="День скриншотов" />
+          </label>
+          <label class="filter-inline">
+            Приложение
+            <select id="shotsAppFilter" aria-label="Фильтр по приложению">
+              <option value="">Все</option>
+            </select>
+          </label>
+          <label class="check filter-inline shots-detail-toggle">
+            <input type="checkbox" id="shotsShowDetails" />
+            С деталями занятия
+          </label>
           <button type="button" class="btn icon-btn" id="refreshShotsBtn" title="Обновить (F5)" aria-label="Обновить скриншоты">
             <svg class="icon-refresh" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" focusable="false">
               <path fill="currentColor" d="M17.65 6.35A7.95 7.95 0 0 0 12 4a8 8 0 1 0 7.75 10h-2.1A6 6 0 1 1 12 6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35Z"/>
@@ -295,6 +309,7 @@
           </button>
         </div>
       </div>
+      <p class="hint shots-filter-meta" id="shotsFilterMeta" hidden></p>
       <div class="shots-grid" id="shotsGrid"></div>
     </section>
 

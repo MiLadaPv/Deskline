@@ -1169,7 +1169,12 @@ class Database:
             rows = conn.execute(
                 """
                 SELECT sh.id, sh.path, sh.taken_at, sh.session_id, sh.reason,
-                       s.category AS session_category
+                       s.category AS session_category,
+                       s.app_name AS app_name,
+                       s.display_name AS display_name,
+                       s.activity_label AS activity_label,
+                       s.activity_kind AS activity_kind,
+                       s.window_title AS window_title
                 FROM screenshots sh
                 LEFT JOIN sessions s ON s.id = sh.session_id
                 WHERE sh.taken_at >= ? AND sh.taken_at < ?

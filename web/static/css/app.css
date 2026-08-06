@@ -1019,6 +1019,34 @@ html[data-theme="dark"] .rank-row-child {
   gap: 16px;
 }
 
+.shots-filters {
+  justify-content: flex-end;
+}
+
+.shots-filters .filter-inline {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.86rem;
+  color: var(--ink-soft);
+  font-weight: 600;
+}
+
+.shots-filters select,
+.shots-filters input[type="date"] {
+  min-width: 140px;
+  max-width: 220px;
+}
+
+.shots-detail-toggle {
+  margin: 0;
+  white-space: nowrap;
+}
+
+.shots-filter-meta {
+  margin: 0 0 12px;
+}
+
 .shot {
   border: 1px solid var(--line);
   background: rgba(255,255,255,0.5);
@@ -1057,6 +1085,11 @@ html[data-theme="dark"] .rank-row-child {
   padding: 10px 12px;
   font-size: 0.82rem;
   color: var(--ink-soft);
+  line-height: 1.35;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 
 .lightbox {
