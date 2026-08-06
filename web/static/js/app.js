@@ -1893,12 +1893,21 @@ async function refreshSummary() {
   if (key === lastSummaryKey) return;
   lastSummaryKey = key;
 
-  document.getElementById("focusValue").textContent = `${summary.focus_pct}%`;
+  const focusText = `${summary.focus_pct}%`;
+  const activityText = `${summary.activity_pct ?? 0}%`;
+  const focusEl = document.getElementById("focusValue");
+  const activityEl = document.getElementById("activityValue");
+  if (focusEl) {
+    const changed = focusEl.textContent !== focusText;
+    focusEl.textContent = focusText;
+    if (changed) pulseMetric(focusEl);
+  }
   document.getElementById("focusSub").textContent = `${fmtDur(summary.focus_sec)} из ${fmtDur(summary.total_sec)}`;
-  const activityValue = document.getElementById("activityValue");
   const activitySub = document.getElementById("activitySub");
-  if (activityValue) {
-    activityValue.textContent = `${summary.activity_pct ?? 0}%`;
+  if (activityEl) {
+    const changed = activityEl.textContent !== activityText;
+    activityEl.textContent = activityText;
+    if (changed) pulseMetric(activityEl);
   }
   if (activitySub) {
     activitySub.textContent = `${fmtDur(summary.active_sec)} активно · ${fmtDur(summary.idle_sec)} без ввода`;
@@ -1907,6 +1916,14 @@ async function refreshSummary() {
   renderKpis(summary, team);
   renderTopProjectsPulse(summary);
   refreshTrends().catch(() => {});
+}
+
+function pulseMetric(el) {
+  if (!el || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+  el.classList.remove("is-tick");
+  void el.offsetWidth;
+  el.classList.add("is-tick");
+  window.setTimeout(() => el.classList.remove("is-tick"), 520);
 }
 
 async function refreshUsageReport() {
@@ -3590,20 +3607,25 @@ function wireUi() {
 
 async function boot() {
   const splash = document.getElementById("appSplash");
+  const markShellReady = () => document.body.classList.add("is-shell-ready");
   if (splash && !sessionStorage.getItem("deskline_splash_done")) {
     window.setTimeout(() => {
       splash.classList.add("is-done");
       sessionStorage.setItem("deskline_splash_done", "1");
+      markShellReady();
     }, 2200);
   } else if (splash) {
     splash.classList.add("is-done");
+    markShellReady();
+  } else {
+    markShellReady();
   }
   wireUi();
   await maybeShowOnboarding().catch(() => {});
   ensureSelectedDay();
   await refreshCompanyPanel().catch(() => {});
   const hashTab = (location.hash || "").replace(/^#/, "");
-  const known = ["today", "day", "usage", "projects", "ratings", "shots", "settings"];
+  const known = ["today", "day", "usage", "meetings", "projects", "ratings", "shots", "settings"];
   if (known.includes(hashTab)) {
     setActiveTab(hashTab, { syncHash: false });
   } else {
