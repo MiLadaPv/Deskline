@@ -2681,6 +2681,8 @@ const SHOTS_POLL_MS = 15000;
 let shotsCache = [];
 let shotsAppFilter = "";
 let shotsShowDetails = false;
+/** Last day successfully rendered in the shots grid */
+let shotsLoadedForDay = "";
 
 function stopShotsPolling() {
   if (shotsPollTimer) {
@@ -2946,10 +2948,33 @@ function filteredShotsRows() {
   return shotsCache.filter((r) => shotAppKey(r) === q);
 }
 
+function renderShotsSkeleton(count = 8) {
+  const grid = document.getElementById("shotsGrid");
+  const meta = document.getElementById("shotsFilterMeta");
+  if (!grid) return;
+  if (meta) {
+    meta.hidden = false;
+    meta.textContent = "Загрузка…";
+  }
+  lightboxItems = [];
+  grid.setAttribute("aria-busy", "true");
+  grid.innerHTML = Array.from({ length: count }, (_, i) => {
+    const delay = (i % 4) * 0.08;
+    return `<div class="shot shot-skel" aria-hidden="true">
+      <div class="shot-skel-media shimmer" style="animation-delay:${delay}s"></div>
+      <div class="shot-skel-cap">
+        <span class="shot-skel-line shimmer" style="animation-delay:${delay + 0.04}s"></span>
+        <span class="shot-skel-line shot-skel-line-short shimmer" style="animation-delay:${delay + 0.08}s"></span>
+      </div>
+    </div>`;
+  }).join("");
+}
+
 function renderShotsGrid() {
   const grid = document.getElementById("shotsGrid");
   const meta = document.getElementById("shotsFilterMeta");
   if (!grid) return;
+  grid.removeAttribute("aria-busy");
   const rows = filteredShotsRows();
   const details = !!shotsShowDetails;
   lightboxItems = rows.map((r) => ({
@@ -2988,7 +3013,7 @@ function renderShotsGrid() {
     .join("");
 }
 
-async function refreshShots() {
+async function refreshShots({ skeleton = false } = {}) {
   const grid = document.getElementById("shotsGrid");
   await loadShotsDays();
   let day = ensureShotsDayInput();
@@ -2998,13 +3023,19 @@ async function refreshShots() {
     if (el) el.value = day;
     syncShotsDayLabel(day);
   }
+  const dayChanged = shotsLoadedForDay !== day;
+  const hasRealCards = !!grid?.querySelector(".shot:not(.shot-skel)");
+  const showSkeleton = skeleton || dayChanged || (!shotsLoadedForDay && !hasRealCards);
+  if (showSkeleton) renderShotsSkeleton();
   let rows;
   try {
     const q = new URLSearchParams({ day });
     rows = await api(`/api/screenshots?${q}`, { quiet402: true });
   } catch (e) {
     shotsCache = [];
+    shotsLoadedForDay = "";
     lightboxItems = [];
+    if (grid) grid.removeAttribute("aria-busy");
     if (e?.code === "pro_required" || e?.detail?.feature === "screenshots") {
       if (grid) {
         grid.innerHTML = `<p class="hint">Скриншоты доступны в Deskline Pro.</p>`;
@@ -3014,6 +3045,7 @@ async function refreshShots() {
     throw e;
   }
   shotsCache = Array.isArray(rows) ? rows : [];
+  shotsLoadedForDay = day;
   fillShotsAppFilter(shotsCache);
   renderShotsGrid();
   if (isShotsCalOpen()) renderShotsCal();
@@ -3537,7 +3569,7 @@ function wireUi() {
       btn.classList.add("is-busy");
     }
     try {
-      await refreshShots();
+      await refreshShots({ skeleton: true });
       showToast("Скриншоты обновлены", "ok");
     } catch (err) {
       showToast(err?.message || "Не удалось обновить скриншоты", "error");

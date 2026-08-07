@@ -25,3 +25,6 @@ def test_shots_toolbar_modern_shell():
     assert ".shots-cal-day.is-empty" in CSS or ".shots-cal-day.has-shots" in CSS
     assert ".shots-refresh" in CSS
     assert ".shots-day-btn" in CSS
+    assert ".shot-skel" in CSS
+    assert "shots-shimmer" in CSS
+    assert ".shimmer" in CSS

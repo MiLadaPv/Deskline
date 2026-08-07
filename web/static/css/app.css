@@ -1580,6 +1580,77 @@ html[data-theme="dark"] .shots-refresh {
   overflow: hidden;
 }
 
+.shot-skel {
+  cursor: default;
+  pointer-events: none;
+}
+
+.shot-skel:hover {
+  transform: none;
+  box-shadow: var(--shadow);
+}
+
+.shot-skel-media {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 10;
+  background: color-mix(in srgb, var(--paper-2) 70%, #cfd8d3);
+}
+
+.shot-skel-cap {
+  padding: 12px;
+  display: grid;
+  gap: 8px;
+}
+
+.shot-skel-line {
+  display: block;
+  height: 10px;
+  border-radius: 6px;
+  width: 86%;
+  background: color-mix(in srgb, var(--paper-2) 75%, #c5d0cb);
+}
+
+.shot-skel-line-short {
+  width: 52%;
+}
+
+.shot-skel .shimmer {
+  background-image: linear-gradient(
+    105deg,
+    color-mix(in srgb, var(--paper-2) 88%, #b8c4be) 0%,
+    color-mix(in srgb, var(--paper) 55%, #fff) 42%,
+    color-mix(in srgb, var(--paper-2) 88%, #b8c4be) 78%
+  );
+  background-size: 220% 100%;
+  animation: shots-shimmer 1.35s ease-in-out infinite;
+}
+
+html[data-theme="dark"] .shot-skel-media,
+html[data-theme="dark"] .shot-skel-line {
+  background: color-mix(in srgb, var(--paper-2) 70%, #1a2420);
+}
+
+html[data-theme="dark"] .shot-skel .shimmer {
+  background-image: linear-gradient(
+    105deg,
+    color-mix(in srgb, var(--paper-2) 80%, #15201c) 0%,
+    color-mix(in srgb, var(--card) 70%, #2a3a34) 45%,
+    color-mix(in srgb, var(--paper-2) 80%, #15201c) 80%
+  );
+}
+
+@keyframes shots-shimmer {
+  0% { background-position: 100% 0; }
+  100% { background-position: -100% 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .shot-skel .shimmer {
+    animation: none;
+  }
+}
+
 .lightbox {
   position: fixed;
   inset: 0;
