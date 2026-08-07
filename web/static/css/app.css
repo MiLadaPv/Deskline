@@ -18,8 +18,14 @@ html[data-theme="light"] {
   --shadow: 0 1px 0 rgba(12, 23, 19, 0.04), 0 14px 36px rgba(12, 23, 19, 0.07);
   --shadow-lift: 0 1px 0 rgba(13, 138, 106, 0.1), 0 18px 40px rgba(13, 138, 106, 0.14);
   --glow: 0 0 0 1px rgba(13, 138, 106, 0.12), 0 14px 32px rgba(13, 138, 106, 0.1);
-  --display: "Fraunces", Georgia, serif;
-  --sans: "Manrope", "Segoe UI", sans-serif;
+  /* One UI face everywhere; Fraunces only on the Deskline wordmark. */
+  --font: "Manrope", "Segoe UI", sans-serif;
+  --sans: var(--font);
+  --display: var(--font);
+  --brand: "Fraunces", Georgia, serif;
+  --label-size: 0.72rem;
+  --label-tracking: 0.08em;
+  --label-weight: 700;
   --logo-ink: #0c1713;
   --card: rgba(255, 255, 255, 0.72);
   --radius-card: 20px;
@@ -227,16 +233,16 @@ html, body {
 
 .eyebrow {
   margin: 0 0 6px;
-  letter-spacing: 0.16em;
+  letter-spacing: var(--label-tracking);
   text-transform: uppercase;
-  font-size: 0.7rem;
-  font-weight: 650;
+  font-size: var(--label-size);
+  font-weight: var(--label-weight);
   color: var(--ink-soft);
 }
 
 .brand {
   margin: 0;
-  font-family: var(--display);
+  font-family: var(--brand);
   font-weight: 700;
   font-optical-sizing: auto;
   font-size: clamp(3.1rem, 7.2vw, 5.2rem);
@@ -264,7 +270,7 @@ html, body {
 
 .brand-lockup-name {
   margin: 0;
-  font-family: var(--display);
+  font-family: var(--brand);
   font-weight: 700;
   font-optical-sizing: auto;
   font-size: clamp(1.85rem, 3.2vw, 2.35rem);
@@ -311,8 +317,8 @@ html, body {
 .brand-block .eyebrow {
   margin: 0 0 8px;
   color: color-mix(in srgb, var(--accent) 72%, var(--ink-soft));
-  letter-spacing: 0.18em;
-  font-weight: 700;
+  letter-spacing: var(--label-tracking);
+  font-weight: var(--label-weight);
 }
 
 .brand-block .brand-lockup-name {
@@ -557,8 +563,8 @@ html[data-theme="dark"] .brand-word {
 
 .panel-head h2 {
   margin: 0;
-  font-family: var(--display);
-  font-optical-sizing: auto;
+  font-family: var(--sans);
+  font-weight: 700;
   letter-spacing: -0.02em;
 }
 
@@ -634,18 +640,18 @@ html[data-theme="dark"] .brand-word {
 
 .focus-label {
   display: block;
-  font-size: 0.74rem;
-  letter-spacing: 0.1em;
+  font-size: var(--label-size);
+  letter-spacing: var(--label-tracking);
   text-transform: uppercase;
-  font-weight: 650;
+  font-weight: var(--label-weight);
   color: var(--ink-soft);
 }
 
 .focus-value {
   display: block;
   margin-top: 4px;
-  font-family: var(--display);
-  font-optical-sizing: auto;
+  font-family: var(--sans);
+  font-weight: 700;
   font-size: 2.55rem;
   letter-spacing: -0.03em;
   color: var(--accent);
@@ -1010,9 +1016,9 @@ main {
 
 .subhead {
   margin: 28px 0 12px;
-  font-family: var(--display);
+  font-family: var(--sans);
   font-size: 1.25rem;
-  font-weight: 600;
+  font-weight: 700;
 }
 
 .hint {
@@ -1502,8 +1508,8 @@ html[data-theme="dark"] .rank-row-child {
 
 .shots-title-block h2 {
   margin: 0;
-  font-family: var(--display);
-  font-optical-sizing: auto;
+  font-family: var(--sans);
+  font-weight: 700;
   font-size: clamp(1.85rem, 3vw, 2.35rem);
   letter-spacing: -0.03em;
 }
@@ -1575,9 +1581,9 @@ html[data-theme="dark"] .rank-row-child {
 }
 
 .shots-chip-label {
-  font-size: 0.72rem;
-  font-weight: 700;
-  letter-spacing: 0.08em;
+  font-size: var(--label-size);
+  font-weight: var(--label-weight);
+  letter-spacing: var(--label-tracking);
   text-transform: uppercase;
   color: var(--ink-soft);
   white-space: nowrap;
@@ -2501,17 +2507,17 @@ html[data-theme="dark"] .skel-project {
 
 .settings-kicker {
   margin: 0 0 4px;
-  font-size: 0.72rem;
-  letter-spacing: 0.14em;
+  font-size: var(--label-size);
+  letter-spacing: var(--label-tracking);
   text-transform: uppercase;
-  font-weight: 700;
+  font-weight: var(--label-weight);
   color: var(--ink-soft);
 }
 
 .settings-top h2 {
   margin: 0;
-  font-family: var(--display);
-  font-optical-sizing: auto;
+  font-family: var(--sans);
+  font-weight: 700;
   font-size: clamp(1.85rem, 3vw, 2.35rem);
   letter-spacing: -0.03em;
 }
@@ -2947,7 +2953,7 @@ html[data-theme="dark"] .settings-form-modern select {
 }
 
 .legal-brand {
-  font-family: var(--display);
+  font-family: var(--brand);
   font-weight: 700;
   font-size: 1.35rem;
   color: var(--ink);
@@ -3458,19 +3464,22 @@ html[data-theme="dark"] .settings-form-modern select {
 
 .kpi-label {
   display: block;
-  font-size: 0.72rem;
-  letter-spacing: 0.08em;
+  font-size: var(--label-size);
+  letter-spacing: var(--label-tracking);
   text-transform: uppercase;
+  font-weight: var(--label-weight);
   color: var(--ink-soft);
 }
 
 .kpi-value {
   display: block;
   margin-top: 6px;
-  font-family: var(--display);
+  font-family: var(--sans);
+  font-weight: 700;
   font-size: 1.55rem;
   line-height: 1.1;
   color: var(--ink);
+  font-variant-numeric: tabular-nums;
 }
 
 .kpi-sub {
@@ -4193,7 +4202,7 @@ html[data-theme="dark"] .boot-logo-anim-dark {
 .boot-splash-title {
   margin: 0;
   text-align: center;
-  font-family: var(--display);
+  font-family: var(--brand);
   font-size: clamp(1.55rem, 3.2vw, 1.9rem);
   color: var(--ink);
   letter-spacing: 0.04em;
@@ -4379,7 +4388,7 @@ html[data-theme="dark"] .tab.active {
 
 .launch-brand strong {
   display: block;
-  font-family: var(--display);
+  font-family: var(--brand);
   font-size: clamp(1.75rem, 3vw, 2.1rem);
   font-weight: 700;
   letter-spacing: -0.03em;
@@ -5049,8 +5058,8 @@ html[data-theme="dark"] .google-btn {
 
 .pulse-section-label {
   margin: 8px 0 0;
-  font-size: 0.78rem;
-  letter-spacing: 0.1em;
+  font-size: var(--label-size);
+  letter-spacing: var(--label-tracking);
   text-transform: uppercase;
   color: var(--ink-soft);
   font-weight: 700;
@@ -5209,9 +5218,9 @@ html[data-theme="dark"] .google-btn {
 
 .meeting-detail-label {
   display: block;
-  font-size: 0.7rem;
-  font-weight: 700;
-  letter-spacing: 0.06em;
+  font-size: var(--label-size);
+  font-weight: var(--label-weight);
+  letter-spacing: var(--label-tracking);
   text-transform: uppercase;
   color: var(--ink-soft);
   margin-bottom: 4px;
@@ -5647,18 +5656,18 @@ html[data-theme="dark"] .hours-line-path.is-neutral {
 
 .pulse-kicker {
   margin: 0 0 2px;
-  font-size: 0.72rem;
-  letter-spacing: 0.08em;
+  font-size: var(--label-size);
+  letter-spacing: var(--label-tracking);
   text-transform: uppercase;
   color: var(--accent);
-  font-weight: 700;
+  font-weight: var(--label-weight);
 }
 
 .pulse-head h3 {
   margin: 0;
-  font-family: var(--display);
+  font-family: var(--sans);
   font-size: 1.35rem;
-  font-weight: 650;
+  font-weight: 700;
   color: var(--ink);
   letter-spacing: -0.02em;
   overflow-wrap: anywhere;
@@ -6413,7 +6422,7 @@ html[data-theme="dark"] .prod-days-chart-wide .stack-seg.distracting {
 }
 
 .welcome-hero h1 {
-  font-family: var(--display);
+  font-family: var(--brand);
   font-optical-sizing: auto;
   font-size: clamp(2.4rem, 5.4vw, 3.7rem);
   line-height: 1.04;
@@ -6602,9 +6611,9 @@ html[data-theme="dark"] .prod-days-chart-wide .stack-seg.distracting {
 .onboard-brand .logo-mark { color: var(--accent); flex-shrink: 0; }
 .onboard-kicker {
   margin: 0 0 4px;
-  font-size: 0.78rem;
-  font-weight: 650;
-  letter-spacing: 0.04em;
+  font-size: var(--label-size);
+  font-weight: var(--label-weight);
+  letter-spacing: var(--label-tracking);
   text-transform: uppercase;
   color: var(--accent);
 }

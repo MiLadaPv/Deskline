@@ -214,3 +214,19 @@ def test_shared_shimmer_loading_system():
     assert "refreshProjects({ skeleton: true })" in js
     assert "refreshRatings({ skeleton: true })" in js
     assert "refreshMeetings({ skeleton: true })" in js
+
+
+def test_typography_system_is_unified():
+    from deskline.config import WEB_ROOT
+
+    css = (WEB_ROOT / "static" / "css" / "app.css").read_text(encoding="utf-8")
+    assert "--display: var(--font)" in css
+    assert '--brand: "Fraunces", Georgia, serif' in css
+    brand = css[css.find(".brand-lockup-name {") : css.find(".brand-lockup-name {") + 220]
+    assert "var(--brand)" in brand
+    panel = css[css.find(".panel-head h2 {") : css.find(".panel-head h2 {") + 180]
+    assert "var(--sans)" in panel
+    assert "var(--brand)" not in panel
+    focus = css[css.find(".focus-value {") : css.find(".focus-value {") + 220]
+    assert "var(--sans)" in focus
+    assert "var(--brand)" not in focus
