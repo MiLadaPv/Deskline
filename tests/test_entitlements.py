@@ -69,6 +69,25 @@ def test_offline_grace_expires(iso_now):
     assert ent.tier == "free"
 
 
+def test_dev_license_ignores_offline_grace(iso_now):
+    lic = {
+        "key": "DESKLINE-PRO-DEV",
+        "tier": "pro",
+        "status": "active",
+        "expires_at": None,
+        "source": "dev",
+        "last_validated_at": (iso_now - timedelta(days=40)).isoformat(),
+    }
+    ent = resolve_entitlements(
+        {"first_run_at": (iso_now - timedelta(days=60)).isoformat()},
+        lic,
+        now=iso_now,
+    )
+    assert ent.tier == "pro"
+    assert ent.is_pro is True
+    assert ent.screenshots is True
+
+
 def test_api_project_limit_and_license(tmp_path: Path, monkeypatch):
     monkeypatch.setenv("DESKLINE_LICENSE_DEV", "1")
     monkeypatch.setattr("deskline.config.DATA_ROOT", tmp_path)

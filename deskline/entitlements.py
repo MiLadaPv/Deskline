@@ -96,7 +96,9 @@ def resolve_entitlements(
     masked = _mask_key(key) if key else None
 
     offline_ok = True
-    if last_check is not None:
+    source = str(lic.get("source") or "").lower().strip()
+    # Local/dev keys are signed offline caches — do not expire them via Lemon revalidation grace.
+    if source != "dev" and last_check is not None:
         offline_ok = now <= last_check + timedelta(days=OFFLINE_GRACE_DAYS)
 
     license_ok = status in {"active", "inactive_grace"} and offline_ok
