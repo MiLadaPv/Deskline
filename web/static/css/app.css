@@ -1243,6 +1243,11 @@ html[data-theme="dark"] .rank-row-child {
   max-width: 420px;
 }
 
+.settings-form-modern {
+  max-width: none;
+  gap: 22px;
+}
+
 .settings-form label {
   display: grid;
   gap: 6px;
@@ -1256,7 +1261,7 @@ html[data-theme="dark"] .rank-row-child {
 }
 
 .settings-hint {
-  margin: -4px 0 12px 1.6rem;
+  margin: -4px 0 12px 0;
   font-size: 0.82rem;
 }
 
@@ -1267,12 +1272,348 @@ html[data-theme="dark"] .rank-row-child {
   background: rgba(255,255,255,0.7);
 }
 
-.settings-save-row {
+.settings-save-row,
+.settings-save-bar {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 12px;
   margin-top: 6px;
+}
+
+.settings-save-bar {
+  position: sticky;
+  bottom: 12px;
+  z-index: 8;
+  padding: 12px 14px;
+  border-radius: 18px;
+  border: 1px solid var(--line);
+  background: color-mix(in srgb, var(--card) 92%, transparent);
+  backdrop-filter: blur(16px) saturate(1.2);
+  box-shadow: var(--shadow);
+}
+
+.settings-shell {
+  max-width: 720px;
+  margin: 0 auto;
+  display: grid;
+  gap: 18px;
+}
+
+.settings-top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.settings-kicker {
+  margin: 0 0 4px;
+  font-size: 0.72rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  font-weight: 700;
+  color: var(--ink-soft);
+}
+
+.settings-top h2 {
+  margin: 0;
+  font-family: var(--display);
+  font-optical-sizing: auto;
+  font-size: clamp(1.85rem, 3vw, 2.35rem);
+  letter-spacing: -0.03em;
+}
+
+.settings-search {
+  position: relative;
+  flex: 1 1 240px;
+  max-width: 360px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 12px;
+  min-height: 44px;
+  border-radius: 14px;
+  border: 1px solid var(--line);
+  background: color-mix(in srgb, var(--card) 94%, #fff);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.5);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.settings-search:focus-within {
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--line));
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 16%, transparent);
+}
+
+.settings-search-ico {
+  flex-shrink: 0;
+  color: var(--ink-soft);
+}
+
+.settings-search input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  outline: none;
+  background: transparent;
+  font: inherit;
+  font-size: 0.98rem;
+  color: var(--ink);
+  padding: 10px 0;
+}
+
+.settings-search input::placeholder {
+  color: color-mix(in srgb, var(--ink-soft) 80%, transparent);
+}
+
+.settings-search-clear {
+  appearance: none;
+  border: 0;
+  background: color-mix(in srgb, var(--ink-soft) 18%, transparent);
+  color: var(--ink);
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  font-size: 1rem;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0;
+}
+
+.settings-empty {
+  margin: 0;
+  padding: 28px 18px;
+  text-align: center;
+  color: var(--ink-soft);
+  border: 1px dashed var(--line);
+  border-radius: 18px;
+  background: color-mix(in srgb, var(--card) 70%, transparent);
+}
+
+.settings-group {
+  display: grid;
+  gap: 10px;
+}
+
+.settings-group.is-hidden,
+.settings-row.is-hidden,
+[data-settings-item].is-hidden {
+  display: none !important;
+}
+
+.settings-group-title {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 0.92rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--ink);
+}
+
+.settings-group-ico {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  display: inline-grid;
+  place-items: center;
+  color: #fff;
+  flex-shrink: 0;
+}
+
+.settings-group-ico.tone-mint { background: linear-gradient(160deg, #34c59a, #0d8a6a); }
+.settings-group-ico.tone-sky { background: linear-gradient(160deg, #5bb8ff, #2f7fd6); }
+.settings-group-ico.tone-violet { background: linear-gradient(160deg, #a78bfa, #7c5cbf); }
+.settings-group-ico.tone-amber { background: linear-gradient(160deg, #f5b65a, #d88920); }
+.settings-group-ico.tone-rose { background: linear-gradient(160deg, #f08a9a, #c94d63); }
+.settings-group-ico.tone-slate { background: linear-gradient(160deg, #8a9aa8, #5d6b78); }
+.settings-group-ico.tone-indigo { background: linear-gradient(160deg, #7f93f5, #4f63c8); }
+.settings-group-ico.tone-teal { background: linear-gradient(160deg, #4ec9c0, #1f9a90); }
+
+.settings-pill {
+  margin-left: 2px;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent-soft) 80%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent) 22%, transparent);
+  border-radius: 999px;
+  padding: 2px 8px;
+}
+
+.settings-group-lead {
+  margin: -2px 0 0;
+  color: var(--ink-soft);
+  font-size: 0.88rem;
+  line-height: 1.45;
+}
+
+.settings-card {
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: color-mix(in srgb, var(--card) 96%, #fff);
+  box-shadow: var(--shadow);
+  overflow: hidden;
+}
+
+.settings-card-pad {
+  padding: 16px;
+  display: grid;
+  gap: 12px;
+}
+
+.settings-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 12px 16px;
+  align-items: center;
+  padding: 13px 16px;
+  border-top: 1px solid color-mix(in srgb, var(--line) 80%, transparent);
+}
+
+.settings-row:first-child {
+  border-top: 0;
+}
+
+.settings-row-stack {
+  grid-template-columns: 1fr;
+  align-items: stretch;
+}
+
+.settings-row-copy {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.settings-row-label {
+  font-weight: 650;
+  font-size: 0.95rem;
+  color: var(--ink);
+  letter-spacing: -0.01em;
+}
+
+.settings-row-hint {
+  font-size: 0.8rem;
+  color: var(--ink-soft);
+  line-height: 1.35;
+}
+
+.settings-row input[type="text"],
+.settings-row input[type="number"],
+.settings-row input[type="password"],
+.settings-row input[type="url"],
+.settings-row select,
+.settings-field input,
+.settings-card-pad input[type="text"],
+.settings-card-pad input[type="password"],
+.settings-form-modern input[type="text"],
+.settings-form-modern input[type="number"],
+.settings-form-modern input[type="password"],
+.settings-form-modern input[type="url"],
+.settings-form-modern select {
+  width: 100%;
+  font: inherit;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--paper) 70%, #fff);
+  color: var(--ink);
+}
+
+.settings-field {
+  display: grid;
+  gap: 6px;
+  font-size: 0.9rem;
+  color: var(--ink-soft);
+}
+
+.settings-switch {
+  position: relative;
+  width: 48px;
+  height: 30px;
+  flex-shrink: 0;
+  cursor: pointer;
+}
+
+.settings-switch input {
+  position: absolute;
+  opacity: 0;
+  inset: 0;
+  margin: 0;
+  cursor: pointer;
+}
+
+.settings-switch span {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--ink-soft) 28%, var(--paper-2));
+  transition: background 0.2s var(--ease-out);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--line) 80%, transparent);
+}
+
+.settings-switch span::after {
+  content: "";
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.18);
+  transition: transform 0.22s var(--ease-spring);
+}
+
+.settings-switch input:checked + span {
+  background: var(--accent);
+}
+
+.settings-switch input:checked + span::after {
+  transform: translateX(18px);
+}
+
+.settings-switch input:focus-visible + span {
+  outline: 2px solid color-mix(in srgb, var(--accent) 55%, transparent);
+  outline-offset: 2px;
+}
+
+.settings-mini-title {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 700;
+}
+
+html[data-theme="dark"] .settings-search,
+html[data-theme="dark"] .settings-card,
+html[data-theme="dark"] .settings-save-bar {
+  background: var(--card);
+}
+
+html[data-theme="dark"] .settings-row input[type="text"],
+html[data-theme="dark"] .settings-row input[type="number"],
+html[data-theme="dark"] .settings-row input[type="password"],
+html[data-theme="dark"] .settings-row input[type="url"],
+html[data-theme="dark"] .settings-row select,
+html[data-theme="dark"] .settings-field input,
+html[data-theme="dark"] .settings-form-modern input,
+html[data-theme="dark"] .settings-form-modern select {
+  background: var(--paper-2);
+}
+
+@media (max-width: 720px) {
+  .settings-top {
+    align-items: stretch;
+  }
+  .settings-search {
+    max-width: none;
+  }
 }
 
 .save-status {

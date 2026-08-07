@@ -2465,6 +2465,61 @@ async function loadSettings() {
   if (workToggle) workToggle.checked = !!cfg.work_mode;
   if (cfg.theme) applyThemePref(cfg.theme);
   if (cfg.entitlements) applyEntitlements(cfg.entitlements);
+  filterSettingsSearch();
+}
+
+function filterSettingsSearch() {
+  const input = document.getElementById("settingsSearch");
+  const clearBtn = document.getElementById("settingsSearchClear");
+  const empty = document.getElementById("settingsSearchEmpty");
+  const shell = document.querySelector("#panel-settings .settings-shell");
+  if (!shell) return;
+  const q = String(input?.value || "")
+    .trim()
+    .toLocaleLowerCase("ru");
+  if (clearBtn) clearBtn.hidden = !q;
+
+  const groups = [...shell.querySelectorAll("[data-settings-group]")];
+  let visibleGroups = 0;
+  for (const group of groups) {
+    const items = [...group.querySelectorAll("[data-settings-item]")];
+    if (!q) {
+      group.classList.remove("is-hidden");
+      items.forEach((item) => item.classList.remove("is-hidden"));
+      visibleGroups += 1;
+      continue;
+    }
+    const groupHit = `${group.dataset.search || ""} ${group.querySelector(".settings-group-title")?.textContent || ""}`
+      .toLocaleLowerCase("ru")
+      .includes(q);
+    let visibleItems = 0;
+    items.forEach((item) => {
+      const hay = `${item.dataset.search || ""} ${item.textContent || ""}`.toLocaleLowerCase("ru");
+      const hit = groupHit || hay.includes(q);
+      item.classList.toggle("is-hidden", !hit);
+      if (hit) visibleItems += 1;
+    });
+    const show = groupHit || visibleItems > 0;
+    group.classList.toggle("is-hidden", !show);
+    if (show) visibleGroups += 1;
+  }
+
+  const saveBar = shell.querySelector(".settings-save-bar");
+  if (saveBar) saveBar.hidden = !!q && visibleGroups === 0;
+  if (empty) empty.hidden = visibleGroups > 0;
+}
+
+function wireSettingsSearch() {
+  const input = document.getElementById("settingsSearch");
+  const clearBtn = document.getElementById("settingsSearchClear");
+  if (!input || input.dataset.wired === "1") return;
+  input.dataset.wired = "1";
+  input.addEventListener("input", () => filterSettingsSearch());
+  clearBtn?.addEventListener("click", () => {
+    input.value = "";
+    filterSettingsSearch();
+    input.focus();
+  });
 }
 
 function updateCompanyUiVisibility() {
@@ -2767,6 +2822,7 @@ function wireGroupedLists() {
 }
 
 function wireUi() {
+  wireSettingsSearch();
   wireThemeToggle();
   wireGroupedLists();
   document.querySelectorAll(".tab").forEach((tab) => {
