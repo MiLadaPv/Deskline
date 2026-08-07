@@ -95,3 +95,13 @@ def test_control_strip_clips_to_capsule():
     chunk = css[idx : idx + 420]
     assert "overflow: hidden" in chunk
     assert "border-radius: 999px" in chunk
+
+
+def test_gantt_blocks_have_no_rounding():
+    from deskline.config import WEB_ROOT
+
+    css = (WEB_ROOT / "static" / "css" / "app.css").read_text(encoding="utf-8")
+    idx = css.find(".gantt-block {")
+    assert idx >= 0
+    chunk = css[idx : idx + 380]
+    assert "border-radius: 0" in chunk
