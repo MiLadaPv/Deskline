@@ -15,13 +15,18 @@ def test_shots_toolbar_modern_shell():
     assert 'id="shotsDayBtn"' in HTML
     assert 'id="shotsCal"' in HTML
     assert 'id="shotsAppFilter"' in HTML
+    assert 'id="shotsAppBtn"' in HTML
+    assert 'id="shotsAppMenu"' in HTML
     assert 'id="shotsShowDetails"' in HTML
     assert 'id="refreshShotsBtn"' in HTML
     assert 'id="shotsFilterMeta"' in HTML
     assert 'type="date"' not in HTML.split('id="panel-shots"', 1)[1].split('id="panel-', 1)[0]
+    assert "<select" not in HTML.split('id="panel-shots"', 1)[1].split('id="panel-', 1)[0]
     assert ".shots-toolbar" in CSS
     assert ".shots-chip" in CSS
     assert ".shots-cal" in CSS
+    assert ".shots-app-menu" in CSS
+    assert ".shots-app-option" in CSS
     assert ".shots-cal-day.is-empty" in CSS or ".shots-cal-day.has-shots" in CSS
     assert ".shots-refresh" in CSS
     assert ".shots-day-btn" in CSS

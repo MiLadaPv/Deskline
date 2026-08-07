@@ -419,15 +419,24 @@
                 </div>
               </div>
             </div>
-            <label class="shots-chip shots-chip-grow" for="shotsAppFilter">
+            <div class="shots-chip shots-chip-grow shots-app-wrap" id="shotsAppFilter">
               <span class="shots-chip-ico" aria-hidden="true">
                 <svg viewBox="0 0 24 24" width="15" height="15"><path fill="currentColor" d="M4 5.5A1.5 1.5 0 0 1 5.5 4h5A1.5 1.5 0 0 1 12 5.5v5A1.5 1.5 0 0 1 10.5 12h-5A1.5 1.5 0 0 1 4 10.5v-5Zm8.5 0A1.5 1.5 0 0 1 14 4h4.5A1.5 1.5 0 0 1 20 5.5v5A1.5 1.5 0 0 1 18.5 12H14a1.5 1.5 0 0 1-1.5-1.5v-5ZM4 14a1.5 1.5 0 0 1 1.5-1.5h5A1.5 1.5 0 0 1 12 14v4.5A1.5 1.5 0 0 1 10.5 20h-5A1.5 1.5 0 0 1 4 18.5V14Zm8.5 0a1.5 1.5 0 0 1 1.5-1.5h4.5A1.5 1.5 0 0 1 20 14v4.5a1.5 1.5 0 0 1-1.5 1.5H14a1.5 1.5 0 0 1-1.5-1.5V14Z"/></svg>
               </span>
               <span class="shots-chip-label">Приложение</span>
-              <select id="shotsAppFilter" aria-label="Фильтр по приложению">
-                <option value="">Все</option>
-              </select>
-            </label>
+              <button type="button" class="shots-app-btn" id="shotsAppBtn" aria-haspopup="listbox" aria-expanded="false" aria-controls="shotsAppMenu">
+                <span id="shotsAppLabel">Все</span>
+              </button>
+              <div class="shots-app-menu" id="shotsAppMenu" hidden role="listbox" aria-multiselectable="true" aria-label="Фильтр по приложениям">
+                <div class="shots-app-search-wrap">
+                  <input type="search" id="shotsAppSearch" placeholder="Поиск…" autocomplete="off" spellcheck="false" />
+                </div>
+                <div class="shots-app-list" id="shotsAppList"></div>
+                <div class="shots-app-foot">
+                  <button type="button" class="shots-cal-action" data-app-clear>Сбросить</button>
+                </div>
+              </div>
+            </div>
             <label class="shots-chip shots-chip-toggle" for="shotsShowDetails">
               <span class="shots-chip-copy">
                 <span class="shots-chip-label">Детали</span>

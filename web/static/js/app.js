@@ -2965,7 +2965,10 @@ let shotsPollTimer = null;
 const SHOTS_POLL_MS = 15000;
 /** @type {any[]} */
 let shotsCache = [];
-let shotsAppFilter = "";
+/** @type {Set<string>} selected app keys; empty = all */
+let shotsAppFilter = new Set();
+/** @type {{ key: string, label: string }[]} */
+let shotsAppOptions = [];
 let shotsShowDetails = false;
 /** Last day successfully rendered in the shots grid */
 let shotsLoadedForDay = "";
@@ -3199,9 +3202,6 @@ function wireShotsDayPicker() {
 }
 
 function fillShotsAppFilter(rows) {
-  const sel = document.getElementById("shotsAppFilter");
-  if (!sel) return;
-  const prev = shotsAppFilter || sel.value || "";
   const map = new Map();
   let orphans = 0;
   for (const r of rows || []) {
@@ -3212,26 +3212,155 @@ function fillShotsAppFilter(rows) {
     }
     if (!map.has(key)) map.set(key, shotAppLabel(r));
   }
-  const opts = [`<option value="">Все</option>`];
-  [...map.entries()]
+  const next = [...map.entries()]
     .sort((a, b) => a[1].localeCompare(b[1], "ru"))
-    .forEach(([key, label]) => {
-      opts.push(`<option value="${escapeHtml(key)}">${escapeHtml(label)}</option>`);
-    });
-  if (orphans) {
-    opts.push(`<option value="__none__">Без сессии (${orphans})</option>`);
-  }
-  sel.innerHTML = opts.join("");
-  if (prev && [...sel.options].some((o) => o.value === prev)) sel.value = prev;
-  else sel.value = "";
-  shotsAppFilter = sel.value || "";
+    .map(([key, label]) => ({ key, label }));
+  if (orphans) next.push({ key: "__none__", label: `Без сессии (${orphans})` });
+  shotsAppOptions = next;
+  const known = new Set(next.map((o) => o.key));
+  shotsAppFilter = new Set([...shotsAppFilter].filter((k) => known.has(k)));
+  syncShotsAppLabel();
+  renderShotsAppList();
+}
+
+function shotsAppFilterLabel() {
+  if (!shotsAppFilter.size) return "Все";
+  const labels = shotsAppOptions
+    .filter((o) => shotsAppFilter.has(o.key))
+    .map((o) => o.label);
+  if (!labels.length) return "Все";
+  if (labels.length === 1) return labels[0];
+  if (labels.length === 2) return `${labels[0]}, ${labels[1]}`;
+  return `${labels[0]} +${labels.length - 1}`;
+}
+
+function syncShotsAppLabel() {
+  const label = document.getElementById("shotsAppLabel");
+  if (label) label.textContent = shotsAppFilterLabel();
 }
 
 function filteredShotsRows() {
-  const q = shotsAppFilter;
-  if (!q) return shotsCache.slice();
-  if (q === "__none__") return shotsCache.filter((r) => !shotAppKey(r));
-  return shotsCache.filter((r) => shotAppKey(r) === q);
+  if (!shotsAppFilter.size) return shotsCache.slice();
+  return shotsCache.filter((r) => {
+    const key = shotAppKey(r);
+    if (!key) return shotsAppFilter.has("__none__");
+    return shotsAppFilter.has(key);
+  });
+}
+
+function isShotsAppMenuOpen() {
+  const menu = document.getElementById("shotsAppMenu");
+  return !!(menu && !menu.hidden);
+}
+
+function closeShotsAppMenu() {
+  const menu = document.getElementById("shotsAppMenu");
+  const btn = document.getElementById("shotsAppBtn");
+  if (menu) menu.hidden = true;
+  if (btn) btn.setAttribute("aria-expanded", "false");
+}
+
+function openShotsAppMenu() {
+  const menu = document.getElementById("shotsAppMenu");
+  const btn = document.getElementById("shotsAppBtn");
+  const search = document.getElementById("shotsAppSearch");
+  if (!menu) return;
+  if (typeof closeShotsCal === "function") closeShotsCal();
+  renderShotsAppList();
+  menu.hidden = false;
+  if (btn) btn.setAttribute("aria-expanded", "true");
+  if (search) {
+    search.value = "";
+    window.setTimeout(() => search.focus(), 0);
+  }
+}
+
+function toggleShotsAppMenu() {
+  if (isShotsAppMenuOpen()) closeShotsAppMenu();
+  else openShotsAppMenu();
+}
+
+function renderShotsAppList() {
+  const list = document.getElementById("shotsAppList");
+  const search = document.getElementById("shotsAppSearch");
+  if (!list) return;
+  const q = String(search?.value || "")
+    .trim()
+    .toLowerCase();
+  const rows = shotsAppOptions.filter((o) => !q || o.label.toLowerCase().includes(q) || o.key.toLowerCase().includes(q));
+  if (!rows.length) {
+    list.innerHTML = `<p class="shots-app-empty">${shotsAppOptions.length ? "Ничего не найдено" : "Пока нет приложений за день"}</p>`;
+    return;
+  }
+  list.innerHTML = rows
+    .map((o) => {
+      const on = shotsAppFilter.has(o.key);
+      return `<button type="button" class="shots-app-option${on ? " is-checked" : ""}" role="option" aria-selected="${on ? "true" : "false"}" data-app-key="${escapeHtml(o.key)}">
+        <span class="shots-app-check" aria-hidden="true">${on ? "✓" : ""}</span>
+        <span>${escapeHtml(o.label)}</span>
+      </button>`;
+    })
+    .join("");
+}
+
+function wireShotsAppFilter() {
+  const wrap = document.querySelector(".shots-app-wrap");
+  const btn = document.getElementById("shotsAppBtn");
+  const menu = document.getElementById("shotsAppMenu");
+  const search = document.getElementById("shotsAppSearch");
+  if (!wrap || !btn || !menu || wrap.dataset.wired === "1") return;
+  wrap.dataset.wired = "1";
+
+  btn.addEventListener("click", (ev) => {
+    ev.preventDefault();
+    ev.stopPropagation();
+    toggleShotsAppMenu();
+  });
+
+  search?.addEventListener("input", () => renderShotsAppList());
+  search?.addEventListener("click", (ev) => ev.stopPropagation());
+  search?.addEventListener("keydown", (ev) => {
+    if (ev.key === "Escape") {
+      closeShotsAppMenu();
+      btn.focus();
+    }
+  });
+
+  menu.addEventListener("click", (ev) => {
+    const t = ev.target;
+    if (!(t instanceof Element)) return;
+    if (t.closest("[data-app-clear]")) {
+      ev.preventDefault();
+      shotsAppFilter = new Set();
+      syncShotsAppLabel();
+      renderShotsAppList();
+      renderShotsGrid();
+      return;
+    }
+    const opt = t.closest("[data-app-key]");
+    if (!opt) return;
+    ev.preventDefault();
+    const key = opt.getAttribute("data-app-key") || "";
+    if (!key) return;
+    if (shotsAppFilter.has(key)) shotsAppFilter.delete(key);
+    else shotsAppFilter.add(key);
+    syncShotsAppLabel();
+    renderShotsAppList();
+    renderShotsGrid();
+  });
+
+  document.addEventListener("click", (ev) => {
+    if (!isShotsAppMenuOpen()) return;
+    if (wrap.contains(ev.target)) return;
+    closeShotsAppMenu();
+  });
+
+  document.addEventListener("keydown", (ev) => {
+    if (ev.key === "Escape" && isShotsAppMenuOpen()) {
+      closeShotsAppMenu();
+      btn.focus();
+    }
+  });
 }
 
 function renderShotsSkeleton(count = 8) {
@@ -3274,7 +3403,7 @@ function renderShotsGrid() {
     return;
   }
   if (!rows.length) {
-    grid.innerHTML = `<p class="hint">Нет скриншотов для выбранного приложения.</p>`;
+    grid.innerHTML = `<p class="hint">Нет скриншотов для выбранных приложений.</p>`;
     return;
   }
   grid.innerHTML = rows
@@ -3891,15 +4020,12 @@ function wireUi() {
     }
   });
 
-  document.getElementById("shotsAppFilter")?.addEventListener("change", (ev) => {
-    shotsAppFilter = ev.currentTarget.value || "";
-    renderShotsGrid();
-  });
   document.getElementById("shotsShowDetails")?.addEventListener("change", (ev) => {
     shotsShowDetails = !!ev.currentTarget.checked;
     renderShotsGrid();
   });
   wireShotsDayPicker();
+  wireShotsAppFilter();
   ensureShotsDayInput();
 
   document.addEventListener("keydown", (ev) => {
