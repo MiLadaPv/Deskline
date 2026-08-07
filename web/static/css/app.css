@@ -315,12 +315,14 @@ body.is-shell-ready .hero-actions {
   flex-wrap: wrap;
   gap: 10px;
   align-items: center;
-  padding: 10px 12px;
+  padding: 10px 18px;
   border: 1px solid var(--line);
   border-radius: 999px;
   background: color-mix(in srgb, var(--card) 88%, transparent);
   backdrop-filter: blur(16px) saturate(1.2);
   box-shadow: var(--shadow);
+  /* Keep end chips inside the capsule — without this, square corners poke past the curve. */
+  overflow: hidden;
 }
 
 .work-toggle {
@@ -3217,6 +3219,9 @@ html[data-theme="dark"] .boot-logo-anim-dark {
   place-items: center;
   color: var(--logo-ink);
   position: relative;
+  overflow: hidden;
+  border-radius: 14px;
+  flex-shrink: 0;
 }
 
 .logo-mark img,
@@ -3225,7 +3230,7 @@ html[data-theme="dark"] .boot-logo-anim-dark {
   height: 100%;
   display: block;
   color: inherit;
-  overflow: visible;
+  overflow: hidden;
   object-fit: contain;
 }
 

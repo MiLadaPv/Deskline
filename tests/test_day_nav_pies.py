@@ -80,3 +80,18 @@ def test_day_feed_ux_contracts():
     assert "highlightTimelineSession" in js
     assert ".day-picture-head" in css
     assert ".timeline li.is-hot" in css
+
+
+def test_control_strip_clips_to_capsule():
+    from deskline.config import WEB_ROOT
+
+    html = (WEB_ROOT / "templates" / "index.html").read_text(encoding="utf-8")
+    css = (WEB_ROOT / "static" / "css" / "app.css").read_text(encoding="utf-8")
+    assert 'class="control-strip"' in html
+    assert "workModeToggle" in html
+    # Capsule must clip children so end chips don't poke past the curve.
+    idx = css.find(".control-strip {")
+    assert idx >= 0
+    chunk = css[idx : idx + 420]
+    assert "overflow: hidden" in chunk
+    assert "border-radius: 999px" in chunk
