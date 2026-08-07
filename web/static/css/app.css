@@ -68,6 +68,11 @@ html[data-theme="dark"] {
 
 * { box-sizing: border-box; }
 
+html {
+  --ui-text-scale: 1;
+  font-size: calc(100% * var(--ui-text-scale));
+}
+
 html, body {
   margin: 0;
   min-height: 100%;
@@ -2514,21 +2519,26 @@ html[data-theme="dark"] .settings-form-modern select {
 
 .pie-chart {
   margin: 10px 0 16px;
+  --chart-scale: 1;
 }
 
 .pie-layout {
   display: grid;
-  grid-template-columns: 240px minmax(0, 1fr);
+  grid-template-columns: minmax(220px, calc(240px * var(--chart-scale, 1))) minmax(0, 1fr);
   gap: 22px;
   align-items: center;
 }
 
 .donut-wrap {
   position: relative;
-  width: 220px;
-  height: 220px;
+  --chart-scale: 1;
+  width: calc(220px * var(--chart-scale, 1));
+  height: calc(220px * var(--chart-scale, 1));
   margin: 0 auto;
-  transition: transform 0.35s cubic-bezier(0.22, 1, 0.36, 1);
+  transition:
+    transform 0.35s cubic-bezier(0.22, 1, 0.36, 1),
+    width 0.12s ease,
+    height 0.12s ease;
 }
 
 .donut-wrap:hover {
@@ -2537,9 +2547,21 @@ html[data-theme="dark"] .settings-form-modern select {
 
 .donut-svg {
   display: block;
-  width: 220px;
-  height: 220px;
+  width: 100%;
+  height: 100%;
   overflow: visible;
+}
+
+.hours-line,
+.prod-days-chart,
+.gantt-wrap,
+.pulse-proj-donut {
+  --chart-scale: 1;
+  zoom: var(--chart-scale, 1);
+}
+
+.chart-zoomable {
+  touch-action: manipulation;
 }
 
 .donut-track {
@@ -3041,10 +3063,13 @@ html[data-theme="dark"] .settings-form-modern select {
     grid-template-columns: 1fr;
     justify-items: center;
   }
-  .donut-wrap,
+  .donut-wrap {
+    width: calc(200px * var(--chart-scale, 1));
+    height: calc(200px * var(--chart-scale, 1));
+  }
   .donut-svg {
-    width: 200px;
-    height: 200px;
+    width: 100%;
+    height: 100%;
   }
   .kind-row {
     grid-template-columns: 90px 1fr 72px;

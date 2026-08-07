@@ -9,6 +9,171 @@ const fmtDur = (sec) => {
   return "0с";
 };
 
+const UI_TEXT_SCALE_KEY = "deskline_ui_text_scale";
+const CHART_SCALE_KEY = "deskline_chart_scales";
+const TEXT_SCALE_MIN = 0.85;
+const TEXT_SCALE_MAX = 1.45;
+const CHART_SCALE_MIN = 0.7;
+const CHART_SCALE_MAX = 1.8;
+const ZOOM_STEP = 0.05;
+
+function clampZoom(value, min, max) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return 1;
+  return Math.min(max, Math.max(min, Math.round(n * 100) / 100));
+}
+
+function getUiTextScale() {
+  try {
+    return clampZoom(localStorage.getItem(UI_TEXT_SCALE_KEY) || "1", TEXT_SCALE_MIN, TEXT_SCALE_MAX);
+  } catch (_) {
+    return 1;
+  }
+}
+
+function setUiTextScale(scale, { persist = true } = {}) {
+  const next = clampZoom(scale, TEXT_SCALE_MIN, TEXT_SCALE_MAX);
+  document.documentElement.style.setProperty("--ui-text-scale", String(next));
+  if (persist) {
+    try {
+      localStorage.setItem(UI_TEXT_SCALE_KEY, String(next));
+    } catch (_) {}
+  }
+  return next;
+}
+
+function readChartScales() {
+  try {
+    const raw = JSON.parse(localStorage.getItem(CHART_SCALE_KEY) || "{}");
+    return raw && typeof raw === "object" ? raw : {};
+  } catch (_) {
+    return {};
+  }
+}
+
+function chartZoomKey(el) {
+  if (!el) return "chart";
+  if (el.id) return el.id;
+  const pie = el.closest?.(".pie-chart");
+  if (pie?.id) return pie.id;
+  const card = el.closest?.(".chart-card");
+  if (card) {
+    const titled = card.querySelector("h3, .subhead");
+    if (titled?.textContent) return `card:${titled.textContent.trim()}`;
+  }
+  return el.className || "chart";
+}
+
+function findChartZoomHost(target) {
+  if (!target || !target.closest) return null;
+  return target.closest(
+    ".pie-chart, .donut-wrap, .pulse-proj-donut, .hours-line, .prod-days-chart, .gantt-wrap"
+  );
+}
+
+function applyChartScale(host, scale, { persist = true } = {}) {
+  if (!host) return 1;
+  const next = clampZoom(scale, CHART_SCALE_MIN, CHART_SCALE_MAX);
+  const pie = host.closest?.(".pie-chart") || (host.classList?.contains("pie-chart") ? host : null);
+  const wrap = host.classList?.contains("donut-wrap")
+    ? host
+    : host.querySelector?.(".donut-wrap");
+  if (pie) pie.style.setProperty("--chart-scale", String(next));
+  if (wrap) wrap.style.setProperty("--chart-scale", String(next));
+  if (!wrap && !pie) {
+    host.style.setProperty("--chart-scale", String(next));
+    host.style.zoom = String(next);
+  }
+  host.classList.add("chart-zoomable");
+  if (persist) {
+    const map = readChartScales();
+    map[chartZoomKey(pie || host)] = next;
+    try {
+      localStorage.setItem(CHART_SCALE_KEY, JSON.stringify(map));
+    } catch (_) {}
+  }
+  return next;
+}
+
+function restoreChartScales() {
+  const map = readChartScales();
+  Object.entries(map).forEach(([key, scale]) => {
+    let host = null;
+    if (key.startsWith("card:")) {
+      const title = key.slice(5);
+      host = [...document.querySelectorAll(".chart-card")].find(
+        (card) => (card.querySelector("h3, .subhead")?.textContent || "").trim() === title
+      )?.querySelector(".pie-chart, .donut-wrap");
+    } else {
+      host = document.getElementById(key);
+    }
+    if (host) applyChartScale(host, scale, { persist: false });
+  });
+}
+
+function wireZoomControls() {
+  if (document.documentElement.dataset.zoomWired === "1") return;
+  document.documentElement.dataset.zoomWired = "1";
+  setUiTextScale(getUiTextScale(), { persist: false });
+
+  document.addEventListener(
+    "wheel",
+    (ev) => {
+      if (!ev.ctrlKey) return;
+      ev.preventDefault();
+      const dir = ev.deltaY < 0 ? ZOOM_STEP : -ZOOM_STEP;
+      const chartHost = findChartZoomHost(ev.target);
+      if (chartHost) {
+        const pie = chartHost.closest(".pie-chart") || chartHost;
+        const current = Number.parseFloat(
+          getComputedStyle(pie).getPropertyValue("--chart-scale") ||
+            chartHost.style.zoom ||
+            "1"
+        );
+        applyChartScale(chartHost, (Number.isFinite(current) ? current : 1) + dir);
+        return;
+      }
+      setUiTextScale(getUiTextScale() + dir);
+    },
+    { passive: false }
+  );
+
+  document.addEventListener("keydown", (ev) => {
+    if (!ev.ctrlKey) return;
+    const key = ev.key;
+    if (key !== "0" && key !== "=" && key !== "+" && key !== "-" && key !== "_") return;
+    const chartHost = findChartZoomHost(document.activeElement) || findChartZoomHost(ev.target);
+    if (key === "0") {
+      ev.preventDefault();
+      if (chartHost) applyChartScale(chartHost, 1);
+      else setUiTextScale(1);
+      return;
+    }
+    if (key === "=" || key === "+") {
+      ev.preventDefault();
+      if (chartHost) {
+        const pie = chartHost.closest(".pie-chart") || chartHost;
+        const current = Number.parseFloat(getComputedStyle(pie).getPropertyValue("--chart-scale") || "1");
+        applyChartScale(chartHost, (Number.isFinite(current) ? current : 1) + ZOOM_STEP);
+      } else setUiTextScale(getUiTextScale() + ZOOM_STEP);
+      return;
+    }
+    if (key === "-" || key === "_") {
+      ev.preventDefault();
+      if (chartHost) {
+        const pie = chartHost.closest(".pie-chart") || chartHost;
+        const current = Number.parseFloat(getComputedStyle(pie).getPropertyValue("--chart-scale") || "1");
+        applyChartScale(chartHost, (Number.isFinite(current) ? current : 1) - ZOOM_STEP);
+      } else setUiTextScale(getUiTextScale() - ZOOM_STEP);
+    }
+  });
+}
+
+// Restore text zoom before first paint of dynamic content.
+try {
+  setUiTextScale(getUiTextScale(), { persist: false });
+} catch (_) {}
+
 const fmtBytes = (n) => {
   n = Math.max(0, Number(n) || 0);
   if (n < 1024) return `${n} Б`;
@@ -741,6 +906,13 @@ function renderPieChart(el, slices, total, emptyText) {
     </ul>
   </div>`;
   wireDonutHover(el);
+  const savedScale = Number.parseFloat(getComputedStyle(el).getPropertyValue("--chart-scale") || "1");
+  if (Number.isFinite(savedScale) && savedScale !== 1) {
+    applyChartScale(el, savedScale, { persist: false });
+  } else {
+    const wrap = el.querySelector(".donut-wrap");
+    if (wrap) wrap.style.setProperty("--chart-scale", getComputedStyle(el).getPropertyValue("--chart-scale").trim() || "1");
+  }
 }
 
 function categoryPieSlices(byCategory) {
@@ -2835,6 +3007,8 @@ function wireGroupedLists() {
 function wireUi() {
   wireSettingsSearch();
   wireThemeToggle();
+  wireZoomControls();
+  restoreChartScales();
   wireGroupedLists();
   document.querySelectorAll(".tab").forEach((tab) => {
     tab.setAttribute("role", "tab");
