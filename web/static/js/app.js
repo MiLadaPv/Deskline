@@ -515,9 +515,125 @@ function listStructure(rows) {
     .join(";");
 }
 
+
+/** @type {Record<string, string>} last skeleton context per panel */
+const skelContexts = {};
+
+function skelLine(width = "80%", delay = 0) {
+  return `<span class="skel-line shimmer" style="width:${width};animation-delay:${delay}s"></span>`;
+}
+
+function showSkeleton(el, kind, count = 6) {
+  if (!el) return;
+  el.setAttribute("aria-busy", "true");
+  el.classList.add("is-skel");
+  let html = "";
+  if (kind === "kpi") {
+    const n = count || 5;
+    html = Array.from({ length: n }, (_, i) => {
+      const d = i * 0.05;
+      return `<article class="pulse-ov-card skel-block" aria-hidden="true">
+        ${skelLine("44%", d)}
+        ${skelLine("62%", d + 0.04)}
+        <span class="skel-meter shimmer" style="animation-delay:${d + 0.08}s"></span>
+      </article>`;
+    }).join("");
+  } else if (kind === "chart") {
+    html = `<div class="skel-chart shimmer" aria-hidden="true"></div>`;
+  } else if (kind === "bars") {
+    const n = count || 7;
+    html = `<div class="skel-bars" aria-hidden="true">${Array.from({ length: n }, (_, i) => {
+      const h = 28 + ((i * 19) % 58);
+      return `<div class="skel-bar-col"><div class="skel-bar shimmer" style="height:${h}%;animation-delay:${i * 0.06}s"></div></div>`;
+    }).join("")}</div>`;
+  } else if (kind === "list") {
+    const tag = el.tagName === "OL" || el.tagName === "UL" ? "li" : "div";
+    html = Array.from({ length: count || 6 }, (_, i) => {
+      const d = i * 0.05;
+      return `<${tag} class="skel-list-row" aria-hidden="true">
+        <span class="skel-avatar shimmer" style="animation-delay:${d}s"></span>
+        <div class="skel-list-copy">${skelLine("72%", d)}${skelLine("42%", d + 0.05)}</div>
+        <span class="skel-meta shimmer" style="animation-delay:${d + 0.08}s"></span>
+      </${tag}>`;
+    }).join("");
+  } else if (kind === "pie") {
+    html = `<div class="skel-pie-layout" aria-hidden="true">
+      <div class="skel-pie shimmer"></div>
+      <div class="skel-pie-leg">${skelLine("64%", 0)}${skelLine("52%", 0.05)}${skelLine("40%", 0.1)}</div>
+    </div>`;
+  } else if (kind === "donut") {
+    html = `<div class="skel-donut-layout" aria-hidden="true">
+      <div class="skel-donut shimmer"></div>
+      <div class="skel-pie-leg">${skelLine("70%", 0)}${skelLine("55%", 0.05)}${skelLine("45%", 0.1)}</div>
+    </div>`;
+  } else if (kind === "gantt") {
+    html = `<div class="skel-gantt" aria-hidden="true">
+      <div class="skel-gantt-track shimmer" style="width:92%"></div>
+      <div class="skel-gantt-track shimmer" style="width:74%;animation-delay:.08s"></div>
+      <div class="skel-gantt-track shimmer" style="width:58%;animation-delay:.16s"></div>
+    </div>`;
+  } else if (kind === "projects") {
+    html = Array.from({ length: count || 4 }, (_, i) => {
+      const d = i * 0.06;
+      return `<div class="skel-project" aria-hidden="true">${skelLine("48%", d)}${skelLine("88%", d + 0.04)}${skelLine("66%", d + 0.08)}</div>`;
+    }).join("");
+  } else if (kind === "rating") {
+    html = Array.from({ length: count || 5 }, (_, i) => {
+      const d = i * 0.05;
+      return `<div class="skel-rating-row" aria-hidden="true">
+        <span class="skel-avatar shimmer" style="animation-delay:${d}s"></span>
+        <div>
+          ${skelLine("55%", d)}
+          ${skelLine("36%", d + 0.04)}
+          <div class="skel-rating-btns">
+            <span class="skel-rating-btn shimmer" style="animation-delay:${d + 0.06}s"></span>
+            <span class="skel-rating-btn shimmer" style="animation-delay:${d + 0.1}s"></span>
+            <span class="skel-rating-btn shimmer" style="animation-delay:${d + 0.14}s"></span>
+            <span class="skel-rating-btn shimmer" style="animation-delay:${d + 0.18}s"></span>
+          </div>
+        </div>
+      </div>`;
+    }).join("");
+  } else if (kind === "shots") {
+    html = Array.from({ length: count || 8 }, (_, i) => {
+      const delay = (i % 4) * 0.08;
+      return `<div class="shot shot-skel" aria-hidden="true">
+        <div class="shot-skel-media shimmer" style="animation-delay:${delay}s"></div>
+        <div class="shot-skel-cap">
+          <span class="shot-skel-line shimmer" style="animation-delay:${delay + 0.04}s"></span>
+          <span class="shot-skel-line shot-skel-line-short shimmer" style="animation-delay:${delay + 0.08}s"></span>
+        </div>
+      </div>`;
+    }).join("");
+  } else {
+    html = `<div class="skel-chart shimmer" aria-hidden="true"></div>`;
+  }
+  el.innerHTML = html;
+}
+
+function markSkelContext(key, ctx) {
+  skelContexts[key] = ctx;
+}
+
+function clearSkel(el) {
+  if (!el) return;
+  el.classList.remove("is-skel");
+  el.removeAttribute("aria-busy");
+}
+
+function needsSkeleton(el, stateKey, contextKey, { force = false } = {}) {
+  if (force) return true;
+  if (!el) return false;
+  if (el.classList.contains("is-skel")) return false;
+  if (!contextKey) return !el.childElementCount || !skelContexts[stateKey];
+  if (skelContexts[stateKey] !== contextKey) return true;
+  return !el.childElementCount;
+}
+
 function renderKpis(summary, team) {
   const el = document.getElementById("kpiStrip");
   if (!el) return;
+  clearSkel(el);
   const total = summary.total_sec || 0;
   const by = summary.by_category || {};
   const productive = by.productive || 0;
@@ -555,6 +671,7 @@ function renderKpis(summary, team) {
 function renderTopProjectsPulse(summary) {
   const el = document.getElementById("topProjectsPulse");
   if (!el) return;
+  clearSkel(el);
   const byProj = summary.by_project || [];
   const named = byProj
     .map((row) => {
@@ -610,6 +727,8 @@ function renderQuietPeople(team) {
   const gauges = document.getElementById("teamGauges");
   const title = document.getElementById("quietTitle");
   if (!quiet || !gauges) return;
+  clearSkel(quiet);
+  clearSkel(gauges);
   const idlePeople = (team || []).filter((m) => !(m.total_sec > 60));
   const active = (team || []).filter((m) => m.total_sec > 60);
   if (companyMode && idlePeople.length) {
@@ -881,12 +1000,14 @@ function pieSignature(slices, total, emptyText) {
 
 function renderPieChart(el, slices, total, emptyText) {
   if (!el) return;
+  const wasSkel = el.classList.contains("is-skel");
+  clearSkel(el);
   const usable = (slices || [])
     .filter((s) => (s.sec || 0) > 0)
     .slice()
     .sort((a, b) => (b.sec || 0) - (a.sec || 0));
   const sig = pieSignature(usable, total, emptyText);
-  if (el.dataset.pieSig === sig) return;
+  if (el.dataset.pieSig === sig && !wasSkel) return;
   const animateEnter = !el.dataset.pieSig;
   el.dataset.pieSig = sig;
 
@@ -1267,6 +1388,7 @@ function hoursPolyline(pts) {
 function renderHoursChart(trends) {
   const el = document.getElementById("hoursChart");
   if (!el) return;
+  clearSkel(el);
   const rows = trends || [];
   const aside = document.getElementById("hoursTrendAside");
   if (aside) aside.textContent = `${rows.length || 0} дн.`;
@@ -1373,6 +1495,7 @@ function renderHoursChart(trends) {
 function renderProdDaysChart(trends) {
   const el = document.getElementById("prodDaysChart");
   if (!el) return;
+  clearSkel(el);
   const raw = trends || [];
   const { rows, unit, label } = aggregateFocusRows(raw);
   const rangeEl = document.getElementById("prodDaysRange");
@@ -1422,10 +1545,31 @@ function renderProdDaysChart(trends) {
     .join("");
 }
 
-async function refreshTrends() {
-  const trends = await api(`/api/trends${trendsQuery()}`);
-  renderHoursChart(trends);
-  renderProdDaysChart(trends);
+async function refreshTrends({ skeleton = false } = {}) {
+  const hoursEl = document.getElementById("hoursChart");
+  const barsEl = document.getElementById("prodDaysChart");
+  const ctx = `trends|${trendsPeriod}|${trendsCustomFrom || ""}|${trendsCustomTo || ""}|${filterProjectId || ""}|${filterEmployeeId || ""}`;
+  const show =
+    skeleton ||
+    needsSkeleton(hoursEl, "trends", ctx, { force: skeleton }) ||
+    needsSkeleton(barsEl, "trends", ctx, { force: skeleton });
+  if (show) {
+    showSkeleton(hoursEl, "chart");
+    showSkeleton(barsEl, "bars", 7);
+  }
+  try {
+    const trends = await api(`/api/trends${trendsQuery()}`);
+    renderHoursChart(trends);
+    renderProdDaysChart(trends);
+    markSkelContext("trends", ctx);
+  } catch (err) {
+    if (hoursEl?.classList.contains("is-skel")) {
+      hoursEl.classList.remove("is-skel");
+      hoursEl.removeAttribute("aria-busy");
+      hoursEl.innerHTML = `<p class="hint">Не удалось загрузить тренд.</p>`;
+    }
+    throw err;
+  }
 }
 
 function categoryClass(cat) {
@@ -1449,7 +1593,7 @@ function setDayGanttMode(mode) {
   } catch (_) {}
   syncDayGanttModeButtons();
   lastDayViewKey = "";
-  refreshTimeline().catch(() => {});
+  refreshTimeline({ skeleton: true }).catch(() => {});
 }
 
 function sessionRowKey(startedAt) {
@@ -1473,6 +1617,7 @@ function highlightTimelineSession(startedAt) {
 function renderDayGantt(rows) {
   const el = document.getElementById("dayGantt");
   if (!el) return;
+  clearSkel(el);
   const { dayStartMs, dayEndMs } = dayBoundsFromRows(rows, selectedDayIso);
   const title = document.getElementById("dayPictureTitle");
   const hint = document.getElementById("dayPictureHint");
@@ -1618,6 +1763,7 @@ function filterGroupedRows(rows, query) {
 
 function renderGroupedList(el, rows, emptyText, opts = {}) {
   if (!el) return;
+  clearSkel(el);
   const {
     searchInput = null,
     moreBtn = null,
@@ -2077,6 +2223,7 @@ function renderProjectTasksHtml(row, settings, summary) {
 async function renderProjectsWorkspace(projects, settings, summary) {
   const list = document.getElementById("projectsList");
   if (!list) return;
+  clearSkel(list);
 
   if (selectedProjectId && !projects.some((p) => String(p.id) === selectedProjectId)) {
     selectedProjectId = "";
@@ -2152,7 +2299,11 @@ async function renderProjectsWorkspace(projects, settings, summary) {
   };
 }
 
-async function refreshProjects() {
+async function refreshProjects({ skeleton = false } = {}) {
+  const list = document.getElementById("projectsList");
+  const ctx = `projects|${projectsReportPeriod}`;
+  const show = skeleton || needsSkeleton(list, "projects", ctx, { force: skeleton });
+  if (show) showSkeleton(list, "projects", 4);
   const q = periodQuery(projectsReportPeriod);
   const [projectsRes, summaryRes, settingsRes] = await Promise.allSettled([
     api("/api/projects"),
@@ -2188,9 +2339,28 @@ async function refreshProjects() {
   }
 
   await renderProjectsWorkspace(projects, settings, summary);
+  markSkelContext("projects", ctx);
 }
 
-async function refreshSummary() {
+async function refreshSummary({ skeleton = false } = {}) {
+  const kpi = document.getElementById("kpiStrip");
+  const proj = document.getElementById("topProjectsPulse");
+  const quiet = document.getElementById("quietList");
+  const gauges = document.getElementById("teamGauges");
+  const ctx = `summary|${filterProjectId || ""}|${filterEmployeeId || ""}`;
+  const show =
+    skeleton ||
+    needsSkeleton(kpi, "summary", ctx, { force: skeleton }) ||
+    needsSkeleton(proj, "summary-proj", ctx, { force: skeleton });
+  if (show) {
+    lastSummaryKey = "";
+    showSkeleton(kpi, "kpi", 5);
+    showSkeleton(proj, "donut");
+    if (quiet) showSkeleton(quiet, "list", 4);
+    if (gauges) showSkeleton(gauges, "list", 3);
+    showSkeleton(document.getElementById("hoursChart"), "chart");
+    showSkeleton(document.getElementById("prodDaysChart"), "bars", 7);
+  }
   const q = summaryQuery();
   const { from, to } = periodBounds("today");
   const teamQ = `from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}${filterProjectId ? `&project_id=${encodeURIComponent(filterProjectId)}` : ""}`;
@@ -2199,7 +2369,10 @@ async function refreshSummary() {
     api(`/api/company/team?${teamQ}`, { quiet402: true }).catch(() => []),
   ]);
   const key = summaryKey(summary) + `|p:${filterProjectId}|e:${filterEmployeeId}`;
-  if (key === lastSummaryKey) return;
+  if (key === lastSummaryKey && !show) {
+    refreshTrends({ skeleton: false }).catch(() => {});
+    return;
+  }
   lastSummaryKey = key;
 
   const focusText = `${summary.focus_pct}%`;
@@ -2224,7 +2397,9 @@ async function refreshSummary() {
   renderQuietPeople(team);
   renderKpis(summary, team);
   renderTopProjectsPulse(summary);
-  refreshTrends().catch(() => {});
+  markSkelContext("summary", ctx);
+  markSkelContext("summary-proj", ctx);
+  refreshTrends({ skeleton: show }).catch(() => {});
 }
 
 function pulseMetric(el) {
@@ -2235,7 +2410,28 @@ function pulseMetric(el) {
   window.setTimeout(() => el.classList.remove("is-tick"), 520);
 }
 
-async function refreshUsageReport() {
+async function refreshUsageReport({ skeleton = false } = {}) {
+  const catPie = document.getElementById("usageCatPie");
+  const kindPie = document.getElementById("usageKindPie");
+  const acts = document.getElementById("activitiesList");
+  const apps = document.getElementById("appsList");
+  const sites = document.getElementById("sitesList");
+  const ctx = `usage|${usagePeriod}|${filterProjectId || ""}|${filterTaskId || ""}|${filterEmployeeId || ""}`;
+  const show =
+    skeleton ||
+    needsSkeleton(catPie, "usage", ctx, { force: skeleton }) ||
+    needsSkeleton(acts, "usage-list", ctx, { force: skeleton });
+  if (show) {
+    showSkeleton(catPie, "pie");
+    showSkeleton(kindPie, "pie");
+    showSkeleton(acts, "list", 7);
+    showSkeleton(apps, "list", 6);
+    showSkeleton(sites, "list", 5);
+    if (catPie) delete catPie.dataset.pieSig;
+    if (kindPie) delete kindPie.dataset.pieSig;
+    const line = document.getElementById("usageTotalLine");
+    if (line) line.textContent = "Загрузка…";
+  }
   const q = periodQuery(usagePeriod, filterProjectId, filterTaskId, filterEmployeeId);
   const summary = await api(`/api/summary?${q}`);
   const total = summary.total_sec || 0;
@@ -2289,6 +2485,8 @@ async function refreshUsageReport() {
     "site",
     "Сайтов пока нет"
   );
+  markSkelContext("usage", ctx);
+  markSkelContext("usage-list", ctx);
 }
 
 let meetingsPeriod = "today";
@@ -2359,10 +2557,28 @@ function wireMeetingChannelPeers(listEl) {
   });
 }
 
-async function refreshMeetings() {
+async function refreshMeetings({ skeleton = false } = {}) {
   const periodSel = document.getElementById("meetingsPeriod");
   if (periodSel) meetingsPeriod = periodSel.value || "today";
   const emp = filterEmployeeId ? `&employee_id=${encodeURIComponent(filterEmployeeId)}` : "";
+  const kpi = document.getElementById("meetingsKpi");
+  const top = document.getElementById("meetingsTopList");
+  const sess = document.getElementById("meetingsSessions");
+  const emailList = document.getElementById("meetingsEmailList");
+  const emailSess = document.getElementById("meetingsEmailSessions");
+  const ctx = `meetings|${meetingsPeriod}|${filterEmployeeId || ""}`;
+  const show =
+    skeleton ||
+    needsSkeleton(kpi, "meetings", ctx, { force: skeleton }) ||
+    needsSkeleton(top, "meetings-top", ctx, { force: skeleton });
+  if (show) {
+    lastMeetingsKey = "";
+    showSkeleton(kpi, "kpi", 4);
+    showSkeleton(top, "list", 5);
+    showSkeleton(sess, "list", 6);
+    showSkeleton(emailList, "list", 4);
+    showSkeleton(emailSess, "list", 4);
+  }
   let report;
   try {
     report = await api(`/api/meetings?period=${encodeURIComponent(meetingsPeriod)}${emp}`, {
@@ -2372,17 +2588,12 @@ async function refreshMeetings() {
     if (err?.code === "history_limit" || err?.code === "pro_required") {
       const note = document.getElementById("meetingsNote");
       if (note) note.textContent = "История дальше Free-лимита — доступно в Pro.";
-      const kpi = document.getElementById("meetingsKpi");
       if (kpi) kpi.innerHTML = "";
-      const top = document.getElementById("meetingsTopList");
       if (top) {
         top.innerHTML = `<li class="empty-state"><span class="rank-icon">•</span><span class="rank-name">Нужен Pro для этого периода</span><span class="rank-meta">—</span></li>`;
       }
-      const sess = document.getElementById("meetingsSessions");
       if (sess) sess.innerHTML = "";
-      const emailList = document.getElementById("meetingsEmailList");
       if (emailList) emailList.innerHTML = "";
-      const emailSess = document.getElementById("meetingsEmailSessions");
       if (emailSess) emailSess.innerHTML = "";
       return;
     }
@@ -2398,14 +2609,14 @@ async function refreshMeetings() {
     (report.sessions || []).length,
     (report.email_top || []).length,
   ].join("|");
-  if (key === lastMeetingsKey) return;
+  if (key === lastMeetingsKey && !show) return;
   lastMeetingsKey = key;
 
   const note = document.getElementById("meetingsNote");
   if (note) note.textContent = report.note || "";
 
-  const kpi = document.getElementById("meetingsKpi");
   if (kpi) {
+    clearSkel(kpi);
     const total = report.total_sec || 0;
     const share = report.share_pct ?? 0;
     const channels = (report.top || []).length;
@@ -2432,6 +2643,7 @@ async function refreshMeetings() {
 
   const topEl = document.getElementById("meetingsTopList");
   if (topEl) {
+    clearSkel(topEl);
     const rows = report.top || [];
     if (!rows.length) {
       topEl.innerHTML = `<li class="empty-state"><span class="rank-icon">•</span><span class="rank-name">Пока нет Телемоста, Мессенджера, Teams…</span><span class="rank-meta">—</span></li>`;
@@ -2524,10 +2736,13 @@ async function refreshMeetings() {
     }
     wireMeetingExpand(emailSessEl);
   }
+  markSkelContext("meetings", ctx);
+  markSkelContext("meetings-top", ctx);
 }
 
 function renderUsageList(el, rows, total, kind, emptyText) {
   if (!el) return;
+  clearSkel(el);
   const sliced = (rows || []).slice(0, 20);
   if (!sliced.length) {
     el.innerHTML = `<li class="empty-state"><span class="rank-icon" aria-hidden="true">•</span><span class="rank-name">${emptyText}</span><span class="rank-meta">—</span></li>`;
@@ -2978,24 +3193,14 @@ function renderShotsSkeleton(count = 8) {
     meta.textContent = "Загрузка…";
   }
   lightboxItems = [];
-  grid.setAttribute("aria-busy", "true");
-  grid.innerHTML = Array.from({ length: count }, (_, i) => {
-    const delay = (i % 4) * 0.08;
-    return `<div class="shot shot-skel" aria-hidden="true">
-      <div class="shot-skel-media shimmer" style="animation-delay:${delay}s"></div>
-      <div class="shot-skel-cap">
-        <span class="shot-skel-line shimmer" style="animation-delay:${delay + 0.04}s"></span>
-        <span class="shot-skel-line shot-skel-line-short shimmer" style="animation-delay:${delay + 0.08}s"></span>
-      </div>
-    </div>`;
-  }).join("");
+  showSkeleton(grid, "shots", count);
 }
 
 function renderShotsGrid() {
   const grid = document.getElementById("shotsGrid");
   const meta = document.getElementById("shotsFilterMeta");
   if (!grid) return;
-  grid.removeAttribute("aria-busy");
+  clearSkel(grid);
   const rows = filteredShotsRows();
   const details = !!shotsShowDetails;
   lightboxItems = rows.map((r) => ({
@@ -3075,12 +3280,13 @@ async function refreshShots({ skeleton = false } = {}) {
 async function refreshCurrentView({ quiet = false } = {}) {
   const tab = currentTabName();
   try {
-    if (tab === "shots") await refreshShots();
-    else if (tab === "today") await refreshSummary();
-    else if (tab === "day") await refreshTimeline();
-    else if (tab === "usage") await refreshUsageReport();
-    else if (tab === "projects") await refreshProjects();
-    else if (tab === "ratings") await refreshRatings();
+    if (tab === "shots") await refreshShots({ skeleton: true });
+    else if (tab === "today") await refreshSummary({ skeleton: true });
+    else if (tab === "day") await refreshTimeline({ skeleton: true });
+    else if (tab === "usage") await refreshUsageReport({ skeleton: true });
+    else if (tab === "projects") await refreshProjects({ skeleton: true });
+    else if (tab === "ratings") await refreshRatings({ skeleton: true });
+    else if (tab === "meetings") await refreshMeetings({ skeleton: true });
     else if (tab === "settings") await loadSettings();
     if (!quiet) showToast("Обновлено", "ok");
   } catch (err) {
@@ -3364,9 +3570,23 @@ function compactFeedRows(rows, minSec = 60, maxGapSec = 45) {
   return out;
 }
 
-async function refreshTimeline() {
+async function refreshTimeline({ skeleton = false } = {}) {
   ensureSelectedDay();
   renderDayWeekStrip();
+  const gantt = document.getElementById("dayGantt");
+  const list = document.getElementById("timelineList");
+  const ctx = `day|${selectedDayIso}|${filterEmployeeId || ""}|${dayGanttMode}`;
+  const show =
+    skeleton ||
+    needsSkeleton(gantt, "day-gantt", ctx, { force: skeleton }) ||
+    needsSkeleton(list, "day-list", ctx, { force: skeleton });
+  if (show) {
+    lastDayViewKey = "";
+    showSkeleton(gantt, "gantt");
+    showSkeleton(list, "list", 8);
+    const line = document.getElementById("daySummaryLine");
+    if (line) line.textContent = "Загрузка…";
+  }
   try {
     const { from, to } = dayQueryBounds(selectedDayIso);
     const emp = filterEmployeeId ? `&employee_id=${encodeURIComponent(filterEmployeeId)}` : "";
@@ -3400,7 +3620,7 @@ async function refreshTimeline() {
       dayTimelineSignature(rows),
       `feed:${feedRows.length}`,
     ].join("|");
-    if (viewKey === lastDayViewKey) return;
+    if (viewKey === lastDayViewKey && !show) return;
     lastDayViewKey = viewKey;
 
     const el = document.getElementById("timelineList");
@@ -3410,6 +3630,8 @@ async function refreshTimeline() {
       if (el) {
         el.innerHTML = `<li><span class="timeline-time">—</span><span class="rank-icon">•</span><span class="rank-name">История дальше Free-лимита — доступно в Pro</span><span class="rank-meta"></span></li>`;
       }
+      markSkelContext("day-gantt", ctx);
+      markSkelContext("day-list", ctx);
       return;
     }
 
@@ -3417,9 +3639,15 @@ async function refreshTimeline() {
     renderDayGantt(rows);
     renderDaySummaryLine(summary);
 
-    if (!el) return;
+    if (!el) {
+      markSkelContext("day-gantt", ctx);
+      markSkelContext("day-list", ctx);
+      return;
+    }
     if (!feedRows.length) {
       el.innerHTML = `<li><span class="timeline-time">—</span><span class="rank-icon">•</span><span class="rank-name">Пока нет сессий</span><span class="rank-meta"></span></li>`;
+      markSkelContext("day-gantt", ctx);
+      markSkelContext("day-list", ctx);
       return;
     }
     const listRows = [...feedRows].sort(
@@ -3451,18 +3679,19 @@ async function refreshTimeline() {
         </li>`;
       })
       .join("");
+    markSkelContext("day-gantt", ctx);
+    markSkelContext("day-list", ctx);
   } catch (err) {
     console.error(err);
     showToast(err?.message || "Не удалось загрузить день", "error");
   }
 }
-
 function selectDay(iso) {
   const today = localDayIso();
   let next = iso || today;
   if (next > today) next = today;
   selectedDayIso = next;
-  return refreshTimeline();
+  return refreshTimeline({ skeleton: true });
 }
 
 function shiftSelectedWeek(deltaDays) {
@@ -3471,14 +3700,20 @@ function shiftSelectedWeek(deltaDays) {
   let next = shiftDayIso(selectedDayIso, deltaDays);
   if (next > today) next = today;
   selectedDayIso = next;
-  return refreshTimeline();
+  return refreshTimeline({ skeleton: true });
 }
 
-async function refreshRatings() {
-  const rows = await api("/api/ratings");
+async function refreshRatings({ skeleton = false } = {}) {
   const el = document.getElementById("ratingsList");
+  const ctx = "ratings|today";
+  const show = skeleton || needsSkeleton(el, "ratings", ctx, { force: skeleton });
+  if (show) showSkeleton(el, "rating", 5);
+  const rows = await api("/api/ratings");
+  if (!el) return;
+  clearSkel(el);
   if (!rows.length) {
     el.innerHTML = `<p class="hint">Сегодня ещё нет приложений и сайтов для оценки.</p>`;
+    markSkelContext("ratings", ctx);
     return;
   }
   el.innerHTML = rows
@@ -3503,6 +3738,7 @@ async function refreshRatings() {
       </div>`;
     })
     .join("");
+  markSkelContext("ratings", ctx);
 }
 
 function wireGroupedLists() {
@@ -3571,15 +3807,17 @@ function wireUi() {
     tab.setAttribute("role", "tab");
     tab.addEventListener("click", () => {
       setActiveTab(tab.dataset.tab);
-      if (tab.dataset.tab === "shots") refreshShots();
+      if (tab.dataset.tab === "shots") refreshShots({ skeleton: true });
       if (tab.dataset.tab === "settings") loadSettings();
       if (tab.dataset.tab === "day") {
         ensureSelectedDay();
-        refreshTimeline().catch(() => {});
+        refreshTimeline({ skeleton: true }).catch(() => {});
       }
-      if (tab.dataset.tab === "ratings") refreshRatings();
-      if (tab.dataset.tab === "projects") refreshProjects();
-      if (tab.dataset.tab === "usage") refreshUsageReport();
+      if (tab.dataset.tab === "today") refreshSummary({ skeleton: true }).catch(() => {});
+      if (tab.dataset.tab === "ratings") refreshRatings({ skeleton: true });
+      if (tab.dataset.tab === "projects") refreshProjects({ skeleton: true });
+      if (tab.dataset.tab === "usage") refreshUsageReport({ skeleton: true });
+      if (tab.dataset.tab === "meetings") refreshMeetings({ skeleton: true }).catch(() => {});
     });
   });
 
@@ -3634,17 +3872,19 @@ function wireUi() {
 
   window.addEventListener("hashchange", () => {
     const name = (location.hash || "#today").replace(/^#/, "") || "today";
-    const known = ["today", "day", "usage", "projects", "ratings", "shots", "settings"];
+    const known = ["today", "day", "usage", "projects", "ratings", "shots", "settings", "meetings"];
     if (!known.includes(name)) return;
     setActiveTab(name, { syncHash: false });
+    if (name === "today") refreshSummary({ skeleton: true }).catch(() => {});
     if (name === "day") {
       ensureSelectedDay();
-      refreshTimeline().catch(() => {});
+      refreshTimeline({ skeleton: true }).catch(() => {});
     }
-    if (name === "usage") refreshUsageReport().catch(() => {});
-    if (name === "projects") refreshProjects().catch(() => {});
-    if (name === "ratings") refreshRatings().catch(() => {});
-    if (name === "shots") refreshShots().catch(() => {});
+    if (name === "usage") refreshUsageReport({ skeleton: true }).catch(() => {});
+    if (name === "projects") refreshProjects({ skeleton: true }).catch(() => {});
+    if (name === "ratings") refreshRatings({ skeleton: true }).catch(() => {});
+    if (name === "shots") refreshShots({ skeleton: true }).catch(() => {});
+    if (name === "meetings") refreshMeetings({ skeleton: true }).catch(() => {});
     if (name === "settings") loadSettings().catch(() => {});
   });
 

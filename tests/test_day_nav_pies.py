@@ -150,3 +150,26 @@ def test_hours_chart_multi_series():
     assert 'class="hours-line-path is-total"' in js
     assert 'class="hours-line-path is-distracting"' in js
     assert "by_category?.productive" in js
+
+
+def test_shared_shimmer_loading_system():
+    from deskline.config import WEB_ROOT
+
+    css = (WEB_ROOT / "static" / "css" / "app.css").read_text(encoding="utf-8")
+    js = (WEB_ROOT / "static" / "js" / "app.js").read_text(encoding="utf-8")
+    assert "@keyframes deskline-shimmer" in css
+    assert ".skel-chart" in css
+    assert ".skel-bars" in css
+    assert ".skel-list-row" in css
+    assert ".skel-pie" in css
+    assert ".skel-gantt" in css
+    assert "function showSkeleton" in js
+    assert "function needsSkeleton" in js
+    assert 'showSkeleton(kpi, "kpi"' in js
+    assert 'showSkeleton(document.getElementById("hoursChart"), "chart"' in js
+    assert "refreshSummary({ skeleton: true })" in js
+    assert "refreshTimeline({ skeleton: true })" in js
+    assert "refreshUsageReport({ skeleton: true })" in js
+    assert "refreshProjects({ skeleton: true })" in js
+    assert "refreshRatings({ skeleton: true })" in js
+    assert "refreshMeetings({ skeleton: true })" in js
