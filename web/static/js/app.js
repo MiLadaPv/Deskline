@@ -476,6 +476,7 @@ function setActiveTab(name, { syncHash = true } = {}) {
   document.querySelectorAll(".panel").forEach((p) => {
     p.classList.toggle("active", p.id === `panel-${tab}`);
   });
+  syncNavMoreState(tab);
   if (aliases[name]) setUsageSlice(name);
   if (syncHash) {
     const next = `#${tab}`;
@@ -486,6 +487,55 @@ function setActiveTab(name, { syncHash = true } = {}) {
   if (tab === "shots") startShotsPolling();
   else stopShotsPolling();
   if (tab === "meetings") refreshMeetings().catch(() => {});
+}
+
+const NAV_MORE_TABS = {
+  meetings: "Звонки",
+  shots: "Скриншоты",
+  ratings: "Рейтинги",
+};
+
+function closeNavMore() {
+  const toggle = document.getElementById("navMoreToggle");
+  const menu = document.getElementById("navMoreMenu");
+  if (menu) menu.hidden = true;
+  if (toggle) toggle.setAttribute("aria-expanded", "false");
+}
+
+function syncNavMoreState(tab) {
+  const toggle = document.getElementById("navMoreToggle");
+  if (!toggle) return;
+  const label = NAV_MORE_TABS[tab];
+  const inMore = Boolean(label);
+  toggle.classList.toggle("is-active-parent", inMore);
+  toggle.innerHTML = inMore
+    ? `${escapeHtml(label)}<span class="nav-more-caret" aria-hidden="true">▾</span>`
+    : `Ещё<span class="nav-more-caret" aria-hidden="true">▾</span>`;
+  closeNavMore();
+}
+
+function wireNavMore() {
+  const wrap = document.getElementById("navMore");
+  const toggle = document.getElementById("navMoreToggle");
+  const menu = document.getElementById("navMoreMenu");
+  if (!wrap || !toggle || !menu || wrap.dataset.wired === "1") return;
+  wrap.dataset.wired = "1";
+
+  toggle.addEventListener("click", (ev) => {
+    ev.preventDefault();
+    ev.stopPropagation();
+    const open = menu.hidden;
+    menu.hidden = !open;
+    toggle.setAttribute("aria-expanded", open ? "true" : "false");
+  });
+
+  document.addEventListener("click", (ev) => {
+    if (!wrap.contains(ev.target)) closeNavMore();
+  });
+
+  document.addEventListener("keydown", (ev) => {
+    if (ev.key === "Escape") closeNavMore();
+  });
 }
 
 function setUsageSlice(slice) {
@@ -3797,6 +3847,7 @@ function wireUi() {
   wireSettingsSearch();
   wireThemeToggle();
   wireZoomControls();
+  wireNavMore();
   restoreChartScales();
   syncDayGanttModeButtons();
   document.querySelectorAll("[data-gantt-mode]").forEach((btn) => {

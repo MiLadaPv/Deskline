@@ -61,6 +61,21 @@ def test_index_tabs_have_distinct_roles():
     assert "По часам" not in html
     assert "app-nav-rail" in html
     assert 'data-tab="today"' in html
+    # Primary nav stays lean; rare sections live under «Ещё».
+    assert 'id="navMore"' in html
+    assert 'id="navMoreMenu"' in html
+    rail = html.split('class="app-nav-rail"', 1)[1].split("</nav>", 1)[0]
+    primary = rail.split('id="navMore"', 1)[0]
+    assert 'data-tab="today"' in primary
+    assert 'data-tab="day"' in primary
+    assert 'data-tab="usage"' in primary
+    assert 'data-tab="projects"' in primary
+    assert 'data-tab="meetings"' not in primary
+    assert 'data-tab="ratings"' not in primary
+    assert 'data-tab="shots"' not in primary
+    assert 'data-tab="meetings"' in rail
+    assert 'data-tab="shots"' in rail
+    assert 'data-tab="ratings"' in rail
 
 
 def test_day_feed_ux_contracts():

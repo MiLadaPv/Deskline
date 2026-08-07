@@ -68,16 +68,23 @@
 
   <nav class="tabs app-nav" role="tablist" aria-label="Разделы">
     <div class="app-nav-rail">
-      <button class="tab active" data-tab="today" type="button" title="Цифры, проекты и тренды">Обзор</button>
-      <button class="tab" data-tab="day" type="button" title="Хронология дня: лента и сессии">Лента</button>
-      <button class="tab" data-tab="usage" type="button" title="Состав времени и рейтинги">Где время</button>
-      <span class="app-nav-divider" aria-hidden="true"></span>
-      <button class="tab" data-tab="meetings" type="button" title="Звонки, мессенджеры и почта">Звонки</button>
-      <button class="tab" data-tab="projects" type="button">Проекты</button>
-      <button class="tab" data-tab="ratings" type="button">Рейтинги</button>
-      <button class="tab" data-tab="shots" type="button">Скриншоты</button>
+      <button class="tab active" data-tab="today" type="button" title="Сводка дня и тренды">Обзор</button>
+      <button class="tab" data-tab="day" type="button" title="Хронология и картина дня">Лента</button>
+      <button class="tab" data-tab="usage" type="button" title="Куда ушло время">Где время</button>
+      <button class="tab" data-tab="projects" type="button" title="Проекты и задачи">Проекты</button>
+      <div class="app-nav-more" id="navMore">
+        <button type="button" class="nav-more-toggle" id="navMoreToggle" aria-haspopup="menu" aria-expanded="false" aria-controls="navMoreMenu" title="Реже используемые разделы">
+          Ещё
+          <span class="nav-more-caret" aria-hidden="true">▾</span>
+        </button>
+        <div class="nav-more-menu" id="navMoreMenu" hidden role="menu" aria-label="Дополнительно">
+          <button class="tab nav-more-item" role="menuitem" data-tab="meetings" type="button" title="Звонки, мессенджеры и почта">Звонки</button>
+          <button class="tab nav-more-item" role="menuitem" data-tab="shots" type="button" title="Галерея скриншотов">Скриншоты</button>
+          <button class="tab nav-more-item" role="menuitem" data-tab="ratings" type="button" title="Оценки приложений и сайтов">Рейтинги</button>
+        </div>
+      </div>
       <span class="app-nav-divider app-nav-divider-end" aria-hidden="true"></span>
-      <button class="tab" data-tab="settings" type="button">Настройки</button>
+      <button class="tab" data-tab="settings" type="button" title="Параметры Deskline">Настройки</button>
     </div>
   </nav>
 
@@ -107,7 +114,7 @@
         <div class="pulse-actions pulse-actions-inline">
           <a class="pulse-link" href="#day" data-tab="day">Лента дня →</a>
           <a class="pulse-link" href="#usage" data-tab="usage">Состав времени →</a>
-          <a class="pulse-link" href="#meetings" data-tab="meetings">Звонки и встречи →</a>
+          <a class="pulse-link" href="#projects" data-tab="projects">Проекты →</a>
         </div>
 
         <div class="pulse-split">
@@ -215,7 +222,7 @@
       <div class="gantt-wrap" id="dayGantt"></div>
       <div class="day-sessions-head">
         <h3 class="subhead">Сессии</h3>
-        <p class="hint day-sessions-hint">Сверху свежие · короче 1 мин склеены с соседней</p>
+        <p class="hint day-sessions-hint">Сверху свежие · короче 1 мин склеены с соседней · <a class="pulse-link" href="#shots" data-tab="shots">скриншоты дня →</a></p>
       </div>
       <ol class="timeline" id="timelineList"></ol>
     </section>
@@ -273,6 +280,10 @@
       </div>
       <div class="usage-pane" id="usage-sites" data-usage-pane="sites" hidden>
         <ol class="rank-list" id="sitesList"></ol>
+      </div>
+      <div class="pulse-actions pulse-actions-inline">
+        <a class="pulse-link" href="#ratings" data-tab="ratings">Массовые рейтинги приложений →</a>
+        <a class="pulse-link" href="#meetings" data-tab="meetings">Звонки и почта →</a>
       </div>
     </section>
 
