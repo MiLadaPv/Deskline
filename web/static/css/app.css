@@ -4133,15 +4133,15 @@ html[data-theme="dark"] .google-btn {
 
 .timeline li.meeting-session {
   display: block;
-  padding: 10px 0;
+  padding: 6px 0;
   border-bottom: 1px solid var(--line);
 }
 
 .meeting-session-main {
   display: grid;
-  grid-template-columns: 4.5rem 32px minmax(0, 1fr) auto;
+  grid-template-columns: 3.6rem 28px minmax(0, 1fr) auto;
   align-items: center;
-  column-gap: 12px;
+  column-gap: 10px;
 }
 
 .meeting-session-text {
@@ -4149,7 +4149,24 @@ html[data-theme="dark"] .google-btn {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 8px 10px;
+  gap: 6px 8px;
+}
+
+.meetings-sessions-hint {
+  margin: 4px 0 0;
+  font-size: 0.78rem;
+}
+
+#meetingsSessions {
+  max-height: min(52vh, 420px);
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+#meetingsEmailSessions {
+  max-height: min(36vh, 280px);
+  overflow-y: auto;
+  padding-right: 4px;
 }
 
 .meeting-expand {

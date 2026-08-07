@@ -74,6 +74,34 @@ def test_meeting_context_from_title_strips_noise():
     )
 
 
+def test_compact_meeting_sessions_absorbs_messenger_flicker():
+    from deskline.meetings import compact_meeting_sessions
+
+    base = "2026-08-07T19:40:00+03:00"
+    rows = []
+    t = 0
+    for sec in (8, 13, 4, 37, 3, 7, 6, 120):
+        start_m = 40 + t // 60
+        start_s = t % 60
+        end = t + sec
+        end_m = 40 + end // 60
+        end_s = end % 60
+        rows.append(
+            {
+                "started_at": f"2026-08-07T19:{start_m:02d}:{start_s:02d}+03:00",
+                "ended_at": f"2026-08-07T19:{end_m:02d}:{end_s:02d}+03:00",
+                "sec": sec,
+                "name": "Яндекс Мессенджер",
+                "site": "messenger.yandex.ru",
+                "app_name": "msedge.exe",
+            }
+        )
+        t = end
+    compact = compact_meeting_sessions(rows, min_sec=60, max_gap_sec=180)
+    assert len(compact) <= 2
+    assert sum(r["sec"] for r in compact) == sum(r["sec"] for r in rows)
+
+
 def test_build_meetings_report_filters_and_totals():
     report = build_meetings_report(
         by_app=[

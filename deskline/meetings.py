@@ -3,9 +3,13 @@ Deskline tracks window focus, not true call-join state. Reports are labeled acco
 """
 
 from __future__ import annotations
+
 import re
+from datetime import datetime
 from typing import Any
+
 from deskline.classify import SITE_ACTIVITIES, clean_browser_title
+
 # Desktop executables where calls/meetings are primary (also used for longer idle).
 MEETING_APP_EXES: frozenset[str] = frozenset(
     {
@@ -251,6 +255,67 @@ def meeting_context_from_title(
         return text[:69].rstrip(" -—|·") + "…"
     return text
 
+
+def _session_channel_key(row: dict[str, Any]) -> tuple[str, str]:
+    site = normalize_site_host(row.get("site"))
+    name = str(row.get("name") or row.get("display_name") or "").strip().casefold()
+    app = normalize_app_exe(row.get("app_name"))
+    return (site or name or app, app)
+
+
+def _parse_iso_ts(value: Any) -> float | None:
+    raw = str(value or "").strip()
+    if not raw:
+        return None
+    try:
+        return datetime.fromisoformat(raw.replace("Z", "+00:00")).timestamp()
+    except ValueError:
+        return None
+
+
+def compact_meeting_sessions(
+    items: list[dict[str, Any]],
+    *,
+    min_sec: float = 60.0,
+    max_gap_sec: float = 180.0,
+) -> list[dict[str, Any]]:
+    """Collapse short window flickers so Calls → Recent windows stays readable."""
+    if not items:
+        return []
+    chrono = sorted(items, key=lambda r: str(r.get("started_at") or ""))
+    out: list[dict[str, Any]] = []
+    for raw in chrono:
+        cur = dict(raw)
+        cur["sec"] = float(cur.get("sec") or 0)
+        cur["parts"] = int(cur.get("parts") or 1)
+        if out:
+            prev = out[-1]
+            same = _session_channel_key(prev) == _session_channel_key(cur)
+            pe = _parse_iso_ts(prev.get("ended_at"))
+            cs = _parse_iso_ts(cur.get("started_at"))
+            gap = max(0.0, cs - pe) if pe is not None and cs is not None else 0.0
+            if cur["sec"] < min_sec or (same and gap <= max_gap_sec):
+                prev["ended_at"] = cur.get("ended_at") or prev.get("ended_at")
+                prev["sec"] = round(float(prev["sec"]) + cur["sec"], 1)
+                prev["parts"] = int(prev.get("parts") or 1) + cur["parts"]
+                # Keep a useful detail if the longer row had none.
+                if not prev.get("detail") and cur.get("detail"):
+                    prev["detail"] = cur["detail"]
+                    prev["has_detail"] = True
+                continue
+        out.append(cur)
+    while len(out) >= 2 and float(out[0].get("sec") or 0) < min_sec:
+        first = out.pop(0)
+        nxt = out[0]
+        nxt["started_at"] = first.get("started_at") or nxt.get("started_at")
+        nxt["sec"] = round(float(nxt.get("sec") or 0) + float(first.get("sec") or 0), 1)
+        nxt["parts"] = int(nxt.get("parts") or 1) + int(first.get("parts") or 1)
+        if not nxt.get("detail") and first.get("detail"):
+            nxt["detail"] = first["detail"]
+            nxt["has_detail"] = True
+    return out
+
+
 def build_meetings_report(
     *,
     by_app: list[dict[str, Any]],
@@ -330,12 +395,18 @@ def build_meetings_report(
                 "has_detail": bool(detail),
             }
         )
+    sess_out.sort(key=lambda r: str(r.get("started_at") or ""))
+    sess_out = compact_meeting_sessions(sess_out, min_sec=60.0, max_gap_sec=180.0)
     sess_out.sort(key=lambda r: str(r.get("started_at") or ""), reverse=True)
+
     email_out = list(email_channels or [])
     email_out.sort(key=lambda r: float(r.get("sec") or 0), reverse=True)
     email_total = round(sum(float(r.get("sec") or 0) for r in email_out), 1)
     email_sess = list(email_sessions or [])
+    email_sess.sort(key=lambda r: str(r.get("started_at") or ""))
+    email_sess = compact_meeting_sessions(email_sess, min_sec=60.0, max_gap_sec=180.0)
     email_sess.sort(key=lambda r: str(r.get("started_at") or ""), reverse=True)
+
     share = 0.0
     tracked = float(total_tracked_sec or 0)
     if tracked > 0 and total_sec > 0:
@@ -347,13 +418,13 @@ def build_meetings_report(
         "by_app": apps_out,
         "by_site": sites_out,
         "top": combined[:12],
-        "sessions": sess_out[:50],
+        "sessions": sess_out[:15],
         "email_total_sec": email_total,
         "email_top": email_out[:12],
-        "email_sessions": email_sess[:40],
+        "email_sessions": email_sess[:12],
         "note": (
             "Учитывается время в фокусе окна: Телемост, Яндекс Мессенджер, Teams, Zoom, Meet… "
             "и отдельно почта. Это не факт «в звонке», а активное окно. "
-            "«Развернуть» показывает контекст из заголовка окна, если он есть."
+            "В «Недавних окнах» короткие переключения склеены; «Развернуть» — контекст заголовка."
         ),
     }

@@ -2275,7 +2275,7 @@ let lastMeetingsKey = "";
 
 function meetingSessionRowHtml(r) {
   const icon = r.icon_url
-    ? iconImgHtml(r.icon_url)
+    ? iconImgHtml(r.icon_url, 28)
     : `<span class="rank-icon">•</span>`;
   const label = r.display_name || r.name || r.app_name || r.site || "Сессия";
   const detail = String(r.detail || "").trim();
@@ -2286,12 +2286,17 @@ function meetingSessionRowHtml(r) {
   const detailBlock = canExpand
     ? `<div class="meeting-detail" hidden><span class="meeting-detail-label">Контекст окна</span><p>${escapeHtml(detail)}</p></div>`
     : "";
+  const parts =
+    Number(r.parts) > 1
+      ? `<span class="timeline-parts">+${Number(r.parts) - 1} коротких</span>`
+      : "";
   return `<li class="meeting-session${canExpand ? " is-expandable" : ""}">
     <div class="meeting-session-main">
       <span class="timeline-time">${fmtClock(r.started_at)}</span>
       ${icon}
       <span class="meeting-session-text">
         <span class="rank-name">${escapeHtml(label)}</span>
+        ${parts}
         ${expandBtn}
       </span>
       <span class="rank-meta">${fmtDur(r.sec)}</span>
@@ -2413,7 +2418,7 @@ async function refreshMeetings() {
 
   const sessEl = document.getElementById("meetingsSessions");
   if (sessEl) {
-    const rows = report.sessions || [];
+    const rows = compactFeedRows(report.sessions || [], 60, 180).slice(0, 15);
     if (!rows.length) {
       sessEl.innerHTML = `<li><span class="timeline-time">—</span><span class="rank-icon">•</span><span class="rank-name">Нет сессий за период</span><span class="rank-meta"></span></li>`;
     } else {
@@ -2447,7 +2452,7 @@ async function refreshMeetings() {
 
   const emailSessEl = document.getElementById("meetingsEmailSessions");
   if (emailSessEl) {
-    const rows = report.email_sessions || [];
+    const rows = compactFeedRows(report.email_sessions || [], 60, 180).slice(0, 12);
     if (!rows.length) {
       emailSessEl.innerHTML = `<li><span class="timeline-time">—</span><span class="rank-icon">•</span><span class="rank-name">Нет почтовых сессий</span><span class="rank-meta"></span></li>`;
     } else {
