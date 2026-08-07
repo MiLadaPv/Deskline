@@ -1366,13 +1366,16 @@ function renderProdDaysChart(trends) {
   }
   el.classList.toggle("is-dense", rows.length > 16);
   el.classList.toggle("is-scroll", rows.length > 16);
+  const maxTotal = Math.max(1, ...rows.map((r) => Number(r.total_sec) || 0));
   el.innerHTML = rows
     .map((r) => {
-      const total = r.total_sec || 0;
+      const total = Number(r.total_sec) || 0;
       const cats = r.by_category || {};
-      const d = new Date(`${(r.end_day || r.day)}T12:00:00`);
+      const d = new Date(`${r.end_day || r.day}T12:00:00`);
       const isWeekend = unit === "day" && (d.getDay() === 0 || d.getDay() === 6);
       const tip = focusBucketTip(r, unit);
+      // Height = activity volume; color mix = focus composition.
+      const hPct = total ? Math.max(10, Math.round((total / maxTotal) * 100)) : 0;
       const segs = [
         ["distracting", cats.distracting || 0],
         ["neutral", cats.neutral || 0],
@@ -1386,10 +1389,13 @@ function renderProdDaysChart(trends) {
         })
         .join("");
       const showVal = rows.length <= 20;
-      return `<div class="prod-day-col${isWeekend ? " is-weekend" : ""}" title="${escapeHtml(tip)}">
-        <div class="prod-day-stack">${total ? segs : `<span class="stack-seg empty" style="height:6%"></span>`}</div>
+      const focus = Math.round(r.focus_pct || 0);
+      return `<div class="prod-day-col${isWeekend ? " is-weekend" : ""}${total ? "" : " is-empty"}" title="${escapeHtml(tip)}">
+        <div class="prod-day-track">
+          <div class="prod-day-stack" style="height:${hPct}%">${segs || `<span class="stack-seg empty" style="height:100%"></span>`}</div>
+        </div>
         <span class="hours-label">${escapeHtml(focusBucketLabel(r, unit))}</span>
-        ${showVal ? `<span class="hours-val">${Math.round(r.focus_pct || 0)}%</span>` : ""}
+        ${showVal ? `<span class="hours-val">${focus}%</span>` : ""}
       </div>`;
     })
     .join("");

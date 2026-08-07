@@ -109,9 +109,26 @@ def test_gantt_blocks_have_no_rounding():
 
 def test_day_chip_active_uses_accent_not_ink_flip():
     from deskline.config import WEB_ROOT
+
     css = (WEB_ROOT / "static" / "css" / "app.css").read_text(encoding="utf-8")
     idx = css.find(".day-chip.is-active {")
     assert idx >= 0
     chunk = css[idx : idx + 280]
     assert "var(--accent)" in chunk
     assert "var(--ink)" not in chunk
+
+
+def test_focus_rhythm_chart_no_capsules():
+    from deskline.config import WEB_ROOT
+
+    html = (WEB_ROOT / "templates" / "index.html").read_text(encoding="utf-8")
+    css = (WEB_ROOT / "static" / "css" / "app.css").read_text(encoding="utf-8")
+    js = (WEB_ROOT / "static" / "js" / "app.js").read_text(encoding="utf-8")
+    assert "prod-focus-legend" in html
+    assert "prod-day-track" in css
+    assert "prod-day-track" in js
+    start = css.find(".prod-days-chart-wide .prod-day-stack {")
+    assert start >= 0
+    chunk = css[start : start + 260]
+    assert "border-radius: 999px" not in chunk
+    assert "border-radius: 0" in chunk

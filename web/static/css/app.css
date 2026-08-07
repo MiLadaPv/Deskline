@@ -4526,8 +4526,8 @@ html[data-theme="dark"] .google-btn {
 
 .prod-days-chart-wide.is-scroll .prod-day-col {
   flex: 0 0 auto;
-  min-width: 28px;
-  width: 28px;
+  min-width: 34px;
+  width: 34px;
 }
 
 .prod-days-chart-wide.is-dense .hours-label {
@@ -5086,10 +5086,10 @@ html[data-theme="dark"] .google-btn {
 
 .prod-days-chart-wide {
   display: flex;
-  gap: 8px;
+  gap: 10px;
   align-items: flex-end;
-  min-height: 160px;
-  padding: 8px 4px 0;
+  min-height: 168px;
+  padding: 4px 2px 0;
   max-width: 100%;
   min-width: 0;
 }
@@ -5098,34 +5098,78 @@ html[data-theme="dark"] .google-btn {
   flex: 1 1 0;
   display: grid;
   justify-items: center;
-  gap: 4px;
+  gap: 6px;
   min-width: 0;
+}
+
+.prod-days-chart-wide .prod-day-track {
+  width: 100%;
+  max-width: 40px;
+  height: 132px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  border-radius: 8px;
+  background:
+    linear-gradient(180deg, transparent 0%, color-mix(in srgb, var(--accent-soft) 55%, transparent) 100%);
+  border: 1px solid color-mix(in srgb, var(--line) 80%, transparent);
+  overflow: hidden;
 }
 
 .prod-days-chart-wide .prod-day-stack {
   width: 100%;
-  max-width: 22px;
-  height: 120px;
+  max-width: none;
+  height: 100%;
+  min-height: 0;
   display: flex;
   flex-direction: column-reverse;
-  border-radius: 999px 999px 8px 8px;
+  border-radius: 0;
   overflow: hidden;
-  background: rgba(31, 107, 86, 0.06);
+  background: transparent;
 }
 
 .prod-days-chart-wide .stack-seg {
   width: 100%;
   display: block;
+  min-height: 2px;
 }
 
-.prod-days-chart-wide .stack-seg.productive { background: var(--accent); }
-.prod-days-chart-wide .stack-seg.neutral { background: #7f958b; }
-.prod-days-chart-wide .stack-seg.distracting { background: #b45309; }
-.prod-days-chart-wide .stack-seg.empty { background: rgba(31, 107, 86, 0.1); }
+.prod-days-chart-wide .stack-seg.productive {
+  background: color-mix(in srgb, var(--accent) 82%, #ffffff 18%);
+}
+.prod-days-chart-wide .stack-seg.neutral {
+  background: #b0beb7;
+}
+.prod-days-chart-wide .stack-seg.distracting {
+  background: color-mix(in srgb, var(--focus) 70%, #f0c4b8 30%);
+}
+.prod-days-chart-wide .stack-seg.empty {
+  background: color-mix(in srgb, var(--accent) 16%, transparent);
+}
+
+html[data-theme="dark"] .prod-days-chart-wide .prod-day-track {
+  background: color-mix(in srgb, var(--accent-soft) 70%, transparent);
+  border-color: var(--line);
+}
+html[data-theme="dark"] .prod-days-chart-wide .stack-seg.productive {
+  background: color-mix(in srgb, var(--accent) 88%, #0a1a14 12%);
+}
+html[data-theme="dark"] .prod-days-chart-wide .stack-seg.neutral {
+  background: #6d7f76;
+}
+html[data-theme="dark"] .prod-days-chart-wide .stack-seg.distracting {
+  background: color-mix(in srgb, var(--focus) 75%, #3a221c 25%);
+}
 
 .prod-day-col.is-weekend .hours-label {
-  color: #9a3412;
-  font-weight: 700;
+  color: var(--ink-soft);
+  font-weight: 650;
+}
+
+.prod-day-col.is-empty .hours-val {
+  color: var(--ink-soft);
+  font-weight: 600;
+  opacity: 0.7;
 }
 
 .prod-days-chart-wide .hours-label {
@@ -5135,9 +5179,17 @@ html[data-theme="dark"] .google-btn {
 }
 
 .prod-days-chart-wide .hours-val {
-  font-size: 0.68rem;
-  color: var(--accent);
+  font-size: 0.72rem;
+  color: var(--ink);
   font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.prod-focus-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin: 10px 0 2px;
 }
 
 .company-panel {
