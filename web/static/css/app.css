@@ -1306,6 +1306,108 @@ html[data-theme="dark"] .rank-row-child {
   font-weight: 600;
 }
 
+.timeline.session-groups {
+  gap: 8px;
+}
+
+#panel-day .timeline.session-groups > li {
+  border-bottom: none;
+  padding: 0;
+  display: block;
+}
+
+.session-group {
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--card) 88%, transparent);
+  overflow: hidden;
+}
+
+.session-group-toggle {
+  appearance: none;
+  width: 100%;
+  margin: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  display: grid;
+  grid-template-columns: 3.6rem 28px minmax(0, 1fr) auto 14px;
+  align-items: center;
+  column-gap: 10px;
+  padding: 10px 12px;
+}
+
+.session-group-toggle:hover {
+  background: color-mix(in srgb, var(--accent-soft) 35%, transparent);
+}
+
+.session-group-text {
+  min-width: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 8px;
+}
+
+.session-group-meta {
+  color: var(--ink-soft);
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.session-group-chev {
+  width: 8px;
+  height: 8px;
+  border-right: 2px solid var(--ink-soft);
+  border-bottom: 2px solid var(--ink-soft);
+  transform: rotate(45deg);
+  transition: transform 0.2s var(--ease-out);
+  justify-self: end;
+  opacity: 0.7;
+}
+
+.session-group.is-open .session-group-chev {
+  transform: rotate(-135deg);
+  margin-top: 4px;
+}
+
+.session-group-items {
+  list-style: none;
+  margin: 0;
+  padding: 0 8px 8px 8px;
+  display: grid;
+  gap: 0;
+  border-top: 1px solid var(--line);
+  background: color-mix(in srgb, var(--paper) 55%, transparent);
+}
+
+#panel-day .session-group-items .session-visit {
+  display: grid;
+  grid-template-columns: 3.6rem 28px minmax(0, 1fr) auto;
+  align-items: center;
+  column-gap: 10px;
+  padding: 8px 4px 8px 8px;
+  border-bottom: 1px solid var(--line);
+}
+
+#panel-day .session-group-items .session-visit:last-child {
+  border-bottom: none;
+}
+
+#panel-day .timeline.session-groups > .session-visit {
+  display: grid;
+  grid-template-columns: 3.6rem 28px minmax(0, 1fr) auto;
+  align-items: center;
+  column-gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--card) 88%, transparent);
+}
+
 .timeline-time {
   font-variant-numeric: tabular-nums;
   color: var(--ink-soft);
@@ -6015,6 +6117,11 @@ html[data-theme="dark"] .hours-line-path.is-neutral {
 .timeline li.is-hot {
   background: color-mix(in srgb, var(--accent-soft) 55%, transparent);
   box-shadow: inset 3px 0 0 var(--accent);
+}
+
+.session-group-items .session-visit.is-hot,
+.timeline.session-groups > .session-visit.is-hot {
+  border-radius: 10px;
 }
 
 .timeline-live {

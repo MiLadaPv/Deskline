@@ -1650,6 +1650,15 @@ function sessionRowKey(startedAt) {
   return String(startedAt || "");
 }
 
+function openSessionGroup(groupEl) {
+  if (!groupEl) return;
+  groupEl.classList.add("is-open");
+  const items = groupEl.querySelector(".session-group-items");
+  if (items) items.hidden = false;
+  const btn = groupEl.querySelector(".session-group-toggle");
+  if (btn) btn.setAttribute("aria-expanded", "true");
+}
+
 function highlightTimelineSession(startedAt) {
   const list = document.getElementById("timelineList");
   if (!list) return;
@@ -1659,6 +1668,7 @@ function highlightTimelineSession(startedAt) {
     (li) => li.dataset.started === key
   );
   if (!row) return;
+  openSessionGroup(row.closest(".session-group"));
   row.classList.add("is-hot");
   row.scrollIntoView({ behavior: "smooth", block: "center" });
   window.setTimeout(() => row.classList.remove("is-hot"), 2200);
@@ -3749,6 +3759,138 @@ function compactFeedRows(rows, minSec = 60, maxGapSec = 45) {
   return out;
 }
 
+/** Collapse the day list into app groups — no endless session ribbon. */
+function groupFeedByApp(rows) {
+  if (!rows || !rows.length) return [];
+  const map = new Map();
+  for (const raw of rows) {
+    const name = String(raw.name || raw.app_name || "—").trim() || "—";
+    const app = String(raw.app_name || "").trim();
+    const key = `${app.toLowerCase()}|${name.toLowerCase()}`;
+    let g = map.get(key);
+    if (!g) {
+      g = {
+        key,
+        name,
+        app_name: app,
+        icon_url: raw.icon_url || "",
+        category: raw.category || "neutral",
+        sec: 0,
+        idle_sec: 0,
+        visits: 0,
+        sessions: [],
+        latest_started: raw.started_at,
+        earliest_started: raw.started_at,
+        has_live: false,
+      };
+      map.set(key, g);
+    }
+    const sec = Number(raw.sec) || 0;
+    const idle = Number(raw.idle_sec) || 0;
+    g.sec = Math.round((g.sec + sec) * 10) / 10;
+    g.idle_sec = Math.round((g.idle_sec + idle) * 10) / 10;
+    g.visits += 1;
+    g.sessions.push(raw);
+    if (!g.icon_url && raw.icon_url) g.icon_url = raw.icon_url;
+    const t = new Date(raw.started_at).getTime();
+    if (t >= new Date(g.latest_started).getTime()) {
+      g.latest_started = raw.started_at;
+      g.category = raw.category || g.category;
+      g.name = name;
+      if (raw.icon_url) g.icon_url = raw.icon_url;
+    }
+    if (t < new Date(g.earliest_started).getTime()) g.earliest_started = raw.started_at;
+    if (!raw.ended_at) g.has_live = true;
+  }
+  const groups = [...map.values()];
+  for (const g of groups) {
+    g.sessions.sort(
+      (a, b) => new Date(b.started_at).getTime() - new Date(a.started_at).getTime()
+    );
+  }
+  groups.sort(
+    (a, b) => new Date(b.latest_started).getTime() - new Date(a.latest_started).getTime()
+  );
+  return groups;
+}
+
+function sessionVisitLabel(n) {
+  const k = Math.abs(Number(n) || 0) % 100;
+  const n1 = k % 10;
+  if (k > 10 && k < 20) return `${n} заходов`;
+  if (n1 === 1) return `${n} заход`;
+  if (n1 >= 2 && n1 <= 4) return `${n} захода`;
+  return `${n} заходов`;
+}
+
+function daySessionRowHtml(r) {
+  const icon = r.icon_url
+    ? iconImgHtml(r.icon_url, 28)
+    : `<span class="rank-icon">•</span>`;
+  const idle =
+    r.idle_sec >= 60 ? `<span class="timeline-idle">idle ${fmtDur(r.idle_sec)}</span>` : "";
+  const parts =
+    r.parts > 1 ? `<span class="timeline-parts">+${r.parts - 1} коротких</span>` : "";
+  const cat = categoryClass(r.category);
+  const open = !r.ended_at ? `<span class="timeline-live">сейчас</span>` : "";
+  return `<li class="session-visit timeline-cat-${cat}" data-started="${escapeHtml(sessionRowKey(r.started_at))}">
+    <span class="timeline-time">${fmtClock(r.started_at)}</span>
+    ${icon}
+    <span>
+      <span class="rank-name">${escapeHtml(r.name)}</span>
+      ${idle}${parts}${open}
+    </span>
+    <span class="rank-meta">${fmtDur(r.sec)}</span>
+  </li>`;
+}
+
+function daySessionGroupHtml(g) {
+  if (g.sessions.length === 1) return daySessionRowHtml(g.sessions[0]);
+  const icon = g.icon_url
+    ? iconImgHtml(g.icon_url, 28)
+    : `<span class="rank-icon">•</span>`;
+  const cat = categoryClass(g.category);
+  const span =
+    g.earliest_started !== g.latest_started
+      ? `${fmtClock(g.earliest_started)}–${fmtClock(g.latest_started)}`
+      : fmtClock(g.latest_started);
+  const live = g.has_live ? `<span class="timeline-live">сейчас</span>` : "";
+  const openClass = g.has_live ? " is-open" : "";
+  const expanded = g.has_live ? "true" : "false";
+  const hidden = g.has_live ? "" : " hidden";
+  return `<li class="session-group timeline-cat-${cat}${openClass}" data-group="${escapeHtml(g.key)}">
+    <button type="button" class="session-group-toggle" aria-expanded="${expanded}">
+      <span class="timeline-time">${fmtClock(g.latest_started)}</span>
+      ${icon}
+      <span class="session-group-text">
+        <span class="rank-name">${escapeHtml(g.name)}</span>
+        <span class="session-group-meta">${sessionVisitLabel(g.visits)} · ${span}</span>
+        ${live}
+      </span>
+      <span class="rank-meta">${fmtDur(g.sec)}</span>
+      <span class="session-group-chev" aria-hidden="true"></span>
+    </button>
+    <ol class="session-group-items"${hidden}>
+      ${g.sessions.map((r) => daySessionRowHtml(r)).join("")}
+    </ol>
+  </li>`;
+}
+
+function wireSessionGroups(listEl) {
+  if (!listEl || listEl.dataset.sessionGroupsWired === "1") return;
+  listEl.dataset.sessionGroupsWired = "1";
+  listEl.addEventListener("click", (ev) => {
+    const btn = ev.target.closest(".session-group-toggle");
+    if (!btn || !listEl.contains(btn)) return;
+    const group = btn.closest(".session-group");
+    if (!group) return;
+    const open = group.classList.toggle("is-open");
+    btn.setAttribute("aria-expanded", open ? "true" : "false");
+    const items = group.querySelector(".session-group-items");
+    if (items) items.hidden = !open;
+  });
+}
+
 async function refreshTimeline({ skeleton = false } = {}) {
   ensureSelectedDay();
   renderDayWeekStrip();
@@ -3790,6 +3932,7 @@ async function refreshTimeline({ skeleton = false } = {}) {
     }
 
     const feedRows = compactFeedRows(rows);
+    const feedGroups = groupFeedByApp(feedRows);
     const viewKey = [
       selectedDayIso,
       filterEmployeeId || "",
@@ -3798,6 +3941,7 @@ async function refreshTimeline({ skeleton = false } = {}) {
       summaryKey(summary),
       dayTimelineSignature(rows),
       `feed:${feedRows.length}`,
+      `groups:${feedGroups.length}`,
     ].join("|");
     if (viewKey === lastDayViewKey && !show) return;
     lastDayViewKey = viewKey;
@@ -3814,7 +3958,7 @@ async function refreshTimeline({ skeleton = false } = {}) {
       return;
     }
 
-    // Day strip keeps full detail; the list absorbs sub-minute flickers.
+    // Day strip keeps full detail; the list groups by app instead of a long ribbon.
     renderDayGantt(rows);
     renderDaySummaryLine(summary);
 
@@ -3823,41 +3967,14 @@ async function refreshTimeline({ skeleton = false } = {}) {
       markSkelContext("day-list", ctx);
       return;
     }
-    if (!feedRows.length) {
+    if (!feedGroups.length) {
       el.innerHTML = `<li><span class="timeline-time">—</span><span class="rank-icon">•</span><span class="rank-name">Пока нет сессий</span><span class="rank-meta"></span></li>`;
       markSkelContext("day-gantt", ctx);
       markSkelContext("day-list", ctx);
       return;
     }
-    const listRows = [...feedRows].sort(
-      (a, b) => new Date(b.started_at).getTime() - new Date(a.started_at).getTime()
-    );
-    el.innerHTML = listRows
-      .map((r) => {
-        const icon = r.icon_url
-          ? iconImgHtml(r.icon_url, 28)
-          : `<span class="rank-icon">•</span>`;
-        const idle =
-          r.idle_sec >= 60
-            ? `<span class="timeline-idle">idle ${fmtDur(r.idle_sec)}</span>`
-            : "";
-        const parts =
-          r.parts > 1
-            ? `<span class="timeline-parts">+${r.parts - 1} коротких</span>`
-            : "";
-        const cat = categoryClass(r.category);
-        const open = !r.ended_at ? `<span class="timeline-live">сейчас</span>` : "";
-        return `<li class="timeline-cat-${cat}" data-started="${escapeHtml(sessionRowKey(r.started_at))}">
-          <span class="timeline-time">${fmtClock(r.started_at)}</span>
-          ${icon}
-          <span>
-            <span class="rank-name">${escapeHtml(r.name)}</span>
-            ${idle}${parts}${open}
-          </span>
-          <span class="rank-meta">${fmtDur(r.sec)}</span>
-        </li>`;
-      })
-      .join("");
+    wireSessionGroups(el);
+    el.innerHTML = feedGroups.map((g) => daySessionGroupHtml(g)).join("");
     markSkelContext("day-gantt", ctx);
     markSkelContext("day-list", ctx);
   } catch (err) {
