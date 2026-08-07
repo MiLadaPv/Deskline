@@ -106,3 +106,12 @@ def test_gantt_blocks_have_no_rounding():
     assert idx >= 0
     chunk = css[idx : idx + 380]
     assert "border-radius: 0" in chunk
+
+def test_day_chip_active_uses_accent_not_ink_flip():
+    from deskline.config import WEB_ROOT
+    css = (WEB_ROOT / "static" / "css" / "app.css").read_text(encoding="utf-8")
+    idx = css.find(".day-chip.is-active {")
+    assert idx >= 0
+    chunk = css[idx : idx + 280]
+    assert "var(--accent)" in chunk
+    assert "var(--ink)" not in chunk

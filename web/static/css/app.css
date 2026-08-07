@@ -2778,7 +2778,7 @@ html[data-theme="dark"] .settings-form-modern select {
 .day-chip {
   appearance: none;
   border: 1px solid var(--line);
-  background: rgba(255, 255, 255, 0.7);
+  background: var(--card);
   color: var(--ink);
   font: inherit;
   padding: 8px 4px;
@@ -2786,26 +2786,36 @@ html[data-theme="dark"] .settings-form-modern select {
   gap: 2px;
   justify-items: center;
   cursor: pointer;
-  border-radius: 2px;
+  border-radius: 10px;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
 }
 
-.day-chip:hover:not(:disabled) {
-  border-color: var(--accent);
-  background: var(--accent-soft);
+.day-chip:hover:not(:disabled):not(.is-active) {
+  border-color: color-mix(in srgb, var(--accent) 42%, var(--line));
+  background: color-mix(in srgb, var(--accent-soft) 55%, var(--card));
+  color: var(--ink);
 }
 
 .day-chip.is-today:not(.is-active) {
+  border-color: color-mix(in srgb, var(--accent) 38%, var(--line));
   box-shadow: inset 0 -2px 0 var(--accent);
 }
 
 .day-chip.is-active {
-  background: var(--ink);
-  border-color: var(--ink);
-  color: var(--paper);
+  /* Brand accent — not ink-black / paper-white flip (breaks dark theme gamma). */
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+  box-shadow: none;
+}
+
+html[data-theme="dark"] .day-chip.is-active {
+  color: #062018;
+  border-color: color-mix(in srgb, var(--accent) 65%, #fff 35%);
 }
 
 .day-chip:disabled {
-  opacity: 0.35;
+  opacity: 0.4;
   cursor: not-allowed;
 }
 
@@ -2813,7 +2823,11 @@ html[data-theme="dark"] .settings-form-modern select {
   font-size: 0.68rem;
   text-transform: lowercase;
   color: inherit;
-  opacity: 0.75;
+  opacity: 0.8;
+}
+
+.day-chip.is-active .day-chip-wd {
+  opacity: 0.92;
 }
 
 .day-chip-num {
