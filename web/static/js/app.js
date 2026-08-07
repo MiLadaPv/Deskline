@@ -637,8 +637,8 @@ function wireDonutHover(root) {
     if (on) {
       const seg = segs.find((s) => s.dataset.key === key);
       if (seg && centerPct && centerLabel) {
-        centerPct.textContent = `${seg.dataset.pct}%`;
-        centerLabel.textContent = seg.dataset.label || "";
+        centerPct.textContent = seg.dataset.dur || `${seg.dataset.pct}%`;
+        centerLabel.textContent = `${seg.dataset.label || ""} · ${seg.dataset.pct}%`;
       }
     } else if (centerPct && centerLabel) {
       centerPct.textContent = basePct;
@@ -674,8 +674,11 @@ function pieSignature(slices, total, emptyText) {
 
 function renderPieChart(el, slices, total, emptyText) {
   if (!el) return;
-  const usable = (slices || []).filter((s) => (s.sec || 0) > 0);
-  const sig = pieSignature(slices, total, emptyText);
+  const usable = (slices || [])
+    .filter((s) => (s.sec || 0) > 0)
+    .slice()
+    .sort((a, b) => (b.sec || 0) - (a.sec || 0));
+  const sig = pieSignature(usable, total, emptyText);
   if (el.dataset.pieSig === sig) return;
   const animateEnter = !el.dataset.pieSig;
   el.dataset.pieSig = sig;
@@ -700,13 +703,11 @@ function renderPieChart(el, slices, total, emptyText) {
       const mid = a0 + sweep / 2;
       const share = Math.round((s.sec / total) * 100);
       const key = String(s.key || s.label || idx);
-      return `<path class="donut-seg" data-key="${escapeHtml(key)}" data-pct="${share}" data-label="${escapeHtml(s.label)}" data-mid="${mid.toFixed(2)}"
+      return `<path class="donut-seg" data-key="${escapeHtml(key)}" data-pct="${share}" data-label="${escapeHtml(s.label)}" data-dur="${escapeHtml(fmtDur(s.sec))}" data-mid="${mid.toFixed(2)}"
         d="${d}" fill="${s.color}" tabindex="0" role="img"
-        aria-label="${escapeHtml(s.label)}: ${share}%" style="--i:${idx}"/>`;
+        aria-label="${escapeHtml(s.label)}: ${fmtDur(s.sec)}, ${share}%" style="--i:${idx}"/>`;
     })
     .join("");
-  const primary = usable[0];
-  const primaryPct = Math.round((primary.sec / total) * 100);
   const glowId = `donutGlow-${el.id || "pie"}`;
   const enterClass = animateEnter ? " is-enter" : "";
   el.innerHTML = `<div class="pie-layout">
@@ -720,9 +721,9 @@ function renderPieChart(el, slices, total, emptyText) {
         <circle class="donut-track" cx="110" cy="110" r="77" fill="none"/>
         <g class="donut-segs${enterClass}" filter="url(#${glowId})">${paths}</g>
       </svg>
-      <div class="donut-center">
-        <strong>${primaryPct}%</strong>
-        <span>${escapeHtml(primary.label)}</span>
+      <div class="donut-center" data-center-mode="total">
+        <strong>${fmtDur(total)}</strong>
+        <span>всего</span>
       </div>
     </div>
     <ul class="pie-legend">
@@ -1930,6 +1931,16 @@ async function refreshUsageReport() {
   const q = periodQuery(usagePeriod, filterProjectId, filterTaskId, filterEmployeeId);
   const summary = await api(`/api/summary?${q}`);
   const total = summary.total_sec || 0;
+  const focus = summary.focus_sec || summary.by_category?.productive || 0;
+  const idle = summary.idle_sec || 0;
+  const line = document.getElementById("usageTotalLine");
+  if (line) {
+    if (!total) {
+      line.textContent = "За период пока нет учтённого времени.";
+    } else {
+      line.textContent = `Всего ${fmtDur(total)} · в фокусе ${fmtDur(focus)} · без ввода ${fmtDur(idle)}`;
+    }
+  }
   renderPieChart(
     document.getElementById("usageCatPie"),
     categoryPieSlices(summary.by_category || {}),
