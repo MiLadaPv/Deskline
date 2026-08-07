@@ -107,6 +107,29 @@ def test_gantt_blocks_have_no_rounding():
     chunk = css[idx : idx + 380]
     assert "border-radius: 0" in chunk
 
+
+def test_gantt_category_colors_match_legend():
+    from deskline.config import WEB_ROOT
+
+    css = (WEB_ROOT / "static" / "css" / "app.css").read_text(encoding="utf-8")
+    assert "--cat-productive:" in css
+    assert "--cat-neutral:" in css
+    assert "--cat-distracting:" in css
+    assert "--cat-idle:" in css
+    assert "--cat-void:" in css
+    assert ".gantt-block.productive { background: var(--cat-productive); }" in css
+    assert ".gantt-block.neutral { background: var(--cat-neutral); }" in css
+    assert ".gantt-block.distracting { background: var(--cat-distracting); }" in css
+    assert "var(--cat-idle)" in css
+    assert ".stack-leg i.idle" in css
+    assert ".stack-leg i.productive { background: var(--cat-productive); }" in css
+    assert ".stack-leg i.neutral { background: var(--cat-neutral); }" in css
+    idle_idx = css.find(".gantt-block.idle")
+    assert idle_idx >= 0
+    idle_chunk = css[idle_idx : idle_idx + 160]
+    assert "var(--cat-idle)" in idle_chunk
+    assert "#c4a484" not in idle_chunk
+
 def test_day_chip_active_uses_accent_not_ink_flip():
     from deskline.config import WEB_ROOT
 

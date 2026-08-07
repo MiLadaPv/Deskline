@@ -10,6 +10,11 @@ html[data-theme="light"] {
   --warn: #8a6a3b;
   --danger: #a33b2c;
   --focus: #b54738;
+  --cat-productive: var(--accent);
+  --cat-neutral: #7d8a82;
+  --cat-distracting: var(--focus);
+  --cat-idle: #c5d0cb;
+  --cat-void: #eef4f1;
   --shadow: 0 1px 0 rgba(12, 23, 19, 0.04), 0 14px 36px rgba(12, 23, 19, 0.07);
   --shadow-lift: 0 1px 0 rgba(13, 138, 106, 0.1), 0 18px 40px rgba(13, 138, 106, 0.14);
   --glow: 0 0 0 1px rgba(13, 138, 106, 0.12), 0 14px 32px rgba(13, 138, 106, 0.1);
@@ -44,6 +49,11 @@ html[data-theme="dark"] {
   --warn: #d4b06e;
   --danger: #ef8f7e;
   --focus: #f09a86;
+  --cat-productive: var(--accent);
+  --cat-neutral: #9fb5ab;
+  --cat-distracting: var(--focus);
+  --cat-idle: #3a4a44;
+  --cat-void: #15221d;
   --shadow: 0 1px 0 rgba(255, 255, 255, 0.04), 0 18px 40px rgba(0, 0, 0, 0.5);
   --shadow-lift: 0 1px 0 rgba(61, 206, 163, 0.14), 0 18px 40px rgba(0, 0, 0, 0.45);
   --glow: 0 0 0 1px rgba(61, 206, 163, 0.18), 0 14px 32px rgba(0, 0, 0, 0.4);
@@ -3306,9 +3316,9 @@ html[data-theme="dark"] .day-chip.is-active {
   min-width: 2px;
 }
 
-.stack-seg.productive { background: var(--accent); }
-.stack-seg.neutral { background: #7d8a82; }
-.stack-seg.distracting { background: var(--focus); }
+.stack-seg.productive { background: var(--cat-productive); }
+.stack-seg.neutral { background: var(--cat-neutral); }
+.stack-seg.distracting { background: var(--cat-distracting); }
 .stack-seg.empty { background: rgba(21, 36, 31, 0.12); }
 
 .stack-legend,
@@ -3333,9 +3343,15 @@ html[data-theme="dark"] .day-chip.is-active {
   display: inline-block;
 }
 
-.stack-leg i.productive { background: var(--accent); }
-.stack-leg i.neutral { background: #7d8a82; }
-.stack-leg i.distracting { background: var(--focus); }
+.stack-leg i.productive { background: var(--cat-productive); }
+.stack-leg i.neutral { background: var(--cat-neutral); }
+.stack-leg i.distracting { background: var(--cat-distracting); }
+.stack-leg i.idle,
+.gantt-legend i.idle {
+  background: var(--cat-idle);
+  border: 1px solid color-mix(in srgb, var(--ink) 18%, transparent);
+  box-sizing: border-box;
+}
 
 .stack-empty {
   padding: 12px;
@@ -3549,9 +3565,9 @@ button.gantt-block:focus-visible {
   padding: 0;
 }
 
-.gantt-block.productive { background: var(--accent); }
-.gantt-block.neutral { background: #6d7c74; }
-.gantt-block.distracting { background: var(--focus); }
+.gantt-block.productive { background: var(--cat-productive); }
+.gantt-block.neutral { background: var(--cat-neutral); }
+.gantt-block.distracting { background: var(--cat-distracting); }
 
 .gantt-block span {
   overflow: hidden;
@@ -5528,7 +5544,7 @@ html[data-theme="dark"] .hours-line-path.is-neutral {
 .pulse-seg.productive { background: var(--accent); }
 .pulse-seg.neutral { background: #7f958b; }
 .pulse-seg.distracting { background: #b45309; }
-.pulse-seg.idle { background: #c4a484; opacity: 0.95; }
+.pulse-seg.idle { background: var(--cat-idle); opacity: 0.95; }
 
 .pulse-now {
   position: absolute;
@@ -5571,7 +5587,7 @@ html[data-theme="dark"] .hours-line-path.is-neutral {
 .pulse-legend i.productive { background: var(--accent); }
 .pulse-legend i.neutral { background: #7f958b; }
 .pulse-legend i.distracting { background: #b45309; }
-.pulse-legend i.idle { background: #c4a484; }
+.pulse-legend i.idle { background: var(--cat-idle); }
 .pulse-legend i.void {
   background: #eef4f1;
   border: 1px solid rgba(31, 107, 86, 0.25);
@@ -5603,7 +5619,8 @@ html[data-theme="dark"] .hours-line-path.is-neutral {
 }
 
 .gantt-block.idle {
-  background: #c4a484;
+  background: var(--cat-idle);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ink) 12%, transparent);
 }
 
 .gantt-block.void-gap {
@@ -5612,7 +5629,7 @@ html[data-theme="dark"] .hours-line-path.is-neutral {
 }
 
 .gantt-block.void-gap:hover {
-  background: rgba(21, 36, 31, 0.08);
+  background: color-mix(in srgb, var(--ink) 8%, transparent);
 }
 
 .gantt-now {
@@ -5629,8 +5646,8 @@ html[data-theme="dark"] .hours-line-path.is-neutral {
 
 .stack-leg i.void,
 .gantt-legend i.void {
-  background: #eef4f1;
-  border: 1px solid rgba(31, 107, 86, 0.25);
+  background: var(--cat-void);
+  border: 1px solid color-mix(in srgb, var(--ink) 22%, transparent);
   box-sizing: border-box;
 }
 
