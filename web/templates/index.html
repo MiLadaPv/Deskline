@@ -378,13 +378,30 @@
             <p class="shots-count" id="shotsFilterMeta" hidden></p>
           </div>
           <div class="shots-toolbar" role="group" aria-label="Фильтры скриншотов">
-            <label class="shots-chip" for="shotsDay">
+            <div class="shots-chip shots-day-wrap">
               <span class="shots-chip-ico" aria-hidden="true">
                 <svg viewBox="0 0 24 24" width="15" height="15"><path fill="currentColor" d="M7 3a1 1 0 0 1 1 1v1h8V4a1 1 0 1 1 2 0v1h1.5A2.5 2.5 0 0 1 22 7.5v11A2.5 2.5 0 0 1 19.5 21h-15A2.5 2.5 0 0 1 2 18.5v-11A2.5 2.5 0 0 1 4.5 5H6V4a1 1 0 0 1 1-1Zm12.5 8.5h-15v7A.5.5 0 0 0 5 19h14.5a.5.5 0 0 0 .5-.5v-7ZM5 7.5V9h14.5V7.5a.5.5 0 0 0-.5-.5H5a.5.5 0 0 0-.5.5Z"/></svg>
               </span>
               <span class="shots-chip-label">День</span>
-              <input type="date" id="shotsDay" aria-label="День скриншотов" />
-            </label>
+              <button type="button" class="shots-day-btn" id="shotsDayBtn" aria-haspopup="dialog" aria-expanded="false" aria-controls="shotsCal">
+                <span id="shotsDayLabel">—</span>
+              </button>
+              <input type="hidden" id="shotsDay" value="" />
+              <div class="shots-cal" id="shotsCal" hidden role="dialog" aria-label="Календарь скриншотов">
+                <div class="shots-cal-head">
+                  <button type="button" class="shots-cal-nav" data-cal-shift="-1" aria-label="Предыдущий месяц">‹</button>
+                  <strong class="shots-cal-month" id="shotsCalMonth"></strong>
+                  <button type="button" class="shots-cal-nav" data-cal-shift="1" aria-label="Следующий месяц">›</button>
+                </div>
+                <div class="shots-cal-wds" aria-hidden="true">
+                  <span>пн</span><span>вт</span><span>ср</span><span>чт</span><span>пт</span><span>сб</span><span>вс</span>
+                </div>
+                <div class="shots-cal-grid" id="shotsCalGrid"></div>
+                <div class="shots-cal-foot">
+                  <button type="button" class="shots-cal-action" data-cal-today>Сегодня</button>
+                </div>
+              </div>
+            </div>
             <label class="shots-chip shots-chip-grow" for="shotsAppFilter">
               <span class="shots-chip-ico" aria-hidden="true">
                 <svg viewBox="0 0 24 24" width="15" height="15"><path fill="currentColor" d="M4 5.5A1.5 1.5 0 0 1 5.5 4h5A1.5 1.5 0 0 1 12 5.5v5A1.5 1.5 0 0 1 10.5 12h-5A1.5 1.5 0 0 1 4 10.5v-5Zm8.5 0A1.5 1.5 0 0 1 14 4h4.5A1.5 1.5 0 0 1 20 5.5v5A1.5 1.5 0 0 1 18.5 12H14a1.5 1.5 0 0 1-1.5-1.5v-5ZM4 14a1.5 1.5 0 0 1 1.5-1.5h5A1.5 1.5 0 0 1 12 14v4.5A1.5 1.5 0 0 1 10.5 20h-5A1.5 1.5 0 0 1 4 18.5V14Zm8.5 0a1.5 1.5 0 0 1 1.5-1.5h4.5A1.5 1.5 0 0 1 20 14v4.5a1.5 1.5 0 0 1-1.5 1.5H14a1.5 1.5 0 0 1-1.5-1.5V14Z"/></svg>

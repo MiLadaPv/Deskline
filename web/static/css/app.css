@@ -1231,7 +1231,175 @@ html[data-theme="dark"] .rank-row-child {
   white-space: nowrap;
 }
 
-.shots-chip input[type="date"],
+.shots-day-wrap {
+  position: relative;
+}
+
+.shots-day-btn {
+  appearance: none;
+  border: 0;
+  outline: none;
+  background: transparent;
+  font: inherit;
+  font-weight: 650;
+  color: var(--ink);
+  padding: 0;
+  cursor: pointer;
+  min-width: 6.5rem;
+  text-align: left;
+  letter-spacing: 0.01em;
+}
+
+.shots-day-btn:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--accent) 55%, transparent);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+.shots-cal {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  z-index: 40;
+  width: min(17.5rem, calc(100vw - 2rem));
+  padding: 12px;
+  border-radius: 16px;
+  border: 1px solid color-mix(in srgb, var(--accent) 22%, var(--line));
+  background: color-mix(in srgb, var(--card) 96%, #fff);
+  box-shadow: var(--shadow-lift);
+  font-family: var(--sans);
+}
+
+.shots-cal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.shots-cal-month {
+  font-size: 0.92rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  text-transform: capitalize;
+  color: var(--ink);
+}
+
+.shots-cal-nav {
+  appearance: none;
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  border: 1px solid transparent;
+  background: color-mix(in srgb, var(--paper) 70%, #fff);
+  color: var(--ink);
+  font-size: 1.15rem;
+  line-height: 1;
+  cursor: pointer;
+  display: inline-grid;
+  place-items: center;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.shots-cal-nav:hover {
+  border-color: color-mix(in srgb, var(--accent) 28%, var(--line));
+  background: color-mix(in srgb, var(--accent-soft) 55%, #fff);
+}
+
+.shots-cal-wds {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 2px;
+  margin-bottom: 4px;
+}
+
+.shots-cal-wds span {
+  text-align: center;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: lowercase;
+  color: var(--ink-soft);
+  padding: 2px 0;
+}
+
+.shots-cal-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 2px;
+}
+
+.shots-cal-day {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  font-weight: 650;
+  font-size: 0.86rem;
+  height: 34px;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.shots-cal-day:hover:not(:disabled):not(.is-selected) {
+  background: color-mix(in srgb, var(--accent-soft) 60%, transparent);
+}
+
+.shots-cal-day.is-muted {
+  color: color-mix(in srgb, var(--ink-soft) 55%, transparent);
+}
+
+.shots-cal-day.is-today:not(.is-selected) {
+  box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--accent) 55%, var(--line));
+}
+
+.shots-cal-day.is-selected {
+  background: var(--accent);
+  color: #fff;
+  font-weight: 700;
+}
+
+.shots-cal-day:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.shots-cal-foot {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px solid var(--line);
+}
+
+.shots-cal-action {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  font-weight: 700;
+  font-size: 0.82rem;
+  color: var(--accent);
+  cursor: pointer;
+  padding: 6px 8px;
+  border-radius: 8px;
+}
+
+.shots-cal-action:hover {
+  background: color-mix(in srgb, var(--accent-soft) 55%, transparent);
+}
+
+html[data-theme="dark"] .shots-cal {
+  background: var(--card);
+}
+
+html[data-theme="dark"] .shots-cal-nav {
+  background: var(--paper-2);
+}
+
 .shots-chip select {
   appearance: none;
   border: 0;
@@ -1240,27 +1408,13 @@ html[data-theme="dark"] .rank-row-child {
   font: inherit;
   font-weight: 650;
   color: var(--ink);
-  min-width: 0;
-  padding: 0;
-}
-
-.shots-chip input[type="date"] {
-  min-width: 9.5rem;
-  color-scheme: light;
-}
-
-html[data-theme="dark"] .shots-chip input[type="date"] {
-  color-scheme: dark;
-}
-
-.shots-chip select {
   flex: 1;
   min-width: 7rem;
+  padding: 0 16px 0 0;
   cursor: pointer;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%233a5349' d='M2.2 4.2 6 8l3.8-3.8-.9-.9L6 6.2 3.1 3.3z'/%3E%3C/svg%3E");
   background-repeat: no-repeat;
   background-position: right 2px center;
-  padding-right: 16px;
 }
 
 html[data-theme="dark"] .shots-chip select {

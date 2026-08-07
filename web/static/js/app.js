@@ -2702,13 +2702,168 @@ function currentTabName() {
   return document.querySelector(".tab.active")?.dataset.tab || "today";
 }
 
+function formatShotsDayLabel(isoDay) {
+  const today = localDayIso();
+  if (isoDay === today) return "Сегодня";
+  if (isoDay === shiftDayIso(today, -1)) return "Вчера";
+  const d = new Date(`${isoDay}T12:00:00`);
+  return d.toLocaleDateString("ru-RU", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  });
+}
+
+function syncShotsDayLabel(isoDay) {
+  const label = document.getElementById("shotsDayLabel");
+  if (label) label.textContent = formatShotsDayLabel(isoDay);
+}
+
+/** Visible month for shots calendar: YYYY-MM */
+let shotsCalMonth = "";
+
 function ensureShotsDayInput() {
   const el = document.getElementById("shotsDay");
   if (!el) return localDayIso();
   if (!el.value) {
     el.value = selectedDayIso || localDayIso();
   }
-  return el.value || localDayIso();
+  const day = el.value || localDayIso();
+  syncShotsDayLabel(day);
+  return day;
+}
+
+function setShotsDay(isoDay, { refresh = true, close = true } = {}) {
+  const el = document.getElementById("shotsDay");
+  const day = isoDay || localDayIso();
+  if (el) el.value = day;
+  syncShotsDayLabel(day);
+  shotsCalMonth = day.slice(0, 7);
+  if (close) closeShotsCal();
+  else renderShotsCal();
+  if (refresh) {
+    refreshShots().catch((err) => showToast(err?.message || "Не удалось загрузить скриншоты", "error"));
+  }
+}
+
+function isShotsCalOpen() {
+  const cal = document.getElementById("shotsCal");
+  return !!(cal && !cal.hidden);
+}
+
+function closeShotsCal() {
+  const cal = document.getElementById("shotsCal");
+  const btn = document.getElementById("shotsDayBtn");
+  if (cal) cal.hidden = true;
+  if (btn) btn.setAttribute("aria-expanded", "false");
+}
+
+function openShotsCal() {
+  const cal = document.getElementById("shotsCal");
+  const btn = document.getElementById("shotsDayBtn");
+  if (!cal) return;
+  const day = ensureShotsDayInput();
+  shotsCalMonth = day.slice(0, 7);
+  renderShotsCal();
+  cal.hidden = false;
+  if (btn) btn.setAttribute("aria-expanded", "true");
+}
+
+function toggleShotsCal() {
+  if (isShotsCalOpen()) closeShotsCal();
+  else openShotsCal();
+}
+
+function shiftShotsCalMonth(delta) {
+  const base = shotsCalMonth || ensureShotsDayInput().slice(0, 7);
+  const [y, m] = base.split("-").map(Number);
+  const d = new Date(y, m - 1 + delta, 1);
+  shotsCalMonth = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+  renderShotsCal();
+}
+
+function renderShotsCal() {
+  const monthEl = document.getElementById("shotsCalMonth");
+  const grid = document.getElementById("shotsCalGrid");
+  if (!monthEl || !grid) return;
+  const selected = ensureShotsDayInput();
+  const today = localDayIso();
+  if (!shotsCalMonth) shotsCalMonth = selected.slice(0, 7);
+  const [y, m] = shotsCalMonth.split("-").map(Number);
+  const monthStart = new Date(y, m - 1, 1);
+  monthEl.textContent = monthStart.toLocaleDateString("ru-RU", {
+    month: "long",
+    year: "numeric",
+  });
+  // Monday-first offset: Sun=0 → 6, Mon=1 → 0, …
+  const startPad = (monthStart.getDay() + 6) % 7;
+  const daysInMonth = new Date(y, m, 0).getDate();
+  const cells = [];
+  for (let i = 0; i < startPad; i++) {
+    cells.push(`<span class="shots-cal-day is-muted" aria-hidden="true"></span>`);
+  }
+  for (let day = 1; day <= daysInMonth; day++) {
+    const iso = `${y}-${String(m).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+    const future = iso > today;
+    const selectedCls = iso === selected ? " is-selected" : "";
+    const todayCls = iso === today ? " is-today" : "";
+    cells.push(
+      `<button type="button" class="shots-cal-day${selectedCls}${todayCls}" data-cal-day="${iso}" ${
+        future ? "disabled" : ""
+      } aria-pressed="${iso === selected ? "true" : "false"}" aria-label="${escapeHtml(
+        formatDayTitle(iso)
+      )}">${day}</button>`
+    );
+  }
+  grid.innerHTML = cells.join("");
+}
+
+function wireShotsDayPicker() {
+  const wrap = document.querySelector(".shots-day-wrap");
+  const btn = document.getElementById("shotsDayBtn");
+  const cal = document.getElementById("shotsCal");
+  if (!wrap || !btn || !cal || wrap.dataset.wired === "1") return;
+  wrap.dataset.wired = "1";
+
+  btn.addEventListener("click", (ev) => {
+    ev.preventDefault();
+    ev.stopPropagation();
+    toggleShotsCal();
+  });
+
+  cal.addEventListener("click", (ev) => {
+    const t = ev.target;
+    if (!(t instanceof Element)) return;
+    const shift = t.closest("[data-cal-shift]");
+    if (shift) {
+      ev.preventDefault();
+      shiftShotsCalMonth(Number(shift.getAttribute("data-cal-shift") || 0));
+      return;
+    }
+    if (t.closest("[data-cal-today]")) {
+      ev.preventDefault();
+      setShotsDay(localDayIso());
+      return;
+    }
+    const dayBtn = t.closest("[data-cal-day]");
+    if (dayBtn && !dayBtn.disabled) {
+      ev.preventDefault();
+      setShotsDay(dayBtn.getAttribute("data-cal-day") || localDayIso());
+    }
+  });
+
+  document.addEventListener("click", (ev) => {
+    if (!isShotsCalOpen()) return;
+    if (wrap.contains(ev.target)) return;
+    closeShotsCal();
+  });
+
+  document.addEventListener("keydown", (ev) => {
+    if (ev.key === "Escape" && isShotsCalOpen()) {
+      closeShotsCal();
+      btn.focus();
+    }
+  });
 }
 
 function fillShotsAppFilter(rows) {
@@ -3350,9 +3505,8 @@ function wireUi() {
     shotsShowDetails = !!ev.currentTarget.checked;
     renderShotsGrid();
   });
-  document.getElementById("shotsDay")?.addEventListener("change", () => {
-    refreshShots().catch((err) => showToast(err?.message || "Не удалось загрузить скриншоты", "error"));
-  });
+  wireShotsDayPicker();
+  ensureShotsDayInput();
 
   document.addEventListener("keydown", (ev) => {
     const box = document.getElementById("shotLightbox");
