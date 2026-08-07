@@ -2702,6 +2702,13 @@ function currentTabName() {
   return document.querySelector(".tab.active")?.dataset.tab || "today";
 }
 
+/** Visible month for shots calendar: YYYY-MM */
+let shotsCalMonth = "";
+/** @type {Set<string>} YYYY-MM-DD days that have screenshots */
+let shotsDaysWithData = new Set();
+/** @type {string[]} newest-first ISO days with screenshots */
+let shotsDaysList = [];
+
 function formatShotsDayLabel(isoDay) {
   const today = localDayIso();
   if (isoDay === today) return "Сегодня";
@@ -2719,9 +2726,6 @@ function syncShotsDayLabel(isoDay) {
   if (label) label.textContent = formatShotsDayLabel(isoDay);
 }
 
-/** Visible month for shots calendar: YYYY-MM */
-let shotsCalMonth = "";
-
 function ensureShotsDayInput() {
   const el = document.getElementById("shotsDay");
   if (!el) return localDayIso();
@@ -2733,9 +2737,34 @@ function ensureShotsDayInput() {
   return day;
 }
 
+function pickShotsDayWithData(preferred) {
+  if (preferred && shotsDaysWithData.has(preferred)) return preferred;
+  if (shotsDaysList.length) return shotsDaysList[0];
+  return preferred || localDayIso();
+}
+
+async function loadShotsDays({ quiet = true } = {}) {
+  try {
+    const data = await api("/api/screenshots/days", { quiet402: true });
+    const days = Array.isArray(data?.days) ? data.days : [];
+    shotsDaysList = days.filter((d) => /^\d{4}-\d{2}-\d{2}$/.test(d));
+    shotsDaysWithData = new Set(shotsDaysList);
+  } catch (e) {
+    if (e?.code === "pro_required" || e?.detail?.feature === "screenshots") {
+      shotsDaysList = [];
+      shotsDaysWithData = new Set();
+      return;
+    }
+    if (!quiet) throw e;
+  }
+}
+
 function setShotsDay(isoDay, { refresh = true, close = true } = {}) {
   const el = document.getElementById("shotsDay");
-  const day = isoDay || localDayIso();
+  let day = isoDay || localDayIso();
+  if (shotsDaysWithData.size && !shotsDaysWithData.has(day)) {
+    day = pickShotsDayWithData(day);
+  }
   if (el) el.value = day;
   syncShotsDayLabel(day);
   shotsCalMonth = day.slice(0, 7);
@@ -2758,10 +2787,11 @@ function closeShotsCal() {
   if (btn) btn.setAttribute("aria-expanded", "false");
 }
 
-function openShotsCal() {
+async function openShotsCal() {
   const cal = document.getElementById("shotsCal");
   const btn = document.getElementById("shotsDayBtn");
   if (!cal) return;
+  await loadShotsDays();
   const day = ensureShotsDayInput();
   shotsCalMonth = day.slice(0, 7);
   renderShotsCal();
@@ -2771,7 +2801,7 @@ function openShotsCal() {
 
 function toggleShotsCal() {
   if (isShotsCalOpen()) closeShotsCal();
-  else openShotsCal();
+  else openShotsCal().catch(() => {});
 }
 
 function shiftShotsCalMonth(delta) {
@@ -2785,6 +2815,7 @@ function shiftShotsCalMonth(delta) {
 function renderShotsCal() {
   const monthEl = document.getElementById("shotsCalMonth");
   const grid = document.getElementById("shotsCalGrid");
+  const todayBtn = document.querySelector("#shotsCal [data-cal-today]");
   if (!monthEl || !grid) return;
   const selected = ensureShotsDayInput();
   const today = localDayIso();
@@ -2795,27 +2826,36 @@ function renderShotsCal() {
     month: "long",
     year: "numeric",
   });
-  // Monday-first offset: Sun=0 → 6, Mon=1 → 0, …
   const startPad = (monthStart.getDay() + 6) % 7;
   const daysInMonth = new Date(y, m, 0).getDate();
   const cells = [];
   for (let i = 0; i < startPad; i++) {
     cells.push(`<span class="shots-cal-day is-muted" aria-hidden="true"></span>`);
   }
+  const restrict = shotsDaysWithData.size > 0;
   for (let day = 1; day <= daysInMonth; day++) {
     const iso = `${y}-${String(m).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
     const future = iso > today;
+    const hasData = shotsDaysWithData.has(iso);
+    const blocked = future || (restrict && !hasData);
     const selectedCls = iso === selected ? " is-selected" : "";
     const todayCls = iso === today ? " is-today" : "";
+    const emptyCls = !future && restrict && !hasData ? " is-empty" : "";
+    const hasCls = hasData ? " has-shots" : "";
     cells.push(
-      `<button type="button" class="shots-cal-day${selectedCls}${todayCls}" data-cal-day="${iso}" ${
-        future ? "disabled" : ""
+      `<button type="button" class="shots-cal-day${selectedCls}${todayCls}${emptyCls}${hasCls}" data-cal-day="${iso}" ${
+        blocked ? "disabled" : ""
       } aria-pressed="${iso === selected ? "true" : "false"}" aria-label="${escapeHtml(
         formatDayTitle(iso)
-      )}">${day}</button>`
+      )}${hasData ? "" : " — нет скриншотов"}">${day}</button>`
     );
   }
   grid.innerHTML = cells.join("");
+  if (todayBtn) {
+    const todayOk = !restrict || shotsDaysWithData.has(today);
+    todayBtn.disabled = !todayOk;
+    todayBtn.title = todayOk ? "" : "За сегодня скриншотов нет";
+  }
 }
 
 function wireShotsDayPicker() {
@@ -2842,13 +2882,17 @@ function wireShotsDayPicker() {
     }
     if (t.closest("[data-cal-today]")) {
       ev.preventDefault();
-      setShotsDay(localDayIso());
+      const today = localDayIso();
+      if (shotsDaysWithData.size && !shotsDaysWithData.has(today)) return;
+      setShotsDay(today);
       return;
     }
     const dayBtn = t.closest("[data-cal-day]");
     if (dayBtn && !dayBtn.disabled) {
+      const iso = dayBtn.getAttribute("data-cal-day") || "";
+      if (shotsDaysWithData.size && iso && !shotsDaysWithData.has(iso)) return;
       ev.preventDefault();
-      setShotsDay(dayBtn.getAttribute("data-cal-day") || localDayIso());
+      setShotsDay(iso || localDayIso());
     }
   });
 
@@ -2946,7 +2990,14 @@ function renderShotsGrid() {
 
 async function refreshShots() {
   const grid = document.getElementById("shotsGrid");
-  const day = ensureShotsDayInput();
+  await loadShotsDays();
+  let day = ensureShotsDayInput();
+  if (shotsDaysWithData.size && !shotsDaysWithData.has(day)) {
+    day = pickShotsDayWithData(day);
+    const el = document.getElementById("shotsDay");
+    if (el) el.value = day;
+    syncShotsDayLabel(day);
+  }
   let rows;
   try {
     const q = new URLSearchParams({ day });
@@ -2965,6 +3016,7 @@ async function refreshShots() {
   shotsCache = Array.isArray(rows) ? rows : [];
   fillShotsAppFilter(shotsCache);
   renderShotsGrid();
+  if (isShotsCalOpen()) renderShotsCal();
 }
 
 async function refreshCurrentView({ quiet = false } = {}) {

@@ -1427,6 +1427,18 @@ class Database:
             out.append(item)
         return out
 
+    def screenshot_days(self) -> list[str]:
+        """Local calendar days (YYYY-MM-DD) that have at least one screenshot, newest first."""
+        with self.connect() as conn:
+            rows = conn.execute("SELECT taken_at FROM screenshots").fetchall()
+        days: set[str] = set()
+        for row in rows:
+            dt = _parse(row["taken_at"])
+            if dt is None:
+                continue
+            days.add(dt.astimezone().date().isoformat())
+        return sorted(days, reverse=True)
+
     def purge_old_screenshots(self, retention_days: int) -> dict[str, int]:
         """Delete screenshot files and DB rows older than retention_days. 0 = keep forever."""
         if retention_days <= 0:

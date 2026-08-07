@@ -1356,14 +1356,27 @@ html[data-theme="dark"] .rank-row-child {
   box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--accent) 55%, var(--line));
 }
 
+.shots-cal-day.has-shots:not(.is-selected) {
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.shots-cal-day.is-empty,
+.shots-cal-day:disabled {
+  opacity: 0.32;
+  cursor: not-allowed;
+  font-weight: 500;
+}
+
 .shots-cal-day.is-selected {
   background: var(--accent);
   color: #fff;
   font-weight: 700;
+  opacity: 1;
 }
 
 .shots-cal-day:disabled {
-  opacity: 0.35;
+  opacity: 0.32;
   cursor: not-allowed;
 }
 
@@ -1388,8 +1401,13 @@ html[data-theme="dark"] .rank-row-child {
   border-radius: 8px;
 }
 
-.shots-cal-action:hover {
+.shots-cal-action:hover:not(:disabled) {
   background: color-mix(in srgb, var(--accent-soft) 55%, transparent);
+}
+
+.shots-cal-action:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
 }
 
 html[data-theme="dark"] .shots-cal {

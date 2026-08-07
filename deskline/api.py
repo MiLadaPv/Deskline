@@ -1051,6 +1051,18 @@ def create_app(tracker: Tracker, db: Database | None = None) -> FastAPI:
         start, end = _range(from_ts, to)
         return db.activities_range(start, end, project_id=project_id, task_id=task_id)
 
+    @app.get("/api/screenshots/days")
+    def screenshots_days() -> dict[str, Any]:
+        """Days that have at least one saved screenshot (for the gallery date picker)."""
+        _pro_required("screenshots")
+        ent, _ = _load_entitlements()
+        days = [
+            d
+            for d in db.screenshot_days()
+            if ent.day_allowed(date.fromisoformat(d))
+        ]
+        return {"days": days}
+
     @app.get("/api/screenshots")
     def screenshots(
         day: str | None = None,

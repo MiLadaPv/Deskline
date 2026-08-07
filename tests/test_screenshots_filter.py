@@ -101,6 +101,11 @@ def test_screenshots_api_app_filter(tmp_path: Path, monkeypatch):
     p2.write_bytes(b"jpg")
     db.add_screenshot(str(p2), reason="app_switch", session_id=sid2)
 
+    yesterday = datetime.now().astimezone() - timedelta(days=1)
+    p3 = tmp_path / "screenshots" / "y.jpg"
+    p3.write_bytes(b"jpg")
+    db.add_screenshot(str(p3), reason="interval", session_id=sid, taken_at=yesterday)
+
     tracker = Tracker(db)
     tracker.cfg["paused"] = True
     client = TestClient(create_app(tracker, db))
@@ -118,3 +123,39 @@ def test_screenshots_api_app_filter(tmp_path: Path, monkeypatch):
     assert filtered
     assert all(str(x.get("app_name") or "").lower().startswith("msedge") for x in filtered)
     assert all(x.get("display_name") == "Microsoft Edge" for x in filtered)
+
+    days_payload = client.get("/api/screenshots/days").json()
+    days = days_payload["days"]
+    assert isinstance(days, list)
+    today = datetime.now().astimezone().date().isoformat()
+    yday = yesterday.astimezone().date().isoformat()
+    assert today in days
+    assert yday in days
+    assert days.index(today) < days.index(yday) or today == yday
+
+
+def test_screenshot_days_db(tmp_path: Path, monkeypatch):
+    shots = tmp_path / "shots"
+    shots.mkdir()
+    monkeypatch.setattr("deskline.config.SCREENSHOTS_DIR", shots)
+    monkeypatch.setattr("deskline.config.CONFIG_PATH", tmp_path / "config.json")
+    monkeypatch.setattr("deskline.config.DATA_ROOT", tmp_path)
+    monkeypatch.setattr("deskline.config.DB_PATH", tmp_path / "deskline.db")
+    monkeypatch.setattr("deskline.config.ICONS_DIR", tmp_path / "icons")
+    (tmp_path / "icons").mkdir(exist_ok=True)
+
+    db = Database(tmp_path / "deskline.db")
+    assert db.screenshot_days() == []
+
+    now = datetime.now().astimezone()
+    older = now - timedelta(days=2)
+    p1 = shots / "a.jpg"
+    p1.write_bytes(b"jpg")
+    db.add_screenshot(str(p1), reason="interval", session_id=None, taken_at=older)
+    p2 = shots / "b.jpg"
+    p2.write_bytes(b"jpg")
+    db.add_screenshot(str(p2), reason="interval", session_id=None, taken_at=now)
+
+    days = db.screenshot_days()
+    assert days[0] == now.date().isoformat()
+    assert older.date().isoformat() in days
