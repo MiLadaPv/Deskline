@@ -1252,6 +1252,18 @@ function bindHoursChartInteractions(el, points, tips) {
   });
 }
 
+function hoursSeriesPoints(vals, padL, padT, chartW, chartH, maxScale, n) {
+  return vals.map((v, i) => {
+    const x = padL + (i * chartW) / Math.max(n - 1, 1);
+    const y = padT + chartH - (Math.max(0, v) / maxScale) * chartH;
+    return [x, y];
+  });
+}
+
+function hoursPolyline(pts) {
+  return pts.map(([x, y]) => `${x.toFixed(1)},${y.toFixed(1)}`).join(" ");
+}
+
 function renderHoursChart(trends) {
   const el = document.getElementById("hoursChart");
   if (!el) return;
@@ -1268,19 +1280,22 @@ function renderHoursChart(trends) {
     el.innerHTML = `<p class="hint">Пока нет тренда по часам.</p>`;
     return;
   }
-  const vals = rows.map((r) => Number(r.active_sec || r.total_sec || 0));
-  const activeVals = vals.filter((v) => v >= 60);
+  const totalVals = rows.map((r) => Number(r.total_sec || r.active_sec || 0));
+  const focusVals = rows.map((r) => Number(r.by_category?.productive || r.focus_sec || 0));
+  const neutralVals = rows.map((r) => Number(r.by_category?.neutral || 0));
+  const distractVals = rows.map((r) => Number(r.by_category?.distracting || 0));
+  const activeVals = totalVals.filter((v) => v >= 60);
   // Mean over days with ≥1м tracked — empty calendar days don't pull the average to zero.
   const avgSec = activeVals.length
     ? activeVals.reduce((a, b) => a + b, 0) / activeVals.length
-    : vals.reduce((a, b) => a + b, 0) / vals.length;
+    : totalVals.reduce((a, b) => a + b, 0) / totalVals.length;
   if (avgEl) {
     avgEl.textContent = `в среднем ${fmtDur(avgSec)} / день`;
     avgEl.title = activeVals.length
       ? `Среднее по ${activeVals.length} дн. с активностью (≥1м)`
       : "Среднее по всем дням периода";
   }
-  const maxSec = Math.max(...vals, avgSec, 1);
+  const maxSec = Math.max(...totalVals, ...focusVals, ...neutralVals, ...distractVals, avgSec, 1);
   const maxH = niceHoursCeiling(maxSec);
   const maxScale = maxH * 3600;
   // Keep a stable viewBox so the SVG fills the card instead of exploding width.
@@ -1301,13 +1316,13 @@ function renderHoursChart(trends) {
         <text x="${padL - 6}" y="${(y + 3).toFixed(1)}" text-anchor="end" class="hours-axis">${tick}ч</text>`;
     })
     .join("");
-  const pts = vals.map((v, i) => {
-    const x = padL + (i * chartW) / Math.max(vals.length - 1, 1);
-    const y = padT + chartH - (v / maxScale) * chartH;
-    return [x, y];
-  });
-  const poly = pts.map(([x, y]) => `${x.toFixed(1)},${y.toFixed(1)}`).join(" ");
-  const area = `${padL},${(padT + chartH).toFixed(1)} ${poly} ${(padL + chartW).toFixed(1)},${(padT + chartH).toFixed(1)}`;
+  const n = rows.length;
+  const totalPts = hoursSeriesPoints(totalVals, padL, padT, chartW, chartH, maxScale, n);
+  const focusPts = hoursSeriesPoints(focusVals, padL, padT, chartW, chartH, maxScale, n);
+  const neutralPts = hoursSeriesPoints(neutralVals, padL, padT, chartW, chartH, maxScale, n);
+  const distractPts = hoursSeriesPoints(distractVals, padL, padT, chartW, chartH, maxScale, n);
+  const polyTotal = hoursPolyline(totalPts);
+  const area = `${padL},${(padT + chartH).toFixed(1)} ${polyTotal} ${(padL + chartW).toFixed(1)},${(padT + chartH).toFixed(1)}`;
   const avgY = padT + chartH - (avgSec / maxScale) * chartH;
   const avgLine =
     avgSec > 0
@@ -1316,37 +1331,43 @@ function renderHoursChart(trends) {
       : "";
   const tips = rows.map((r, i) => {
     const d = new Date(`${r.day}T12:00:00`);
-    return `${d.toLocaleDateString("ru-RU", {
+    const head = `${d.toLocaleDateString("ru-RU", {
       weekday: "short",
       day: "numeric",
       month: "short",
-    })} · ${fmtDur(vals[i])}`;
+    })} · всего ${fmtDur(totalVals[i])}`;
+    return `${head}\nФокус ${fmtDur(focusVals[i])} · Нейтрально ${fmtDur(neutralVals[i])} · Отвлечение ${fmtDur(distractVals[i])}`;
   });
   const dense = rows.length > 60;
   const dotR = dense ? 2.5 : 4.5;
   const hitR = dense ? 8 : 12;
-  const dots = pts
-    .map(([x, y], i) => {
+  const xLabels = totalPts
+    .map(([x], i) => {
+      if (!shouldShowHoursXLabel(i, rows.length)) return "";
       const label = hoursXLabel(rows[i].day, rows.length);
-      const showLabel = shouldShowHoursXLabel(i, rows.length);
-      const labelSvg = showLabel
-        ? `<text x="${x}" y="${h - 8}" text-anchor="middle" class="hours-axis hours-x">${escapeHtml(label)}</text>`
-        : "";
-      return `<g class="hours-point" tabindex="0" aria-label="${escapeHtml(tips[i])}">
+      return `<text x="${x}" y="${h - 8}" text-anchor="middle" class="hours-axis hours-x">${escapeHtml(label)}</text>`;
+    })
+    .join("");
+  const dots = totalPts
+    .map(([x, y], i) => {
+      return `<g class="hours-point" tabindex="0" aria-label="${escapeHtml(tips[i].replace(/\n/g, " · "))}">
         <circle cx="${x}" cy="${y}" r="${hitR}" class="hours-dot-hit"/>
         <circle cx="${x}" cy="${y}" r="${dotR}" class="hours-dot"/>
-        ${labelSvg}
       </g>`;
     })
     .join("");
   el.innerHTML = `<svg class="hours-line-svg" viewBox="0 0 ${w} ${h}" preserveAspectRatio="xMidYMid meet" role="img" aria-label="${escapeHtml(trendsTitleForRows(rows))}">
     ${grid}
     <polygon class="hours-line-fill" points="${area}"/>
-    <polyline class="hours-line-path" fill="none" points="${poly}"/>
+    <polyline class="hours-line-path is-distracting" fill="none" points="${hoursPolyline(distractPts)}"/>
+    <polyline class="hours-line-path is-neutral" fill="none" points="${hoursPolyline(neutralPts)}"/>
+    <polyline class="hours-line-path is-productive" fill="none" points="${hoursPolyline(focusPts)}"/>
+    <polyline class="hours-line-path is-total" fill="none" points="${polyTotal}"/>
     ${avgLine}
+    ${xLabels}
     ${dots}
   </svg>`;
-  bindHoursChartInteractions(el, pts, tips);
+  bindHoursChartInteractions(el, totalPts, tips);
 }
 
 function renderProdDaysChart(trends) {

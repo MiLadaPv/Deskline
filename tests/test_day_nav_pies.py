@@ -132,3 +132,21 @@ def test_focus_rhythm_chart_no_capsules():
     chunk = css[start : start + 260]
     assert "border-radius: 999px" not in chunk
     assert "border-radius: 0" in chunk
+
+
+def test_hours_chart_multi_series():
+    from deskline.config import WEB_ROOT
+
+    html = (WEB_ROOT / "templates" / "index.html").read_text(encoding="utf-8")
+    css = (WEB_ROOT / "static" / "css" / "app.css").read_text(encoding="utf-8")
+    js = (WEB_ROOT / "static" / "js" / "app.js").read_text(encoding="utf-8")
+    assert "hours-line-legend" in html
+    assert "hours-leg-total" in html
+    assert "hours-line-path.is-total" in css
+    assert "hours-line-path.is-productive" in css
+    assert "hours-line-path.is-neutral" in css
+    assert "hours-line-path.is-distracting" in css
+    assert "stroke-width: 3.75" in css
+    assert 'class="hours-line-path is-total"' in js
+    assert 'class="hours-line-path is-distracting"' in js
+    assert "by_category?.productive" in js

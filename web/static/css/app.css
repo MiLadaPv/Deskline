@@ -4721,10 +4721,54 @@ html[data-theme="dark"] .google-btn {
 }
 
 .hours-line-path {
-  stroke: var(--accent);
-  stroke-width: 3;
+  fill: none;
   stroke-linejoin: round;
   stroke-linecap: round;
+}
+
+.hours-line-path.is-distracting {
+  stroke: var(--focus);
+  stroke-width: 1.75;
+  opacity: 0.92;
+}
+
+.hours-line-path.is-neutral {
+  stroke: #6d7c74;
+  stroke-width: 1.75;
+  opacity: 0.9;
+}
+
+.hours-line-path.is-productive {
+  stroke: #1f6b56;
+  stroke-width: 2;
+}
+
+.hours-line-path.is-total {
+  stroke: var(--accent);
+  stroke-width: 3.75;
+}
+
+html[data-theme="dark"] .hours-line-path.is-productive {
+  stroke: #3dcea3;
+}
+
+html[data-theme="dark"] .hours-line-path.is-neutral {
+  stroke: #9fb5ab;
+}
+
+.hours-line-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 14px;
+  margin-top: 10px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--ink-soft);
+}
+
+.hours-line-legend .stack-leg i.hours-leg-total {
+  background: var(--accent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 28%, transparent);
 }
 
 .hours-dot-hit {
@@ -4764,7 +4808,8 @@ html[data-theme="dark"] .google-btn {
   color: #f4faf7;
   font-size: 0.78rem;
   font-weight: 600;
-  white-space: nowrap;
+  white-space: pre-line;
+  text-align: center;
   pointer-events: none;
   box-shadow: 0 10px 24px rgba(21, 36, 31, 0.22);
 }
