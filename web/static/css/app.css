@@ -174,6 +174,12 @@ html, body {
   }
 
   .top .brand-block,
+  .brand-block .logo-mark,
+  .brand-block .eyebrow,
+  .brand-block .brand-word,
+  .brand-block .tagline,
+  .brand-block .logo-mark::after,
+  .brand-word::after,
   .app-nav-rail,
   .hero-actions,
   main > .panel.active,
@@ -189,6 +195,11 @@ html, body {
     filter: none !important;
     opacity: 1 !important;
     transform: none !important;
+  }
+
+  .brand-word::after,
+  .brand-block .logo-mark::after {
+    display: none;
   }
 }
 
@@ -268,21 +279,166 @@ html, body {
   color: var(--ink-soft);
 }
 
+.brand-block {
+  position: relative;
+  isolation: isolate;
+  padding: 6px 0 2px;
+}
+
+.brand-block::before {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  left: -28px;
+  top: -18px;
+  width: min(420px, 72vw);
+  height: min(168px, 28vw);
+  border-radius: 40% 55% 45% 50%;
+  background:
+    radial-gradient(ellipse 70% 65% at 28% 42%, color-mix(in srgb, var(--accent) 22%, transparent), transparent 72%),
+    radial-gradient(ellipse 55% 50% at 68% 58%, color-mix(in srgb, var(--accent-soft) 70%, transparent), transparent 75%);
+  filter: blur(2px);
+  pointer-events: none;
+  animation: brandAuraDrift 14s ease-in-out infinite alternate;
+}
+
 .brand-block .brand-lockup {
-  margin-bottom: 4px;
+  margin-bottom: 2px;
+  gap: 16px;
+  align-items: center;
+}
+
+.brand-block .eyebrow {
+  margin: 0 0 8px;
+  color: color-mix(in srgb, var(--accent) 72%, var(--ink-soft));
+  letter-spacing: 0.18em;
+  font-weight: 700;
 }
 
 .brand-block .brand-lockup-name {
-  font-size: clamp(2.75rem, 6.2vw, 4.6rem);
+  font-size: clamp(2.9rem, 6.6vw, 4.85rem);
+  line-height: 0.9;
+  letter-spacing: -0.045em;
+  color: transparent;
+}
+
+.brand-word {
+  position: relative;
+  display: inline-block;
+  background: linear-gradient(
+    118deg,
+    var(--ink) 0%,
+    var(--ink) 48%,
+    color-mix(in srgb, var(--accent) 48%, var(--ink)) 100%
+  );
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  filter: drop-shadow(0 10px 22px color-mix(in srgb, var(--accent) 16%, transparent));
+}
+
+.brand-word::after {
+  content: "";
+  position: absolute;
+  inset: -8% -12%;
+  background: linear-gradient(
+    105deg,
+    transparent 34%,
+    color-mix(in srgb, #fff 55%, transparent) 50%,
+    transparent 66%
+  );
+  background-size: 220% 100%;
+  background-position: 120% 0;
+  mix-blend-mode: soft-light;
+  pointer-events: none;
+  opacity: 0.55;
+  animation: brandWordSheen 10s ease-in-out 2.2s infinite;
 }
 
 .brand-block .logo-mark {
-  width: 64px;
-  height: 64px;
+  width: 72px;
+  height: 72px;
+  border-radius: 18px;
+  background:
+    linear-gradient(160deg, color-mix(in srgb, #fff 55%, transparent), transparent 55%),
+    color-mix(in srgb, var(--accent-soft) 88%, transparent);
+  box-shadow:
+    0 1px 0 color-mix(in srgb, #fff 55%, transparent),
+    0 10px 28px color-mix(in srgb, var(--accent) 18%, transparent);
+  overflow: visible;
+}
+
+.brand-block .logo-mark::after {
+  content: "";
+  position: absolute;
+  inset: -10%;
+  border-radius: inherit;
+  background: radial-gradient(circle at 50% 45%, color-mix(in srgb, var(--accent) 28%, transparent), transparent 68%);
+  z-index: -1;
+  opacity: 0.55;
+  animation: brandMarkHalo 6.5s ease-in-out infinite;
+  pointer-events: none;
+}
+
+.brand-block .logo-mark.logo-anim {
+  animation: logo-tile-in 0.75s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.brand-block .tagline {
+  margin: 14px 0 0;
+  max-width: 36ch;
+  color: color-mix(in srgb, var(--ink-soft) 88%, var(--ink));
+  font-size: 1.05rem;
+  line-height: 1.5;
+}
+
+@keyframes brandAuraDrift {
+  from { transform: translate3d(0, 0, 0) scale(1); opacity: 0.72; }
+  to { transform: translate3d(4%, 6%, 0) scale(1.06); opacity: 1; }
+}
+
+@keyframes brandMarkHalo {
+  0%, 100% { opacity: 0.35; transform: scale(0.96); }
+  50% { opacity: 0.7; transform: scale(1.08); }
+}
+
+@keyframes brandWordSheen {
+  0%, 72%, 100% { background-position: 120% 0; opacity: 0.2; }
+  82% { background-position: -20% 0; opacity: 0.65; }
+}
+
+@keyframes brandPieceIn {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes brandWordIn {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+    letter-spacing: -0.02em;
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+    letter-spacing: -0.045em;
+  }
 }
 
 body.is-shell-ready .top .brand-block {
-  animation: shellRise 0.75s var(--ease-out) both;
+  animation: none;
+}
+
+body.is-shell-ready .brand-block .eyebrow {
+  animation: brandPieceIn 0.7s var(--ease-out) 0.06s both;
+}
+
+body.is-shell-ready .brand-block .brand-word {
+  animation: brandWordIn 0.85s var(--ease-out) 0.12s both;
+}
+
+body.is-shell-ready .brand-block .tagline {
+  animation: brandPieceIn 0.75s var(--ease-out) 0.22s both;
 }
 
 body.is-shell-ready .app-nav-rail {
@@ -299,6 +455,25 @@ body.is-shell-ready .hero-actions {
   color: var(--ink-soft);
   font-size: 1.02rem;
   line-height: 1.45;
+}
+
+html[data-theme="dark"] .brand-block::before {
+  background:
+    radial-gradient(ellipse 70% 65% at 28% 42%, color-mix(in srgb, var(--accent) 28%, transparent), transparent 72%),
+    radial-gradient(ellipse 55% 50% at 68% 58%, color-mix(in srgb, var(--accent-soft) 80%, transparent), transparent 75%);
+}
+
+html[data-theme="dark"] .brand-block .logo-mark {
+  background:
+    linear-gradient(160deg, color-mix(in srgb, #fff 8%, transparent), transparent 55%),
+    color-mix(in srgb, var(--accent-soft) 92%, transparent);
+  box-shadow:
+    0 1px 0 color-mix(in srgb, #fff 8%, transparent),
+    0 12px 30px color-mix(in srgb, var(--accent) 22%, transparent);
+}
+
+html[data-theme="dark"] .brand-word {
+  filter: drop-shadow(0 12px 26px color-mix(in srgb, var(--accent) 22%, transparent));
 }
 
 .sr-only {

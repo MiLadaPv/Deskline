@@ -28,6 +28,7 @@ def test_dashboard_index_ok(tmp_path, monkeypatch):
     res = client.get("/")
     assert res.status_code == 200
     assert "Deskline" in res.text
+    assert "brand-word" in res.text
     assert 'id="shotLightbox"' in res.text
     assert 'id="toastRegion"' in res.text
     assert 'id="settingsSaveStatus"' in res.text
