@@ -2311,6 +2311,7 @@ function wireMeetingExpand(listEl) {
   listEl.addEventListener("click", (ev) => {
     const btn = ev.target.closest(".meeting-expand");
     if (!btn || !listEl.contains(btn)) return;
+    if (btn.classList.contains("meeting-peers-toggle")) return;
     const row = btn.closest(".meeting-session");
     if (!row) return;
     const open = row.classList.toggle("is-open");
@@ -2318,6 +2319,22 @@ function wireMeetingExpand(listEl) {
     btn.textContent = open ? "Свернуть" : "Развернуть";
     const detail = row.querySelector(".meeting-detail");
     if (detail) detail.hidden = !open;
+  });
+}
+
+function wireMeetingChannelPeers(listEl) {
+  if (!listEl || listEl.dataset.peersWired === "1") return;
+  listEl.dataset.peersWired = "1";
+  listEl.addEventListener("click", (ev) => {
+    const btn = ev.target.closest(".meeting-peers-toggle");
+    if (!btn || !listEl.contains(btn)) return;
+    const row = btn.closest(".meeting-channel");
+    if (!row) return;
+    const open = row.classList.toggle("is-open");
+    btn.setAttribute("aria-expanded", open ? "true" : "false");
+    btn.textContent = open ? "Свернуть" : "С кем";
+    const panel = row.querySelector(".meeting-peers");
+    if (panel) panel.hidden = !open;
   });
 }
 
@@ -2356,7 +2373,7 @@ async function refreshMeetings() {
     filterEmployeeId || "",
     report.total_sec,
     report.email_total_sec || 0,
-    (report.top || []).map((r) => `${r.key}:${Math.floor(r.sec / 60)}`).join(","),
+    (report.top || []).map((r) => `${r.key}:${Math.floor(r.sec / 60)}:${(r.peers||[]).length}`).join(","),
     (report.sessions || []).length,
     (report.email_top || []).length,
   ].join("|");
@@ -2400,20 +2417,46 @@ async function refreshMeetings() {
     } else {
       const total = report.total_sec || 0;
       topEl.innerHTML = rows
-        .map((r) => {
+        .map((r, idx) => {
           const icon = r.icon_url
             ? iconImgHtml(r.icon_url)
             : `<span class="rank-icon" aria-hidden="true">•</span>`;
           const share = total ? Math.round((r.sec / total) * 100) : 0;
           const kind = r.source === "site" ? "сайт" : "приложение";
-          return `<li>
-            ${icon}
-            <span class="rank-name">${escapeHtml(r.name)} <span class="rank-kind">${kind}</span></span>
-            <span class="rank-meta">${fmtDur(r.sec)} · ${share}%</span>
+          const peers = r.peers || [];
+          const peerRows = peers.length
+            ? peers
+                .map((p) => {
+                  const tag = p.kind === "group" ? "группа" : "чат";
+                  return `<li class="meeting-peer">
+                    <span class="meeting-peer-tag">${tag}</span>
+                    <span class="meeting-peer-name">${escapeHtml(p.name)}</span>
+                    <span class="meeting-peer-meta">${fmtDur(p.sec)}</span>
+                  </li>`;
+                })
+                .join("")
+            : "";
+          const body = peers.length
+            ? `<ul class="meeting-peers-list">${peerRows}</ul>`
+            : `<p class="hint meeting-peers-empty">${escapeHtml(r.peers_hint || "Имён в заголовке окна не было.")}</p>`;
+          return `<li class="meeting-channel" data-channel-idx="${idx}">
+            <div class="meeting-channel-main">
+              ${icon}
+              <span class="meeting-channel-text">
+                <span class="rank-name">${escapeHtml(r.name)} <span class="rank-kind">${kind}</span></span>
+                <button type="button" class="meeting-expand meeting-peers-toggle" aria-expanded="false">С кем</button>
+              </span>
+              <span class="rank-meta">${fmtDur(r.sec)} · ${share}%</span>
+            </div>
+            <div class="meeting-peers" hidden>
+              <span class="meeting-detail-label">С кем говорили</span>
+              ${body}
+            </div>
           </li>`;
         })
         .join("");
     }
+    wireMeetingChannelPeers(topEl);
   }
 
   const sessEl = document.getElementById("meetingsSessions");

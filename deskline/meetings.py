@@ -8,7 +8,7 @@ import re
 from datetime import datetime
 from typing import Any
 
-from deskline.classify import SITE_ACTIVITIES, clean_browser_title
+from deskline.classify import SITE_ACTIVITIES
 
 # Desktop executables where calls/meetings are primary (also used for longer idle).
 MEETING_APP_EXES: frozenset[str] = frozenset(
@@ -83,9 +83,12 @@ _MEETING_TITLE_RE = re.compile(
 )
 _BRAND_PREFIX_RE = re.compile(
     r"^(?:"
+    r"(?:звонок\s+(?:в\s+)?)?(?:яндекс\s*)?телемост\w*|"
     r"яндекс\s*мессенджер|yandex\s*messenger|"
-    r"яндекс\s*телемост|yandex\s*telemost|телемост|telemost|"
-    r"google\s*meet|zoom(?:\s*meeting)?|microsoft\s*teams|teams|webex|discord|skype"
+    r"yandex\s*telemost\w*|telemost\w*|"
+    r"google\s*meet|"
+    r"zoom(?:\s+meeting)?(?:\s+with)?|"
+    r"microsoft\s*teams|teams|webex|discord|skype"
     r")\s*[—\-–|·:]*\s*",
     re.IGNORECASE,
 )
@@ -95,7 +98,8 @@ _NOISE_DETAIL = re.compile(
     r"unread(?:\s+messages?)?|"
     r"непрочитанн\w*|"
     r"входящие|inbox|sent|черновики|drafts|"
-    r"создать\s+видеовстречу|бесплатные\s+видеовстречи.*"
+    r"создать\s+(?:видео)?встреч\w*|"
+    r"бесплатные\s+видеовстречи.*"
     r")$",
     re.IGNORECASE,
 )
@@ -223,6 +227,69 @@ def is_email_activity(
     label = str(activity_label or "").casefold()
     return any(tok in label for tok in ("почта", "gmail", "outlook", "mail.ru"))
 
+_PAGES_RE = re.compile(
+    r"\s*(?:и еще\s+)?\d+\s+страниц\w*\b",
+    re.IGNORECASE,
+)
+_UNREAD_RE = re.compile(
+    r"\s*[—\-–|·:]*\s*\d+\s+"
+    r"(?:"
+    r"нов\w*\s+сообщени\w*"
+    r"|unread(?:\s+messages?)?"
+    r"|непрочитанн\w*"
+    r")\b",
+    re.IGNORECASE,
+)
+_GROUP_SPLIT_RE = re.compile(r"\s*(?:,|;|/|·|\||\bи\b)\s*", re.IGNORECASE)
+
+
+def meeting_peers_from_title(
+    window_title: str | None,
+    *,
+    site: str | None = None,
+    activity_label: str | None = None,
+) -> list[str]:
+    """Extract chat/call counterpart names from a window title (best-effort).
+
+    Edge often does NOT put Yandex Messenger peer names in the title — only unread
+    counters. Telemost / Zoom / Teams titles frequently do include names.
+    """
+    from deskline.classify import _BROWSER_APP_TAIL, _BROWSER_EXTRA_PAGES
+
+    title = (window_title or "").replace("\u200b", "").replace("\xa0", " ").strip()
+    if not title:
+        return []
+    title = _BROWSER_EXTRA_PAGES.sub("", title)
+    title = _BROWSER_APP_TAIL.sub("", title)
+    title = re.sub(r"\s*[—\-–|]\s*microsoft\s*teams\s*$", "", title, flags=re.IGNORECASE)
+    title = _PAGES_RE.sub("", title)
+    title = _UNREAD_RE.sub("", title)
+    title = re.sub(r"\s+[—\-–|]\s*$", "", title).strip(" -—|·:•")
+    title = _BRAND_PREFIX_RE.sub("", title).strip(" -—|·:•")
+    title = re.sub(r"(?:^|\s)—?\s*яндекс\s*:.*$", "", title, flags=re.IGNORECASE).strip(" -—|·:•")
+    title = re.sub(r"^яндекс\s*:\s*", "", title, flags=re.IGNORECASE).strip(" -—|·:•")
+    if not title or len(title) < 2:
+        return []
+    if _NOISE_DETAIL.match(title):
+        return []
+    brand = (activity_label or meeting_site_label(site) or "").casefold()
+    if brand and title.casefold() == brand:
+        return []
+    parts = [p.strip(" -—|·:•") for p in _GROUP_SPLIT_RE.split(title) if p and p.strip()]
+    peers: list[str] = []
+    for part in parts or [title]:
+        if len(part) < 2 or _NOISE_DETAIL.match(part):
+            continue
+        part = re.sub(r"^(?:with|с|со)\s+", "", part, flags=re.IGNORECASE).strip()
+        if brand and part.casefold() == brand:
+            continue
+        if len(part) > 64:
+            part = part[:61].rstrip(" -—|·") + "…"
+        if part not in peers:
+            peers.append(part)
+    return peers[:8]
+
+
 def meeting_context_from_title(
     window_title: str | None,
     *,
@@ -230,30 +297,82 @@ def meeting_context_from_title(
     activity_label: str | None = None,
 ) -> str | None:
     """Best-effort 'with whom / about what' from the window title (may be empty)."""
-    cleaned = clean_browser_title(window_title)
-    if not cleaned:
+    peers = meeting_peers_from_title(
+        window_title, site=site, activity_label=activity_label
+    )
+    if not peers:
         return None
-    text = cleaned.replace("\xa0", " ").strip()
-    text = _BRAND_PREFIX_RE.sub("", text).strip(" -—|·:•")
-    if not text:
-        return None
-    if _NOISE_DETAIL.match(text):
-        return None
-    # Drop leftover unread counters mid-string
-    text = re.sub(
-        r"\b\d+\s+(?:нов\w*\s+сообщен\w*|unread(?:\s+messages?)?)\b",
-        "",
-        text,
-        flags=re.IGNORECASE,
-    ).strip(" -—|·:•")
-    if not text or len(text) < 2:
-        return None
-    brand = (activity_label or meeting_site_label(site) or "").casefold()
-    if brand and text.casefold() == brand:
-        return None
-    if len(text) > 72:
-        return text[:69].rstrip(" -—|·") + "…"
-    return text
+    return peers[0] if len(peers) == 1 else ", ".join(peers)
+
+
+def is_group_meeting_title(window_title: str | None) -> bool:
+    peers = meeting_peers_from_title(window_title)
+    if len(peers) >= 2:
+        return True
+    blob = (window_title or "").casefold()
+    return any(tok in blob for tok in ("групп", "group", "команд", "team meeting", "standup"))
+
+
+def attach_peers_to_channels(
+    channels: list[dict[str, Any]], sessions: list[dict[str, Any]]
+) -> list[dict[str, Any]]:
+    """Roll session peer details up onto channel rows for expandable «С кем»."""
+    buckets: dict[str, dict[str, dict[str, Any]]] = {}
+    for sess in sessions or []:
+        site = normalize_site_host(sess.get("site"))
+        app = normalize_app_exe(sess.get("app_name"))
+        channel_key = f"site:{site}" if site else f"app:{app}"
+        peers = list(sess.get("peers") or [])
+        if not peers and sess.get("detail"):
+            peers = [str(sess["detail"])]
+        if not peers:
+            peers = meeting_peers_from_title(
+                sess.get("window_title"),
+                site=site,
+                activity_label=sess.get("name") or sess.get("display_name"),
+            )
+        if not peers:
+            continue
+        sec = float(sess.get("sec") or 0)
+        kind = (
+            "group"
+            if len(peers) >= 2 or is_group_meeting_title(sess.get("window_title"))
+            else "dm"
+        )
+        label = ", ".join(peers) if kind == "group" else peers[0]
+        channel_bucket = buckets.setdefault(channel_key, {})
+        slot = channel_bucket.setdefault(
+            label.casefold(),
+            {"name": label, "sec": 0.0, "kind": kind, "parts": 0},
+        )
+        slot["sec"] = round(float(slot["sec"]) + sec, 1)
+        slot["parts"] = int(slot["parts"]) + 1
+        if kind == "group":
+            slot["kind"] = "group"
+
+    out: list[dict[str, Any]] = []
+    for ch in channels:
+        row = dict(ch)
+        key = str(row.get("key") or "")
+        peer_map = buckets.get(key) or {}
+        peers = sorted(peer_map.values(), key=lambda r: float(r["sec"]), reverse=True)
+        row["peers"] = peers[:12]
+        row["peers_sec"] = round(sum(float(p["sec"]) for p in peers), 1)
+        row["has_peers"] = bool(peers)
+        if key.startswith("site:messenger.yandex.ru") and not peers:
+            row["peers_hint"] = (
+                "Edge не пишет имя чата в заголовок окна для Яндекс Мессенджера "
+                "(только «N новых сообщений») — собеседника отсюда не видно."
+            )
+        elif not peers:
+            row["peers_hint"] = (
+                "В заголовке окна не было имён. Для Zoom/Teams/Телемоста имена "
+                "появятся, если их показывает сам заголовок."
+            )
+        else:
+            row["peers_hint"] = None
+        out.append(row)
+    return out
 
 
 def _session_channel_key(row: dict[str, Any]) -> tuple[str, str]:
@@ -298,10 +417,13 @@ def compact_meeting_sessions(
                 prev["ended_at"] = cur.get("ended_at") or prev.get("ended_at")
                 prev["sec"] = round(float(prev["sec"]) + cur["sec"], 1)
                 prev["parts"] = int(prev.get("parts") or 1) + cur["parts"]
-                # Keep a useful detail if the longer row had none.
                 if not prev.get("detail") and cur.get("detail"):
                     prev["detail"] = cur["detail"]
                     prev["has_detail"] = True
+                if cur.get("peers"):
+                    prev["peers"] = list(
+                        dict.fromkeys([*(prev.get("peers") or []), *cur["peers"]])
+                    )
                 continue
         out.append(cur)
     while len(out) >= 2 and float(out[0].get("sec") or 0) < min_sec:
@@ -366,6 +488,9 @@ def build_meetings_report(
     combined = apps_out + sites_out
     combined.sort(key=lambda r: r["sec"], reverse=True)
     total_sec = round(sum(r["sec"] for r in combined), 1)
+
+    # Use raw (pre-compact) sessions for peer mining so short named flickers aren't lost.
+    peer_source: list[dict[str, Any]] = []
     sess_out: list[dict[str, Any]] = []
     for row in sessions or []:
         app = row.get("app_name")
@@ -377,24 +502,34 @@ def build_meetings_report(
         ):
             continue
         inferred = infer_meeting_site(site=site, activity_label=label, window_title=title)
-        detail = meeting_context_from_title(title, site=inferred or site, activity_label=label)
-        sess_out.append(
-            {
-                "started_at": row.get("started_at"),
-                "ended_at": row.get("ended_at"),
-                "sec": row.get("sec"),
-                "idle_sec": row.get("idle_sec"),
-                "name": label,
-                "app_name": row.get("app_name"),
-                "display_name": row.get("display_name"),
-                "site": inferred or site,
-                "category": row.get("category"),
-                "icon_url": row.get("icon_url"),
-                "window_title": title,
-                "detail": detail,
-                "has_detail": bool(detail),
-            }
+        peers = meeting_peers_from_title(
+            title, site=inferred or site, activity_label=label
         )
+        detail = meeting_context_from_title(
+            title, site=inferred or site, activity_label=label
+        )
+        item = {
+            "started_at": row.get("started_at"),
+            "ended_at": row.get("ended_at"),
+            "sec": row.get("sec"),
+            "idle_sec": row.get("idle_sec"),
+            "name": label,
+            "app_name": row.get("app_name"),
+            "display_name": row.get("display_name"),
+            "site": inferred or site,
+            "category": row.get("category"),
+            "icon_url": row.get("icon_url"),
+            "window_title": title,
+            "detail": detail,
+            "peers": peers,
+            "has_detail": bool(detail),
+            "is_group": len(peers) >= 2 or is_group_meeting_title(title),
+        }
+        peer_source.append(item)
+        sess_out.append(item)
+
+    combined = attach_peers_to_channels(combined, peer_source)
+
     sess_out.sort(key=lambda r: str(r.get("started_at") or ""))
     sess_out = compact_meeting_sessions(sess_out, min_sec=60.0, max_gap_sec=180.0)
     sess_out.sort(key=lambda r: str(r.get("started_at") or ""), reverse=True)
@@ -424,7 +559,7 @@ def build_meetings_report(
         "email_sessions": email_sess[:12],
         "note": (
             "Учитывается время в фокусе окна: Телемост, Яндекс Мессенджер, Teams, Zoom, Meet… "
-            "и отдельно почта. Это не факт «в звонке», а активное окно. "
-            "В «Недавних окнах» короткие переключения склеены; «Развернуть» — контекст заголовка."
+            "Кнопка «С кем» на канале показывает имена из заголовка окна "
+            "(групповые — списком). У Мессенджера в Edge имя чата в заголовок часто не попадает."
         ),
     }

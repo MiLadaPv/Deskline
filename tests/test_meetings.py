@@ -74,6 +74,60 @@ def test_meeting_context_from_title_strips_noise():
     )
 
 
+def test_meeting_peers_from_titles():
+    from deskline.meetings import meeting_peers_from_title
+
+    assert meeting_peers_from_title(
+        "Zoom Meeting with Alice, Bob — Google Chrome", site="zoom.us"
+    ) == ["Alice", "Bob"]
+    assert meeting_peers_from_title(
+        "Звонок в Яндекс Телемосте — Команда Проект — Личный: Microsoft Edge"
+    ) == ["Команда Проект"]
+    assert (
+        meeting_peers_from_title(
+            "Яндекс Мессенджер — 10 новых сообщений и еще 9 страниц — Личный: Microsoft Edge"
+        )
+        == []
+    )
+
+
+def test_attach_peers_to_channels_marks_messenger_hint():
+    from deskline.meetings import attach_peers_to_channels
+
+    channels = attach_peers_to_channels(
+        [{"key": "site:messenger.yandex.ru", "name": "Яндекс Мессенджер", "sec": 100}],
+        [
+            {
+                "site": "messenger.yandex.ru",
+                "sec": 100,
+                "window_title": "Яндекс Мессенджер — 3 новых сообщения и еще 8 страниц — Личный: Microsoft Edge",
+            }
+        ],
+    )
+    assert channels[0]["has_peers"] is False
+    assert "Edge" in (channels[0].get("peers_hint") or "")
+
+    with_peers = attach_peers_to_channels(
+        [{"key": "site:telemost.yandex.ru", "name": "Яндекс Телемост", "sec": 50}],
+        [
+            {
+                "site": "telemost.yandex.ru",
+                "sec": 20,
+                "window_title": "Звонок в Яндекс Телемосте — Анна, Иван — Личный: Microsoft Edge",
+            },
+            {
+                "site": "telemost.yandex.ru",
+                "sec": 30,
+                "window_title": "Звонок в Яндекс Телемосте — Команда Проект — Личный: Microsoft Edge",
+            },
+        ],
+    )
+    assert with_peers[0]["has_peers"] is True
+    names = {p["name"] for p in with_peers[0]["peers"]}
+    assert "Анна, Иван" in names or "Анна" in str(names)
+    assert "Команда Проект" in names
+
+
 def test_compact_meeting_sessions_absorbs_messenger_flicker():
     from deskline.meetings import compact_meeting_sessions
 
