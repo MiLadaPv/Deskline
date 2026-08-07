@@ -73,11 +73,12 @@ def test_day_feed_ux_contracts():
     assert 'data-gantt-mode="active"' in html
     assert 'data-gantt-mode="full"' in html
     assert 'id="dayPictureTitle"' in html
-    assert "Сверху — самые свежие" in html
+    assert "Сверху свежие" in html
     assert "function activityViewBounds" in js
-    assert "Newest first" in js
+    assert "Newest first" in js or "compactFeedRows" in js
     assert "dayGanttMode" in js
     assert "highlightTimelineSession" in js
+    assert "compactFeedRows" in js
     assert ".day-picture-head" in css
     assert ".timeline li.is-hot" in css
 

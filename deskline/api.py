@@ -920,15 +920,23 @@ def create_app(tracker: Tracker, db: Database | None = None) -> FastAPI:
     def timeline(
         day: str | None = Query(default=None, description="YYYY-MM-DD local calendar day"),
         employee_id: int | None = None,
+        compact: bool = Query(
+            default=False,
+            description="Absorb sub-minute flickers for a shorter Day feed list",
+        ),
     ) -> list[dict[str, Any]]:
         if not day:
-            return db.timeline_for_day(date.today(), employee_id=employee_id)
-        try:
-            target = date.fromisoformat(day)
-        except ValueError as exc:
-            raise HTTPException(400, "Invalid day; use YYYY-MM-DD") from exc
-        _assert_day_allowed(target)
-        return db.timeline_for_day(target, employee_id=employee_id)
+            rows = db.timeline_for_day(date.today(), employee_id=employee_id)
+        else:
+            try:
+                target = date.fromisoformat(day)
+            except ValueError as exc:
+                raise HTTPException(400, "Invalid day; use YYYY-MM-DD") from exc
+            _assert_day_allowed(target)
+            rows = db.timeline_for_day(target, employee_id=employee_id)
+        if compact:
+            return db.compact_timeline_feed(rows)
+        return rows
 
     @app.get("/api/projects")
     def projects(include_archived: bool = False) -> list[dict[str, Any]]:

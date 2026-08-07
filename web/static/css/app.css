@@ -1015,6 +1015,35 @@ html[data-theme="dark"] .rank-row-child {
   border-bottom: 1px solid var(--line);
 }
 
+#panel-day .timeline li {
+  grid-template-columns: 3.6rem 28px minmax(0, 1fr) auto;
+  column-gap: 10px;
+  padding: 6px 0;
+}
+
+#panel-day .timeline .rank-icon {
+  width: 28px;
+  height: 28px;
+  padding: 2px;
+  border-radius: 8px;
+}
+
+#panel-day .timeline .rank-name {
+  font-size: 0.92rem;
+}
+
+#panel-day .timeline .timeline-time,
+#panel-day .timeline .rank-meta {
+  font-size: 0.82rem;
+}
+
+.timeline-parts {
+  margin-left: 8px;
+  color: var(--ink-soft);
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
 .timeline-time {
   font-variant-numeric: tabular-nums;
   color: var(--ink-soft);

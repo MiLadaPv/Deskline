@@ -3005,6 +3005,51 @@ function dayTimelineSignature(rows) {
     .join(";");
 }
 
+/** Absorb sub-minute flickers into the previous row — keeps the Day list readable. */
+function compactFeedRows(rows, minSec = 60, maxGapSec = 45) {
+  if (!rows || !rows.length) return [];
+  const chrono = [...rows].sort(
+    (a, b) => new Date(a.started_at).getTime() - new Date(b.started_at).getTime()
+  );
+  const out = [];
+  for (const raw of chrono) {
+    const cur = {
+      ...raw,
+      sec: Number(raw.sec) || 0,
+      idle_sec: Number(raw.idle_sec) || 0,
+      parts: Number(raw.parts) || 1,
+    };
+    if (out.length) {
+      const prev = out[out.length - 1];
+      const same =
+        String(prev.name || "").toLowerCase() === String(cur.name || "").toLowerCase() &&
+        String(prev.app_name || "").toLowerCase() === String(cur.app_name || "").toLowerCase();
+      const gap = Math.max(
+        0,
+        (new Date(cur.started_at).getTime() - new Date(prev.ended_at || cur.started_at).getTime()) /
+          1000
+      );
+      if (cur.sec < minSec || (same && gap <= maxGapSec)) {
+        prev.ended_at = cur.ended_at || prev.ended_at;
+        prev.sec = Math.round((prev.sec + cur.sec) * 10) / 10;
+        prev.idle_sec = Math.round((prev.idle_sec + cur.idle_sec) * 10) / 10;
+        prev.parts += cur.parts;
+        continue;
+      }
+    }
+    out.push(cur);
+  }
+  while (out.length >= 2 && out[0].sec < minSec) {
+    const first = out.shift();
+    const next = out[0];
+    next.started_at = first.started_at || next.started_at;
+    next.sec = Math.round((next.sec + first.sec) * 10) / 10;
+    next.idle_sec = Math.round((next.idle_sec + first.idle_sec) * 10) / 10;
+    next.parts += first.parts;
+  }
+  return out;
+}
+
 async function refreshTimeline() {
   ensureSelectedDay();
   renderDayWeekStrip();
@@ -3031,6 +3076,7 @@ async function refreshTimeline() {
       showToast("Не удалось загрузить ленту дня", "error");
     }
 
+    const feedRows = compactFeedRows(rows);
     const viewKey = [
       selectedDayIso,
       filterEmployeeId || "",
@@ -3038,6 +3084,7 @@ async function refreshTimeline() {
       dayGanttMode,
       summaryKey(summary),
       dayTimelineSignature(rows),
+      `feed:${feedRows.length}`,
     ].join("|");
     if (viewKey === lastDayViewKey) return;
     lastDayViewKey = viewKey;
@@ -3052,26 +3099,30 @@ async function refreshTimeline() {
       return;
     }
 
+    // Day strip keeps full detail; the list absorbs sub-minute flickers.
     renderDayGantt(rows);
     renderDaySummaryLine(summary);
 
     if (!el) return;
-    if (!rows.length) {
+    if (!feedRows.length) {
       el.innerHTML = `<li><span class="timeline-time">—</span><span class="rank-icon">•</span><span class="rank-name">Пока нет сессий</span><span class="rank-meta"></span></li>`;
       return;
     }
-    // Newest first — nobody wants to scroll from 08:00 to find what they just did.
-    const listRows = [...rows].sort(
+    const listRows = [...feedRows].sort(
       (a, b) => new Date(b.started_at).getTime() - new Date(a.started_at).getTime()
     );
     el.innerHTML = listRows
       .map((r) => {
         const icon = r.icon_url
-          ? iconImgHtml(r.icon_url)
+          ? iconImgHtml(r.icon_url, 28)
           : `<span class="rank-icon">•</span>`;
         const idle =
           r.idle_sec >= 60
             ? `<span class="timeline-idle">idle ${fmtDur(r.idle_sec)}</span>`
+            : "";
+        const parts =
+          r.parts > 1
+            ? `<span class="timeline-parts">+${r.parts - 1} коротких</span>`
             : "";
         const cat = categoryClass(r.category);
         const open = !r.ended_at ? `<span class="timeline-live">сейчас</span>` : "";
@@ -3080,7 +3131,7 @@ async function refreshTimeline() {
           ${icon}
           <span>
             <span class="rank-name">${escapeHtml(r.name)}</span>
-            ${idle}${open}
+            ${idle}${parts}${open}
           </span>
           <span class="rank-meta">${fmtDur(r.sec)}</span>
         </li>`;

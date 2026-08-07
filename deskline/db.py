@@ -1273,7 +1273,7 @@ class Database:
         )
 
     def _merge_consecutive_timeline(
-        self, items: list[dict[str, Any]], *, max_gap_sec: float = 8.0
+        self, items: list[dict[str, Any]], *, max_gap_sec: float = 45.0
     ) -> list[dict[str, Any]]:
         """Collapse back-to-back same activity (title churn → many short sessions)."""
         if len(items) < 2:
@@ -1299,6 +1299,55 @@ class Database:
             else:
                 merged.append(dict(cur))
         return merged
+
+    @staticmethod
+    def compact_timeline_feed(
+        items: list[dict[str, Any]], *, min_sec: float = 60.0, max_gap_sec: float = 45.0
+    ) -> list[dict[str, Any]]:
+        """Absorb sub-minute flickers into the previous row for a readable Day feed.
+
+        The full timeline (for the day strip) stays detailed; the list should not
+        be hundreds of 3–15s app switches.
+        """
+        if not items:
+            return []
+        chrono = sorted(items, key=lambda r: str(r.get("started_at") or ""))
+        out: list[dict[str, Any]] = []
+        for raw in chrono:
+            cur = dict(raw)
+            cur["sec"] = float(cur.get("sec") or 0)
+            cur["idle_sec"] = float(cur.get("idle_sec") or 0)
+            cur["parts"] = int(cur.get("parts") or 1)
+            if out:
+                prev = out[-1]
+                same = (
+                    (prev.get("name") or "").strip().casefold()
+                    == (cur.get("name") or "").strip().casefold()
+                    and (prev.get("app_name") or "").strip().lower()
+                    == (cur.get("app_name") or "").strip().lower()
+                )
+                pe = _parse(str(prev.get("ended_at") or ""))
+                cs = _parse(str(cur.get("started_at") or ""))
+                gap = max(0.0, (cs - pe).total_seconds()) if pe and cs else 0.0
+                absorb = cur["sec"] < min_sec or (same and gap <= max_gap_sec)
+                if absorb:
+                    prev["ended_at"] = cur.get("ended_at") or prev.get("ended_at")
+                    prev["sec"] = round(float(prev["sec"]) + cur["sec"], 1)
+                    prev["idle_sec"] = round(float(prev.get("idle_sec") or 0) + cur["idle_sec"], 1)
+                    prev["parts"] = int(prev.get("parts") or 1) + cur["parts"]
+                    continue
+            out.append(cur)
+        # Fold a leading micro into the next keeper when the day starts with noise.
+        while len(out) >= 2 and float(out[0].get("sec") or 0) < min_sec:
+            first = out.pop(0)
+            nxt = out[0]
+            nxt["started_at"] = first.get("started_at") or nxt.get("started_at")
+            nxt["sec"] = round(float(nxt.get("sec") or 0) + float(first.get("sec") or 0), 1)
+            nxt["idle_sec"] = round(
+                float(nxt.get("idle_sec") or 0) + float(first.get("idle_sec") or 0), 1
+            )
+            nxt["parts"] = int(nxt.get("parts") or 1) + int(first.get("parts") or 1)
+        return out
 
     def ratings_for_day(self, day: date | None = None) -> list[dict[str, Any]]:
         """Apps and sites seen today with effective category for the ratings editor."""

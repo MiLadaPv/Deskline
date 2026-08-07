@@ -136,3 +136,39 @@ def test_timeline_merges_consecutive_same_activity(tmp_path: Path):
     assert "Telegram" in names
     first_yt = next(r for r in timeline if r["name"] == "YouTube")
     assert first_yt["sec"] >= 45
+
+
+def test_compact_timeline_feed_absorbs_flicker(tmp_path: Path):
+    db = Database(tmp_path / "feed.db")
+    t0 = datetime.now().astimezone().replace(hour=19, minute=40, second=0, microsecond=0)
+    cursor = t0
+    # Long remote, then a burst of 5–12s flickers, then long messenger.
+    plan = [
+        ("mstsc.exe", "Удалёнка", "remote", 180),
+        ("deskline-desktop.exe", "Deskline Desktop", "other", 8),
+        ("msedge.exe", "BBC", "other", 5),
+        ("explorer.exe", "Проводник", "other", 4),
+        ("msedge.exe", "Яндекс Мессенджер", "messaging", 12),
+        ("msedge.exe", "Яндекс Мессенджер", "messaging", 240),
+    ]
+    for app, label, kind, sec in plan:
+        sid = db.start_session(
+            app,
+            label,
+            "messenger.yandex.ru" if "Мессенджер" in label else None,
+            "productive" if kind == "messaging" else "neutral",
+            started_at=cursor,
+            display_name=label,
+            activity_kind=kind,
+            activity_label=label,
+        )
+        db.end_session(sid, ended_at=cursor + timedelta(seconds=sec))
+        cursor = cursor + timedelta(seconds=sec)
+
+    raw = db.timeline_for_day(t0.date())
+    feed = db.compact_timeline_feed(raw, min_sec=60)
+    assert len(feed) < len(raw)
+    assert len(feed) <= 3
+    assert sum(r["sec"] for r in feed) == sum(r["sec"] for r in raw) or abs(
+        sum(r["sec"] for r in feed) - sum(r["sec"] for r in raw)
+    ) < 1.0
