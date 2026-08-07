@@ -2560,7 +2560,7 @@ function meetingSessionRowHtml(r) {
   const detail = String(r.detail || "").trim();
   const canExpand = Boolean(detail);
   const expandBtn = canExpand
-    ? `<button type="button" class="meeting-expand" aria-expanded="false">Развернуть</button>`
+    ? `<button type="button" class="meeting-expand" aria-expanded="false">Контекст</button>`
     : "";
   const detailBlock = canExpand
     ? `<div class="meeting-detail" hidden><span class="meeting-detail-label">Контекст окна</span><p>${escapeHtml(detail)}</p></div>`
@@ -2584,6 +2584,32 @@ function meetingSessionRowHtml(r) {
   </li>`;
 }
 
+function meetingSessionGroupHtml(g) {
+  if (g.sessions.length === 1) return meetingSessionRowHtml(g.sessions[0]);
+  const icon = g.icon_url
+    ? iconImgHtml(g.icon_url, 28)
+    : `<span class="rank-icon">•</span>`;
+  const span =
+    g.earliest_started !== g.latest_started
+      ? `${fmtClock(g.earliest_started)}–${fmtClock(g.latest_started)}`
+      : fmtClock(g.latest_started);
+  return `<li class="session-group meeting-session-group" data-group="${escapeHtml(g.key)}">
+    <button type="button" class="session-group-toggle" aria-expanded="false">
+      <span class="timeline-time">${fmtClock(g.latest_started)}</span>
+      ${icon}
+      <span class="session-group-text">
+        <span class="rank-name">${escapeHtml(g.name)}</span>
+        <span class="session-group-meta">${sessionVisitLabel(g.visits)} · ${span}</span>
+      </span>
+      <span class="rank-meta">${fmtDur(g.sec)}</span>
+      <span class="session-group-chev" aria-hidden="true"></span>
+    </button>
+    <ol class="session-group-items" hidden>
+      ${g.sessions.map((r) => meetingSessionRowHtml(r)).join("")}
+    </ol>
+  </li>`;
+}
+
 function wireMeetingExpand(listEl) {
   if (!listEl || listEl.dataset.expandWired === "1") return;
   listEl.dataset.expandWired = "1";
@@ -2595,7 +2621,7 @@ function wireMeetingExpand(listEl) {
     if (!row) return;
     const open = row.classList.toggle("is-open");
     btn.setAttribute("aria-expanded", open ? "true" : "false");
-    btn.textContent = open ? "Свернуть" : "Развернуть";
+    btn.textContent = open ? "Свернуть" : "Контекст";
     const detail = row.querySelector(".meeting-detail");
     if (detail) detail.hidden = !open;
   });
@@ -2754,12 +2780,13 @@ async function refreshMeetings({ skeleton = false } = {}) {
 
   const sessEl = document.getElementById("meetingsSessions");
   if (sessEl) {
-    const rows = compactFeedRows(report.sessions || [], 60, 180).slice(0, 15);
-    if (!rows.length) {
+    const groups = groupFeedByApp(compactFeedRows(report.sessions || [], 60, 180)).slice(0, 12);
+    if (!groups.length) {
       sessEl.innerHTML = `<li><span class="timeline-time">—</span><span class="rank-icon">•</span><span class="rank-name">Нет сессий за период</span><span class="rank-meta"></span></li>`;
     } else {
-      sessEl.innerHTML = rows.map(meetingSessionRowHtml).join("");
+      sessEl.innerHTML = groups.map((g) => meetingSessionGroupHtml(g)).join("");
     }
+    wireSessionGroups(sessEl);
     wireMeetingExpand(sessEl);
   }
 
@@ -2788,12 +2815,13 @@ async function refreshMeetings({ skeleton = false } = {}) {
 
   const emailSessEl = document.getElementById("meetingsEmailSessions");
   if (emailSessEl) {
-    const rows = compactFeedRows(report.email_sessions || [], 60, 180).slice(0, 12);
-    if (!rows.length) {
+    const groups = groupFeedByApp(compactFeedRows(report.email_sessions || [], 60, 180)).slice(0, 10);
+    if (!groups.length) {
       emailSessEl.innerHTML = `<li><span class="timeline-time">—</span><span class="rank-icon">•</span><span class="rank-name">Нет почтовых сессий</span><span class="rank-meta"></span></li>`;
     } else {
-      emailSessEl.innerHTML = rows.map(meetingSessionRowHtml).join("");
+      emailSessEl.innerHTML = groups.map((g) => meetingSessionGroupHtml(g)).join("");
     }
+    wireSessionGroups(emailSessEl);
     wireMeetingExpand(emailSessEl);
   }
   markSkelContext("meetings", ctx);
@@ -3764,7 +3792,7 @@ function groupFeedByApp(rows) {
   if (!rows || !rows.length) return [];
   const map = new Map();
   for (const raw of rows) {
-    const name = String(raw.name || raw.app_name || "—").trim() || "—";
+    const name = String(raw.display_name || raw.name || raw.app_name || "—").trim() || "—";
     const app = String(raw.app_name || "").trim();
     const key = `${app.toLowerCase()}|${name.toLowerCase()}`;
     let g = map.get(key);

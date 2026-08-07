@@ -315,3 +315,18 @@ def test_meetings_api(tmp_path: Path, monkeypatch):
     assert "meetingsEmailList" in (
         Path(__file__).resolve().parents[1] / "web" / "templates" / "index.html"
     ).read_text(encoding="utf-8")
+
+
+def test_meetings_ui_no_rank_grid_overlap_and_grouped_sessions():
+    from deskline.config import WEB_ROOT
+
+    html = (WEB_ROOT / "templates" / "index.html").read_text(encoding="utf-8")
+    css = (WEB_ROOT / "static" / "css" / "app.css").read_text(encoding="utf-8")
+    js = (WEB_ROOT / "static" / "js" / "app.js").read_text(encoding="utf-8")
+    assert 'class="rank-list meetings-channel-list"' in html
+    assert 'id="meetingsSessions"' in html
+    assert "session-groups" in html
+    assert "li.meeting-channel" in css
+    assert "flex-direction: column" in css
+    assert "meetingSessionGroupHtml" in js
+    assert "groupFeedByApp(compactFeedRows(report.sessions" in js
