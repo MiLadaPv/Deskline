@@ -61,3 +61,22 @@ def test_index_tabs_have_distinct_roles():
     assert "По часам" not in html
     assert "app-nav-rail" in html
     assert 'data-tab="today"' in html
+
+
+def test_day_feed_ux_contracts():
+    from deskline.config import WEB_ROOT
+
+    html = (WEB_ROOT / "templates" / "index.html").read_text(encoding="utf-8")
+    js = (WEB_ROOT / "static" / "js" / "app.js").read_text(encoding="utf-8")
+    css = (WEB_ROOT / "static" / "css" / "app.css").read_text(encoding="utf-8")
+
+    assert 'data-gantt-mode="active"' in html
+    assert 'data-gantt-mode="full"' in html
+    assert 'id="dayPictureTitle"' in html
+    assert "Сверху — самые свежие" in html
+    assert "function activityViewBounds" in js
+    assert "Newest first" in js
+    assert "dayGanttMode" in js
+    assert "highlightTimelineSession" in js
+    assert ".day-picture-head" in css
+    assert ".timeline li.is-hot" in css

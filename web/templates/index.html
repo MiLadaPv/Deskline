@@ -191,9 +191,21 @@
         <div class="day-nav" id="dayNav" aria-label="Выбор дня"></div>
       </div>
       <p class="day-summary-line" id="daySummaryLine" aria-live="polite"></p>
-      <h3 class="subhead">Картина дня · 00:00–24:00</h3>
+      <div class="day-picture-head">
+        <div>
+          <h3 class="subhead" id="dayPictureTitle">Картина дня</h3>
+          <p class="hint day-picture-hint" id="dayPictureHint">Плотная шкала по активным часам — без пустой ночи</p>
+        </div>
+        <div class="seg day-gantt-mode" role="group" aria-label="Масштаб картины дня">
+          <button type="button" class="seg-btn active" data-gantt-mode="active">Активные часы</button>
+          <button type="button" class="seg-btn" data-gantt-mode="full">00:00–24:00</button>
+        </div>
+      </div>
       <div class="gantt-wrap" id="dayGantt"></div>
-      <h3 class="subhead">Сессии</h3>
+      <div class="day-sessions-head">
+        <h3 class="subhead">Сессии</h3>
+        <p class="hint day-sessions-hint">Сверху — самые свежие</p>
+      </div>
       <ol class="timeline" id="timelineList"></ol>
     </section>
 

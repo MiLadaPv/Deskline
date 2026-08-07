@@ -698,6 +698,48 @@ function dayBoundsFromRows(rows, fallbackIso) {
   return { day, dayStartMs: dayStart.getTime(), dayEndMs: dayEnd.getTime(), spanMs: 24 * 3600 * 1000 };
 }
 
+/** Crop the day strip to where work actually happened (optional full-day mode). */
+function activityViewBounds(rows, dayStartMs, dayEndMs, mode = "active") {
+  if (mode !== "active") {
+    return { viewStartMs: dayStartMs, viewEndMs: dayEndMs, spanMs: dayEndMs - dayStartMs };
+  }
+  let min = Infinity;
+  let max = -Infinity;
+  for (const r of rows || []) {
+    const a = new Date(r.started_at).getTime();
+    const b = new Date(r.ended_at || Date.now()).getTime();
+    const clipped = clipToDay(a, b, dayStartMs, dayEndMs);
+    if (!clipped) continue;
+    min = Math.min(min, clipped.start);
+    max = Math.max(max, clipped.end);
+  }
+  if (!Number.isFinite(min) || !Number.isFinite(max) || max <= min) {
+    return { viewStartMs: dayStartMs, viewEndMs: dayEndMs, spanMs: dayEndMs - dayStartMs };
+  }
+  const pad = 20 * 60 * 1000;
+  const step = 30 * 60 * 1000;
+  let viewStartMs = Math.max(dayStartMs, min - pad);
+  let viewEndMs = Math.min(dayEndMs, max + pad);
+  viewStartMs = dayStartMs + Math.floor((viewStartMs - dayStartMs) / step) * step;
+  viewEndMs = dayStartMs + Math.ceil((viewEndMs - dayStartMs) / step) * step;
+  if (viewEndMs <= viewStartMs) {
+    viewEndMs = Math.min(dayEndMs, viewStartMs + 2 * 3600 * 1000);
+  }
+  // Keep at least ~2 hours so tiny days aren't a single blob.
+  if (viewEndMs - viewStartMs < 2 * 3600 * 1000) {
+    const mid = (min + max) / 2;
+    viewStartMs = Math.max(dayStartMs, mid - 3600 * 1000);
+    viewEndMs = Math.min(dayEndMs, mid + 3600 * 1000);
+    viewStartMs = dayStartMs + Math.floor((viewStartMs - dayStartMs) / step) * step;
+    viewEndMs = dayStartMs + Math.ceil((viewEndMs - dayStartMs) / step) * step;
+  }
+  return {
+    viewStartMs,
+    viewEndMs,
+    spanMs: Math.max(step, viewEndMs - viewStartMs),
+  };
+}
+
 function pctOnDay(ms, dayStartMs, spanMs) {
   return ((ms - dayStartMs) / spanMs) * 100;
 }
@@ -1365,33 +1407,83 @@ function categoryClass(cat) {
   return "neutral";
 }
 
+let dayGanttMode = localStorage.getItem("deskline_gantt_mode") === "full" ? "full" : "active";
+
+function syncDayGanttModeButtons() {
+  document.querySelectorAll("[data-gantt-mode]").forEach((btn) => {
+    btn.classList.toggle("active", btn.dataset.ganttMode === dayGanttMode);
+  });
+}
+
+function setDayGanttMode(mode) {
+  dayGanttMode = mode === "full" ? "full" : "active";
+  try {
+    localStorage.setItem("deskline_gantt_mode", dayGanttMode);
+  } catch (_) {}
+  syncDayGanttModeButtons();
+  lastDayViewKey = "";
+  refreshTimeline().catch(() => {});
+}
+
+function sessionRowKey(startedAt) {
+  return String(startedAt || "");
+}
+
+function highlightTimelineSession(startedAt) {
+  const list = document.getElementById("timelineList");
+  if (!list) return;
+  const key = sessionRowKey(startedAt);
+  list.querySelectorAll("li.is-hot").forEach((li) => li.classList.remove("is-hot"));
+  const row = [...list.querySelectorAll("li[data-started]")].find(
+    (li) => li.dataset.started === key
+  );
+  if (!row) return;
+  row.classList.add("is-hot");
+  row.scrollIntoView({ behavior: "smooth", block: "center" });
+  window.setTimeout(() => row.classList.remove("is-hot"), 2200);
+}
+
 function renderDayGantt(rows) {
   const el = document.getElementById("dayGantt");
   if (!el) return;
-  const { dayStartMs, dayEndMs, spanMs } = dayBoundsFromRows(rows, selectedDayIso);
+  const { dayStartMs, dayEndMs } = dayBoundsFromRows(rows, selectedDayIso);
+  const title = document.getElementById("dayPictureTitle");
+  const hint = document.getElementById("dayPictureHint");
+  syncDayGanttModeButtons();
   if (!rows.length) {
+    if (title) title.textContent = "Картина дня";
+    if (hint) hint.textContent = "Пока нет сессий для этого дня";
     el.innerHTML = `<p class="hint">Пока нет сессий для этого дня.</p>`;
     return;
   }
 
+  const { viewStartMs, viewEndMs, spanMs } = activityViewBounds(
+    rows,
+    dayStartMs,
+    dayEndMs,
+    dayGanttMode
+  );
+  const hoursSpan = Math.max(1, Math.round(spanMs / 3600000));
+  const tickStepH = hoursSpan <= 6 ? 1 : hoursSpan <= 12 ? 2 : 3;
   const hours = [];
-  for (let h = 0; h <= 24; h += 2) {
-    const left = (h / 24) * 100;
-    const label = h === 24 ? "24:00" : `${String(h).padStart(2, "0")}:00`;
-    const edge = h === 0 ? " is-start" : h === 24 ? " is-end" : "";
-    hours.push(
-      `<span class="gantt-hour${edge}" style="left:${left}%">${label}</span>`
-    );
+  for (let ms = viewStartMs; ms <= viewEndMs + 1000; ms += tickStepH * 3600000) {
+    const clamped = Math.min(ms, viewEndMs);
+    const left = pctOnDay(clamped, viewStartMs, spanMs);
+    const label = fmtClockMs(clamped);
+    const edge =
+      clamped <= viewStartMs + 1000 ? " is-start" : clamped >= viewEndMs - 1000 ? " is-end" : "";
+    hours.push(`<span class="gantt-hour${edge}" style="left:${left}%">${label}</span>`);
+    if (clamped >= viewEndMs) break;
   }
 
-  const voids = voidGapsForDay(rows, dayStartMs, dayEndMs)
+  const voids = voidGapsForDay(rows, viewStartMs, viewEndMs)
     .map((g) => {
       const durSec = (g.end - g.start) / 1000;
       if (durSec < 60) return "";
-      const left = pctOnDay(g.start, dayStartMs, spanMs);
+      const left = pctOnDay(g.start, viewStartMs, spanMs);
       const width = ((g.end - g.start) / spanMs) * 100;
       const tip = `Нет трека · ${fmtDur(durSec)} · ${fmtClockMs(g.start)}–${fmtClockMs(g.end)}`;
-      return `<div class="gantt-block void-gap is-narrow" style="left:${left}%;width:${Math.max(0.2, width)}%" title="${escapeHtml(tip)}"></div>`;
+      return `<div class="gantt-block void-gap is-narrow" style="left:${left}%;width:${Math.max(0.35, width)}%" title="${escapeHtml(tip)}"></div>`;
     })
     .join("");
 
@@ -1399,24 +1491,25 @@ function renderDayGantt(rows) {
   for (const r of rows) {
     const a = new Date(r.started_at).getTime();
     const b = new Date(r.ended_at || Date.now()).getTime();
-    const clipped = clipToDay(a, b, dayStartMs, dayEndMs);
+    const clipped = clipToDay(a, b, viewStartMs, viewEndMs);
     if (!clipped) continue;
     const dur = clipped.end - clipped.start;
     const idleMs = Math.min(dur, Math.max(0, Number(r.idle_sec || 0) * 1000));
     const activeMs = Math.max(0, dur - idleMs);
     const cat = categoryClass(r.category);
+    const startedKey = sessionRowKey(r.started_at);
     if (activeMs > 0) {
-      const left = pctOnDay(clipped.start, dayStartMs, spanMs);
-      const width = Math.max(0.15, (activeMs / spanMs) * 100);
-      const title = `${r.name || ""} · ${fmtClock(r.started_at)}–${fmtClock(r.ended_at)} · ${fmtDur(activeMs / 1000)}`;
-      const showLabel = width >= 3.5;
+      const left = pctOnDay(clipped.start, viewStartMs, spanMs);
+      const width = Math.max(0.35, (activeMs / spanMs) * 100);
+      const titleTip = `${r.name || ""} · ${fmtClock(r.started_at)}–${fmtClock(r.ended_at)} · ${fmtDur(activeMs / 1000)}`;
+      const showLabel = width >= 4.5;
       blocks.push(
-        `<div class="gantt-block ${cat}${showLabel ? "" : " is-narrow"}" style="left:${left}%;width:${width}%" title="${escapeHtml(title)}">${showLabel ? `<span>${escapeHtml(r.name || "")}</span>` : ""}</div>`
+        `<button type="button" class="gantt-block ${cat}${showLabel ? "" : " is-narrow"}" style="left:${left}%;width:${width}%" title="${escapeHtml(titleTip)}" data-started="${escapeHtml(startedKey)}">${showLabel ? `<span>${escapeHtml(r.name || "")}</span>` : ""}</button>`
       );
     }
     if (idleMs > 0) {
-      const left = pctOnDay(clipped.start + activeMs, dayStartMs, spanMs);
-      const width = Math.max(0.15, (idleMs / spanMs) * 100);
+      const left = pctOnDay(clipped.start + activeMs, viewStartMs, spanMs);
+      const width = Math.max(0.35, (idleMs / spanMs) * 100);
       blocks.push(
         `<div class="gantt-block idle is-narrow" style="left:${left}%;width:${width}%" title="Простой · ${fmtDur(idleMs / 1000)}"></div>`
       );
@@ -1425,14 +1518,24 @@ function renderDayGantt(rows) {
 
   let nowMark = "";
   const now = Date.now();
-  if (now >= dayStartMs && now <= dayEndMs) {
-    const left = pctOnDay(now, dayStartMs, spanMs);
+  if (now >= viewStartMs && now <= viewEndMs) {
+    const left = pctOnDay(now, viewStartMs, spanMs);
     nowMark = `<div class="gantt-now" style="left:${left}%" title="Сейчас"></div>`;
+  }
+
+  if (title) {
+    title.textContent = `Картина дня · ${fmtClockMs(viewStartMs)}–${fmtClockMs(viewEndMs)}`;
+  }
+  if (hint) {
+    hint.textContent =
+      dayGanttMode === "full"
+        ? "Полные сутки. Клик по блоку — прыжок к сессии ниже"
+        : "Только активные часы. Клик по блоку — прыжок к сессии ниже · Ctrl+колёсико — масштаб";
   }
 
   el.innerHTML = `
     <div class="gantt-scale">${hours.join("")}</div>
-    <div class="gantt-track gantt-track-fullday" data-pulse-scrub="1" style="--gantt-hours:24">${voids}${blocks.join("")}${nowMark}</div>
+    <div class="gantt-track gantt-track-fullday" data-pulse-scrub="1" style="--gantt-hours:${Math.max(1, hoursSpan)}">${voids}${blocks.join("")}${nowMark}</div>
     <div class="gantt-legend">
       <span class="stack-leg"><i class="productive"></i>Фокус</span>
       <span class="stack-leg"><i class="neutral"></i>Нейтрально</span>
@@ -1440,7 +1543,13 @@ function renderDayGantt(rows) {
       <span class="stack-leg"><i class="idle"></i>Простой</span>
       <span class="stack-leg"><i class="void"></i>Пусто</span>
     </div>`;
-  bindPulseDayScrub(el.querySelector("[data-pulse-scrub]"), dayStartMs, spanMs);
+  bindPulseDayScrub(el.querySelector("[data-pulse-scrub]"), viewStartMs, spanMs);
+  el.querySelectorAll(".gantt-block[data-started]").forEach((btn) => {
+    btn.addEventListener("click", (ev) => {
+      ev.stopPropagation();
+      highlightTimelineSession(btn.dataset.started);
+    });
+  });
 }
 
 function kindLabel(kind) {
@@ -2853,6 +2962,7 @@ async function refreshTimeline() {
       selectedDayIso,
       filterEmployeeId || "",
       gated ? "gated" : "ok",
+      dayGanttMode,
       summaryKey(summary),
       dayTimelineSignature(rows),
     ].join("|");
@@ -2877,7 +2987,11 @@ async function refreshTimeline() {
       el.innerHTML = `<li><span class="timeline-time">—</span><span class="rank-icon">•</span><span class="rank-name">Пока нет сессий</span><span class="rank-meta"></span></li>`;
       return;
     }
-    el.innerHTML = rows
+    // Newest first — nobody wants to scroll from 08:00 to find what they just did.
+    const listRows = [...rows].sort(
+      (a, b) => new Date(b.started_at).getTime() - new Date(a.started_at).getTime()
+    );
+    el.innerHTML = listRows
       .map((r) => {
         const icon = r.icon_url
           ? iconImgHtml(r.icon_url)
@@ -2887,12 +3001,13 @@ async function refreshTimeline() {
             ? `<span class="timeline-idle">idle ${fmtDur(r.idle_sec)}</span>`
             : "";
         const cat = categoryClass(r.category);
-        return `<li class="timeline-cat-${cat}">
+        const open = !r.ended_at ? `<span class="timeline-live">сейчас</span>` : "";
+        return `<li class="timeline-cat-${cat}" data-started="${escapeHtml(sessionRowKey(r.started_at))}">
           <span class="timeline-time">${fmtClock(r.started_at)}</span>
           ${icon}
           <span>
             <span class="rank-name">${escapeHtml(r.name)}</span>
-            ${idle}
+            ${idle}${open}
           </span>
           <span class="rank-meta">${fmtDur(r.sec)}</span>
         </li>`;
@@ -3009,6 +3124,10 @@ function wireUi() {
   wireThemeToggle();
   wireZoomControls();
   restoreChartScales();
+  syncDayGanttModeButtons();
+  document.querySelectorAll("[data-gantt-mode]").forEach((btn) => {
+    btn.addEventListener("click", () => setDayGanttMode(btn.dataset.ganttMode));
+  });
   wireGroupedLists();
   document.querySelectorAll(".tab").forEach((tab) => {
     tab.setAttribute("role", "tab");
