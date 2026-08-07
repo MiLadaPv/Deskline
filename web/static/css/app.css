@@ -4070,7 +4070,7 @@ html[data-theme="dark"] .google-btn {
 }
 
 .meetings-kpi {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   margin: 0 0 18px;
 }
 
@@ -4078,8 +4078,84 @@ html[data-theme="dark"] .google-btn {
   margin: 0 0 14px;
 }
 
-.meetings-split {
+.meetings-split,
+.meetings-email-split {
   margin-top: 4px;
+}
+
+.meetings-email-split {
+  margin-top: 16px;
+}
+
+.timeline li.meeting-session {
+  display: block;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.meeting-session-main {
+  display: grid;
+  grid-template-columns: 4.5rem 32px minmax(0, 1fr) auto;
+  align-items: center;
+  column-gap: 12px;
+}
+
+.meeting-session-text {
+  min-width: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 10px;
+}
+
+.meeting-expand {
+  appearance: none;
+  border: 1px solid var(--line);
+  background: color-mix(in srgb, var(--card) 88%, transparent);
+  color: var(--ink-soft);
+  font: inherit;
+  font-size: 0.75rem;
+  font-weight: 650;
+  padding: 4px 10px;
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.meeting-expand:hover {
+  color: var(--ink);
+  border-color: color-mix(in srgb, var(--accent) 35%, var(--line));
+}
+
+.meeting-detail {
+  margin: 8px 0 2px 4.5rem;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--accent-soft) 35%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent) 18%, var(--line));
+}
+
+.meeting-detail-label {
+  display: block;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+  margin-bottom: 4px;
+}
+
+.meeting-detail p {
+  margin: 0;
+  color: var(--ink);
+  font-size: 0.9rem;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 900px) {
+  .meetings-kpi {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 .pulse-ov-card {

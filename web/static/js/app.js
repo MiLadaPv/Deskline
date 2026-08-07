@@ -2267,6 +2267,49 @@ async function refreshUsageReport() {
 let meetingsPeriod = "today";
 let lastMeetingsKey = "";
 
+function meetingSessionRowHtml(r) {
+  const icon = r.icon_url
+    ? iconImgHtml(r.icon_url)
+    : `<span class="rank-icon">•</span>`;
+  const label = r.display_name || r.name || r.app_name || r.site || "Сессия";
+  const detail = String(r.detail || "").trim();
+  const canExpand = Boolean(detail);
+  const expandBtn = canExpand
+    ? `<button type="button" class="meeting-expand" aria-expanded="false">Развернуть</button>`
+    : "";
+  const detailBlock = canExpand
+    ? `<div class="meeting-detail" hidden><span class="meeting-detail-label">Контекст окна</span><p>${escapeHtml(detail)}</p></div>`
+    : "";
+  return `<li class="meeting-session${canExpand ? " is-expandable" : ""}">
+    <div class="meeting-session-main">
+      <span class="timeline-time">${fmtClock(r.started_at)}</span>
+      ${icon}
+      <span class="meeting-session-text">
+        <span class="rank-name">${escapeHtml(label)}</span>
+        ${expandBtn}
+      </span>
+      <span class="rank-meta">${fmtDur(r.sec)}</span>
+    </div>
+    ${detailBlock}
+  </li>`;
+}
+
+function wireMeetingExpand(listEl) {
+  if (!listEl || listEl.dataset.expandWired === "1") return;
+  listEl.dataset.expandWired = "1";
+  listEl.addEventListener("click", (ev) => {
+    const btn = ev.target.closest(".meeting-expand");
+    if (!btn || !listEl.contains(btn)) return;
+    const row = btn.closest(".meeting-session");
+    if (!row) return;
+    const open = row.classList.toggle("is-open");
+    btn.setAttribute("aria-expanded", open ? "true" : "false");
+    btn.textContent = open ? "Свернуть" : "Развернуть";
+    const detail = row.querySelector(".meeting-detail");
+    if (detail) detail.hidden = !open;
+  });
+}
+
 async function refreshMeetings() {
   const periodSel = document.getElementById("meetingsPeriod");
   if (periodSel) meetingsPeriod = periodSel.value || "today";
@@ -2288,6 +2331,10 @@ async function refreshMeetings() {
       }
       const sess = document.getElementById("meetingsSessions");
       if (sess) sess.innerHTML = "";
+      const emailList = document.getElementById("meetingsEmailList");
+      if (emailList) emailList.innerHTML = "";
+      const emailSess = document.getElementById("meetingsEmailSessions");
+      if (emailSess) emailSess.innerHTML = "";
       return;
     }
     throw err;
@@ -2297,8 +2344,10 @@ async function refreshMeetings() {
     meetingsPeriod,
     filterEmployeeId || "",
     report.total_sec,
+    report.email_total_sec || 0,
     (report.top || []).map((r) => `${r.key}:${Math.floor(r.sec / 60)}`).join(","),
     (report.sessions || []).length,
+    (report.email_top || []).length,
   ].join("|");
   if (key === lastMeetingsKey) return;
   lastMeetingsKey = key;
@@ -2311,10 +2360,12 @@ async function refreshMeetings() {
     const total = report.total_sec || 0;
     const share = report.share_pct ?? 0;
     const channels = (report.top || []).length;
+    const emailSec = report.email_total_sec || 0;
     kpi.innerHTML = [
-      { label: "Во встречах", value: fmtDur(total), pct: share, tone: "productive" },
+      { label: "Связь / звонки", value: fmtDur(total), pct: share, tone: "productive" },
       { label: "Доля дня", value: `${share}%`, pct: share, tone: "tracked" },
       { label: "Каналы", value: String(channels), pct: null, tone: "active" },
+      { label: "Почта", value: fmtDur(emailSec), pct: null, tone: "active" },
     ]
       .map((it) => {
         const meter =
@@ -2334,7 +2385,7 @@ async function refreshMeetings() {
   if (topEl) {
     const rows = report.top || [];
     if (!rows.length) {
-      topEl.innerHTML = `<li class="empty-state"><span class="rank-icon">•</span><span class="rank-name">Пока нет времени в Teams, Zoom, Meet…</span><span class="rank-meta">—</span></li>`;
+      topEl.innerHTML = `<li class="empty-state"><span class="rank-icon">•</span><span class="rank-name">Пока нет Телемоста, Мессенджера, Teams…</span><span class="rank-meta">—</span></li>`;
     } else {
       const total = report.total_sec || 0;
       topEl.innerHTML = rows
@@ -2360,21 +2411,43 @@ async function refreshMeetings() {
     if (!rows.length) {
       sessEl.innerHTML = `<li><span class="timeline-time">—</span><span class="rank-icon">•</span><span class="rank-name">Нет сессий за период</span><span class="rank-meta"></span></li>`;
     } else {
-      sessEl.innerHTML = rows
+      sessEl.innerHTML = rows.map(meetingSessionRowHtml).join("");
+    }
+    wireMeetingExpand(sessEl);
+  }
+
+  const emailEl = document.getElementById("meetingsEmailList");
+  if (emailEl) {
+    const rows = report.email_top || [];
+    if (!rows.length) {
+      emailEl.innerHTML = `<li class="empty-state"><span class="rank-icon">•</span><span class="rank-name">Пока нет времени в почте</span><span class="rank-meta">—</span></li>`;
+    } else {
+      const total = report.email_total_sec || 0;
+      emailEl.innerHTML = rows
         .map((r) => {
           const icon = r.icon_url
             ? iconImgHtml(r.icon_url)
-            : `<span class="rank-icon">•</span>`;
-          const label = r.display_name || r.name || r.app_name || r.site || "Встреча";
+            : `<span class="rank-icon" aria-hidden="true">•</span>`;
+          const share = total ? Math.round((r.sec / total) * 100) : 0;
           return `<li>
-            <span class="timeline-time">${fmtClock(r.started_at)}</span>
             ${icon}
-            <span class="rank-name">${escapeHtml(label)}</span>
-            <span class="rank-meta">${fmtDur(r.sec)}</span>
+            <span class="rank-name">${escapeHtml(r.name)}</span>
+            <span class="rank-meta">${fmtDur(r.sec)} · ${share}%</span>
           </li>`;
         })
         .join("");
     }
+  }
+
+  const emailSessEl = document.getElementById("meetingsEmailSessions");
+  if (emailSessEl) {
+    const rows = report.email_sessions || [];
+    if (!rows.length) {
+      emailSessEl.innerHTML = `<li><span class="timeline-time">—</span><span class="rank-icon">•</span><span class="rank-name">Нет почтовых сессий</span><span class="rank-meta"></span></li>`;
+    } else {
+      emailSessEl.innerHTML = rows.map(meetingSessionRowHtml).join("");
+    }
+    wireMeetingExpand(emailSessEl);
   }
 }
 

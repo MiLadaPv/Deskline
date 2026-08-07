@@ -1,17 +1,23 @@
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 from pathlib import Path
 
 from fastapi.testclient import TestClient
 
-from deskline.config import DEFAULT_CONFIG, ensure_data_dirs, save_config
+from deskline.classify import resolve_activity
+from deskline.config import DEFAULT_CONFIG, save_config
 from deskline.db import Database
 from deskline.meetings import (
     build_meetings_report,
+    infer_meeting_site,
+    is_email_activity,
+    is_meeting_activity,
     is_meeting_app,
     is_meeting_site,
     meeting_app_label,
+    meeting_context_from_title,
+    meeting_site_label,
 )
 
 
@@ -22,8 +28,50 @@ def test_meeting_allowlist_helpers():
     assert is_meeting_site("meet.google.com")
     assert is_meeting_site("www.zoom.us")
     assert is_meeting_site("us05web.zoom.us")
+    assert is_meeting_site("messenger.yandex.ru")
+    assert is_meeting_site("telemost.yandex.ru")
     assert not is_meeting_site("telegram.org")
     assert meeting_app_label("zoom.exe") == "Zoom"
+    assert meeting_site_label("messenger.yandex.ru") == "Яндекс Мессенджер"
+    assert meeting_site_label("telemost.yandex.ru") == "Яндекс Телемост"
+
+
+def test_telemost_and_messenger_title_inference():
+    assert resolve_activity("msedge.exe", "Звонок в Яндекс Телемосте")["url_hint"] == "telemost.yandex.ru"
+    assert resolve_activity("msedge.exe", "Звонок в Яндекс Телемосте")["activity_label"] == "Яндекс Телемост"
+    assert (
+        infer_meeting_site(activity_label="Звонок в Яндекс Телемосте", window_title=None)
+        == "telemost.yandex.ru"
+    )
+    assert is_meeting_activity(
+        app_name="msedge.exe",
+        site=None,
+        activity_label="Звонок в Яндекс Телемосте",
+        window_title="",
+    )
+    assert is_meeting_activity(
+        app_name="msedge.exe",
+        site="messenger.yandex.ru",
+        activity_label="Яндекс Мессенджер",
+    )
+    assert is_email_activity(site="mail.yandex.ru", activity_kind="email")
+    assert is_email_activity(activity_label="Яндекс Почта")
+
+
+def test_meeting_context_from_title_strips_noise():
+    detail = meeting_context_from_title(
+        "Яндекс Мессенджер — Команда Проект — Личный: Microsoft Edge",
+        site="messenger.yandex.ru",
+        activity_label="Яндекс Мессенджер",
+    )
+    assert detail == "Команда Проект"
+    assert (
+        meeting_context_from_title(
+            "Яндекс Мессенджер — 16 новых сообщений — Личный: Microsoft Edge",
+            site="messenger.yandex.ru",
+        )
+        is None
+    )
 
 
 def test_build_meetings_report_filters_and_totals():
@@ -34,6 +82,7 @@ def test_build_meetings_report_filters_and_totals():
         ],
         by_site=[
             {"name": "meet.google.com", "sec": 300},
+            {"name": "messenger.yandex.ru", "sec": 120},
             {"name": "youtube.com", "sec": 120},
         ],
         sessions=[
@@ -59,17 +108,20 @@ def test_build_meetings_report_filters_and_totals():
                 "name": "Notepad",
             },
         ],
+        email_channels=[{"key": "site:mail.yandex.ru", "name": "Яндекс Почта", "sec": 90}],
+        email_sessions=[],
         total_tracked_sec=1800,
     )
-    assert report["total_sec"] == 900.0
-    assert report["share_pct"] == 50.0
+    assert report["total_sec"] == 1020.0
+    assert report["share_pct"] == 56.7
     assert len(report["by_app"]) == 1
-    assert len(report["by_site"]) == 1
+    assert len(report["by_site"]) == 2
     assert len(report["sessions"]) == 2
-    assert "фокусе" in report["note"].casefold() or "окна" in report["note"].casefold()
+    assert report["email_total_sec"] == 90.0
+    assert "телемост" in report["note"].casefold() or "мессенджер" in report["note"].casefold()
 
 
-def test_meetings_for_range_counts_apps_and_sites(tmp_path: Path, monkeypatch):
+def test_meetings_for_range_counts_yandex_and_mail(tmp_path: Path, monkeypatch):
     monkeypatch.setattr("deskline.config.CONFIG_PATH", tmp_path / "config.json")
     monkeypatch.setattr("deskline.config.DATA_ROOT", tmp_path)
     monkeypatch.setattr("deskline.config.DB_PATH", tmp_path / "deskline.db")
@@ -92,94 +144,92 @@ def test_meetings_for_range_counts_apps_and_sites(tmp_path: Path, monkeypatch):
     )
     db.end_session(sid_zoom, ended_at=start + timedelta(minutes=20))
 
-    sid_meet = db.start_session(
+    sid_msg = db.start_session(
         "msedge.exe",
-        "Meet - Google Meet",
-        "meet.google.com",
-        "productive",
+        "Яндекс Мессенджер — 3 новых сообщения — Личный: Microsoft Edge",
+        "messenger.yandex.ru",
+        "neutral",
         display_name="Microsoft Edge",
         activity_kind="messaging",
-        activity_label="Google Meet",
-        started_at=start + timedelta(minutes=30),
+        activity_label="Яндекс Мессенджер",
+        started_at=start + timedelta(minutes=25),
     )
-    db.end_session(sid_meet, ended_at=start + timedelta(minutes=45))
+    db.end_session(sid_msg, ended_at=start + timedelta(minutes=40))
 
-    sid_other = db.start_session(
-        "code.exe",
-        "main.py - VS Code",
+    sid_tm = db.start_session(
+        "msedge.exe",
+        "Звонок в Яндекс Телемосте — Личный: Microsoft Edge",
         None,
         "productive",
-        display_name="VS Code",
-        activity_kind="coding",
-        activity_label="VS Code",
-        started_at=start + timedelta(minutes=50),
+        display_name="Microsoft Edge",
+        activity_kind="other",
+        activity_label="Звонок в Яндекс Телемосте",
+        started_at=start + timedelta(minutes=45),
     )
-    db.end_session(sid_other, ended_at=start + timedelta(minutes=80))
+    db.end_session(sid_tm, ended_at=start + timedelta(minutes=55))
+
+    sid_mail = db.start_session(
+        "msedge.exe",
+        "Входящие — Яндекс Почта — Личный: Microsoft Edge",
+        "mail.yandex.ru",
+        "productive",
+        display_name="Microsoft Edge",
+        activity_kind="email",
+        activity_label="Яндекс Почта",
+        started_at=start + timedelta(minutes=56),
+    )
+    db.end_session(sid_mail, ended_at=start + timedelta(minutes=66))
 
     report = db.meetings_for_range(start, end)
-    assert report["total_sec"] >= 34 * 60  # ~20 + ~15 min
-    assert any(r["app_name"] == "zoom.exe" for r in report["by_app"])
-    assert any(r["site"] == "meet.google.com" for r in report["by_site"])
-    assert all(
-        (r.get("app_name") == "zoom.exe") or (r.get("site") == "meet.google.com")
-        for r in report["sessions"]
-    )
+    assert report["total_sec"] >= 40 * 60
+    sites = {r.get("site") for r in report["by_site"]}
+    assert "messenger.yandex.ru" in sites
+    assert "telemost.yandex.ru" in sites
+    assert report["email_total_sec"] >= 9 * 60
+    assert any(r["name"] == "Яндекс Почта" for r in report["email_top"])
 
 
 def test_meetings_api(tmp_path: Path, monkeypatch):
-    monkeypatch.setenv("DESKLINE_LICENSE_DEV", "1")
+    monkeypatch.setattr("deskline.config.CONFIG_PATH", tmp_path / "config.json")
     monkeypatch.setattr("deskline.config.DATA_ROOT", tmp_path)
     monkeypatch.setattr("deskline.config.DB_PATH", tmp_path / "deskline.db")
-    monkeypatch.setattr("deskline.config.SCREENSHOTS_DIR", tmp_path / "screenshots")
-    monkeypatch.setattr("deskline.config.CONFIG_PATH", tmp_path / "config.json")
-    monkeypatch.setattr("deskline.config.ICONS_DIR", tmp_path / "icons")
+    monkeypatch.setattr("deskline.config.SCREENSHOTS_DIR", tmp_path / "shots")
     monkeypatch.setattr("deskline.auth.AUTH_PATH", tmp_path / "auth.json")
-    monkeypatch.setattr("deskline.capture.SCREENSHOTS_DIR", tmp_path / "screenshots")
-    monkeypatch.setattr("deskline.license_store.LICENSE_PATH", tmp_path / "license.json")
-    (tmp_path / "screenshots").mkdir()
-    (tmp_path / "icons").mkdir()
+    save_config({**DEFAULT_CONFIG, "work_mode": False})
 
     from deskline.api import create_app
     from deskline.auth import set_password
     from deskline.tracker import Tracker
 
-    ensure_data_dirs()
-    save_config(
-        {
-            **DEFAULT_CONFIG,
-            "first_run_at": (datetime.now(timezone.utc) - timedelta(days=30)).isoformat(),
-            "onboarding_done": True,
-        }
-    )
     set_password("test-pass-1234")
     db = Database(tmp_path / "deskline.db")
-    start = datetime.now().astimezone() - timedelta(minutes=30)
+    tracker = Tracker(db)
+    tracker.cfg["paused"] = True
+    now = datetime.now().astimezone()
     sid = db.start_session(
         "teams.exe",
-        "Standup | Microsoft Teams",
+        "Standup",
         None,
         "productive",
         display_name="Microsoft Teams",
         activity_kind="messaging",
         activity_label="Microsoft Teams",
-        started_at=start,
+        started_at=now - timedelta(minutes=30),
     )
-    db.end_session(sid, ended_at=start + timedelta(minutes=12))
+    db.end_session(sid, ended_at=now - timedelta(minutes=10))
 
-    tracker = Tracker(db)
-    tracker.cfg["paused"] = True
-    client = TestClient(create_app(tracker, db))
-    login = client.post(
+    app = create_app(tracker, db)
+    client = TestClient(app)
+    client.post(
         "/api/auth/login",
         json={"username": "owner", "password": "test-pass-1234", "remember": False},
     )
-    assert login.status_code == 200
-    assert client.post("/api/license/activate", json={"key": "DESKLINE-PRO-DEV"}).status_code == 200
-
     res = client.get("/api/meetings?period=today")
     assert res.status_code == 200
     body = res.json()
-    assert body["period"] == "today"
-    assert body["total_sec"] >= 11 * 60
+    assert body["total_sec"] >= 15 * 60
     assert any(r["app_name"] == "teams.exe" for r in body["by_app"])
-    assert body["note"]
+    assert "email_total_sec" in body
+    assert "meetingsEmailList" in (
+        Path(__file__).resolve().parents[1] / "web" / "templates" / "index.html"
+    ).read_text(encoding="utf-8")

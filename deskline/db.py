@@ -1082,13 +1082,18 @@ class Database:
         end: datetime,
         employee_id: int | None = None,
     ) -> dict[str, Any]:
-        """Foreground time in meeting apps/sites for [start, end)."""
+        """Foreground time in meeting apps/sites (+ email) for [start, end)."""
         from deskline.config import load_config
         from deskline.meetings import (
             build_meetings_report,
+            email_channel_label,
+            infer_meeting_site,
+            is_email_activity,
+            is_meeting_activity,
             is_meeting_app,
-            is_meeting_site,
             meeting_app_label,
+            meeting_context_from_title,
+            meeting_site_label,
             normalize_app_exe,
             normalize_site_host,
         )
@@ -1109,6 +1114,8 @@ class Database:
         by_app: dict[str, dict[str, Any]] = {}
         by_site: dict[str, dict[str, Any]] = {}
         sessions: list[dict[str, Any]] = []
+        email_channels: dict[str, dict[str, Any]] = {}
+        email_sessions: list[dict[str, Any]] = []
         tracked = 0.0
         now = _utcnow()
 
@@ -1127,65 +1134,132 @@ class Database:
             if employee_id is not None and meta.get("employee_id") != employee_id:
                 continue
             tracked += dur
+            title = str(row["window_title"] or "") if "window_title" in keys else ""
             site = meta.get("url_hint") or site_for_activity_label(meta["activity_label"])
             app = meta.get("app_name")
-            hit_app = is_meeting_app(app)
-            hit_site = is_meeting_site(site)
-            if not (hit_app or hit_site):
+            label = meta.get("activity_label")
+            hit_meet = is_meeting_activity(
+                app_name=app, site=site, activity_label=label, window_title=title
+            )
+            hit_mail = is_email_activity(
+                app_name=app,
+                site=site,
+                activity_kind=meta.get("activity_kind"),
+                activity_label=label,
+            )
+            if not (hit_meet or hit_mail):
                 continue
             full_span = max(0.0, (e - s).total_seconds()) or dur
             idle_full = float(row["idle_sec"] or 0) if "idle_sec" in keys else 0.0
             idle_part = min(dur, idle_full * (dur / full_span) if full_span else 0.0)
-            # Prefer desktop app over browser host so the same span is not double-counted.
-            icon = resolve_icon_url(site=site if (hit_site and not hit_app) else None, app_name=app)
-            if hit_app:
-                key = normalize_app_exe(app)
-                bucket = by_app.setdefault(
+
+            if hit_meet:
+                hit_app = is_meeting_app(app)
+                inferred = infer_meeting_site(
+                    site=site, activity_label=label, window_title=title
+                )
+                host = inferred or normalize_site_host(site)
+                icon = resolve_icon_url(
+                    site=host if (host and not hit_app) else None, app_name=app
+                )
+                if hit_app:
+                    key = normalize_app_exe(app)
+                    bucket = by_app.setdefault(
+                        key,
+                        {
+                            "app_name": key,
+                            "name": meeting_app_label(app, meta.get("display_name")),
+                            "sec": 0.0,
+                            "icon_url": icon,
+                        },
+                    )
+                    bucket["sec"] += dur
+                    if not bucket.get("icon_url") and icon:
+                        bucket["icon_url"] = icon
+                elif host:
+                    bucket = by_site.setdefault(
+                        host,
+                        {
+                            "name": meeting_site_label(host, label),
+                            "site": host,
+                            "display_name": meeting_site_label(host, label),
+                            "sec": 0.0,
+                            "icon_url": icon,
+                        },
+                    )
+                    bucket["sec"] += dur
+                    if not bucket.get("icon_url") and icon:
+                        bucket["icon_url"] = icon
+                if len(sessions) < 80:
+                    sessions.append(
+                        {
+                            "started_at": _iso(seg_start),
+                            "ended_at": _iso(seg_end),
+                            "sec": round(dur, 1),
+                            "idle_sec": round(idle_part, 1),
+                            "name": label,
+                            "app_name": meta["app_name"],
+                            "display_name": meeting_site_label(host, meta.get("display_name"))
+                            if host and not hit_app
+                            else meta["display_name"],
+                            "site": host or site,
+                            "category": normalize_category(meta["category"]),
+                            "icon_url": icon,
+                            "window_title": title,
+                            "detail": meeting_context_from_title(
+                                title, site=host or site, activity_label=label
+                            ),
+                        }
+                    )
+
+            if hit_mail:
+                host = normalize_site_host(site)
+                if host:
+                    key = f"site:{host}"
+                    icon = resolve_icon_url(site=host, app_name=app)
+                    name = email_channel_label(host, app, label)
+                else:
+                    key = f"app:{normalize_app_exe(app) or 'mail'}"
+                    icon = resolve_icon_url(app_name=app)
+                    name = email_channel_label(None, app, label)
+                bucket = email_channels.setdefault(
                     key,
                     {
-                        "app_name": key,
-                        "name": meeting_app_label(app, meta.get("display_name")),
+                        "key": key,
+                        "name": name,
+                        "site": host or None,
+                        "app_name": normalize_app_exe(app) if not host else None,
                         "sec": 0.0,
                         "icon_url": icon,
+                        "source": "site" if host else "app",
                     },
                 )
                 bucket["sec"] += dur
                 if not bucket.get("icon_url") and icon:
                     bucket["icon_url"] = icon
-            else:
-                host = normalize_site_host(site)
-                bucket = by_site.setdefault(
-                    host,
-                    {
-                        "name": host,
-                        "site": host,
-                        "sec": 0.0,
-                        "icon_url": icon,
-                    },
-                )
-                bucket["sec"] += dur
-                if not bucket.get("icon_url") and icon:
-                    bucket["icon_url"] = icon
-            if len(sessions) < 60:
-                sessions.append(
-                    {
-                        "started_at": _iso(seg_start),
-                        "ended_at": _iso(seg_end),
-                        "sec": round(dur, 1),
-                        "idle_sec": round(idle_part, 1),
-                        "name": meta["activity_label"],
-                        "app_name": meta["app_name"],
-                        "display_name": meta["display_name"],
-                        "site": site,
-                        "category": normalize_category(meta["category"]),
-                        "icon_url": icon,
-                    }
-                )
+                if len(email_sessions) < 50:
+                    email_sessions.append(
+                        {
+                            "started_at": _iso(seg_start),
+                            "ended_at": _iso(seg_end),
+                            "sec": round(dur, 1),
+                            "name": name,
+                            "site": host or site,
+                            "app_name": meta["app_name"],
+                            "icon_url": icon,
+                            "window_title": title,
+                            "detail": meeting_context_from_title(
+                                title, site=host or site, activity_label=label
+                            ),
+                        }
+                    )
 
         return build_meetings_report(
             by_app=list(by_app.values()),
             by_site=list(by_site.values()),
             sessions=sessions,
+            email_channels=list(email_channels.values()),
+            email_sessions=email_sessions,
             total_tracked_sec=tracked,
         )
 

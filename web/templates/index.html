@@ -72,7 +72,7 @@
       <button class="tab" data-tab="day" type="button" title="Хронология дня: лента и сессии">Лента</button>
       <button class="tab" data-tab="usage" type="button" title="Состав времени и рейтинги">Где время</button>
       <span class="app-nav-divider" aria-hidden="true"></span>
-      <button class="tab" data-tab="meetings" type="button" title="Время в Teams, Zoom, Meet…">Звонки</button>
+      <button class="tab" data-tab="meetings" type="button" title="Звонки, мессенджеры и почта">Звонки</button>
       <button class="tab" data-tab="projects" type="button">Проекты</button>
       <button class="tab" data-tab="ratings" type="button">Рейтинги</button>
       <button class="tab" data-tab="shots" type="button">Скриншоты</button>
@@ -296,7 +296,7 @@
 
     <section id="panel-meetings" class="panel">
       <div class="panel-head">
-        <h2>Звонки и встречи</h2>
+        <h2>Звонки, встречи и почта</h2>
         <div class="filter-bar">
           <label class="filter-inline">
             Период
@@ -314,13 +314,13 @@
         </div>
       </div>
       <p class="hint meetings-note" id="meetingsNote"></p>
-      <div class="pulse-overview meetings-kpi" id="meetingsKpi" aria-label="Сводка по звонкам"></div>
+      <div class="pulse-overview meetings-kpi" id="meetingsKpi" aria-label="Сводка по звонкам и почте"></div>
       <div class="pulse-split meetings-split">
         <section class="pulse-panel">
           <header class="pulse-head">
             <div>
               <p class="pulse-kicker">Каналы</p>
-              <h3>Где были встречи</h3>
+              <h3>Где были звонки</h3>
             </div>
           </header>
           <ol class="rank-list" id="meetingsTopList"></ol>
@@ -333,6 +333,26 @@
             </div>
           </header>
           <ol class="timeline" id="meetingsSessions"></ol>
+        </section>
+      </div>
+      <div class="pulse-split meetings-email-split">
+        <section class="pulse-panel">
+          <header class="pulse-head">
+            <div>
+              <p class="pulse-kicker">Почта</p>
+              <h3>Чтение и ответы</h3>
+            </div>
+          </header>
+          <ol class="rank-list" id="meetingsEmailList"></ol>
+        </section>
+        <section class="pulse-panel">
+          <header class="pulse-head">
+            <div>
+              <p class="pulse-kicker">Сессии почты</p>
+              <h3>Недавние письма</h3>
+            </div>
+          </header>
+          <ol class="timeline" id="meetingsEmailSessions"></ol>
         </section>
       </div>
     </section>
