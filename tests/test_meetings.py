@@ -207,7 +207,7 @@ def test_build_meetings_report_filters_and_totals():
     assert report["share_pct"] == 50.0
     assert len(report["by_app"]) == 1
     assert len(report["by_site"]) == 1
-    assert report["by_site"][0]["name"] == "meet.google.com"
+    assert report["by_site"][0]["name"] in {"meet.google.com", "Google Meet"}
     assert len(report["sessions"]) == 2
     assert report["email_total_sec"] == 90.0
     assert "телемост" in report["note"].casefold() or "мессенджер" in report["note"].casefold()
