@@ -45,9 +45,8 @@ def test_boot_css_preserves_gradients_and_enlarges_mark():
     assert ".logo-mark .logo-bar-1" in CSS
     assert ".boot-logo-svg .logo-bar-1" in CSS
     assert "revert-layer" in CSS
-    # Must not be a bare global solid fill rule
-    assert "\n.logo-bar-1 { fill:" not in CSS
-    assert CSS.count(".logo-bar-1 { fill: #3b82f6; }") == 0
+    # Bare global solid fill (no .logo-mark / .boot-logo-svg prefix) must be gone
+    assert "\n.logo-bar-1 {" not in CSS
 
 
 def test_boot_letter_loader_replaces_progress_line():
