@@ -731,24 +731,154 @@ function appsCupSvg(rank) {
   </svg>`;
 }
 
+/** Browsers / RDP shells — Overview should show what happened inside, not the shell. */
+const SHELL_APP_EXES = new Set([
+  "chrome.exe",
+  "msedge.exe",
+  "firefox.exe",
+  "browser.exe",
+  "opera.exe",
+  "brave.exe",
+  "vivaldi.exe",
+  "mstsc.exe",
+  "msrdc.exe",
+]);
+
+function isShellAppRow(row) {
+  const exe = String(row?.app_name || "").trim().toLowerCase();
+  if (SHELL_APP_EXES.has(exe)) return true;
+  const kind = String(row?.kind || "").toLowerCase();
+  if (kind === "remote") return true;
+  const name = String(row?.name || "").toLowerCase();
+  return name === "remote desktop" || name === "microsoft edge" || name === "google chrome";
+}
+
+function formatActivityDisplayName(name) {
+  const raw = String(name || "").trim();
+  const m = /^RDP\s*·\s*(.+)$/i.exec(raw);
+  if (m) return m[1].trim() || raw;
+  return raw || "Активность";
+}
+
+function shortViaLabel(parentName, appName) {
+  const n = String(parentName || "").trim();
+  if (!n) return "";
+  const exe = String(appName || "").toLowerCase();
+  if (exe === "mstsc.exe" || exe === "msrdc.exe" || /^remote desktop$/i.test(n)) return "удалёнка";
+  if (/microsoft edge/i.test(n) || exe === "msedge.exe") return "Edge";
+  if (/google chrome/i.test(n) || exe === "chrome.exe") return "Chrome";
+  if (/yandex/i.test(n) || exe === "browser.exe") return "Яндекс";
+  if (/firefox/i.test(n)) return "Firefox";
+  if (/opera/i.test(n)) return "Opera";
+  if (/brave/i.test(n)) return "Brave";
+  return n;
+}
+
+/** Prefer sites / RDP hosts over bare browser & Remote Desktop shells. */
+function topFocusCandidates(summary) {
+  const minSec = 30;
+  const grouped = summary.by_app_grouped || [];
+  const rows = grouped.length
+    ? grouped
+    : (summary.by_app || []).map((r) => ({ ...r, children: [] }));
+  const bag = [];
+
+  for (const row of rows) {
+    const children = (row.children || []).filter((c) => (c.sec || 0) >= minSec);
+    const shell = isShellAppRow(row);
+    if (shell || children.length) {
+      if (children.length) {
+        for (const c of children) {
+          bag.push({
+            name: formatActivityDisplayName(c.name),
+            sec: c.sec || 0,
+            icon_url: c.icon_url || row.icon_url || "",
+            category: c.category || row.category || "neutral",
+            via: shortViaLabel(row.name, row.app_name),
+            kind: c.kind || row.kind || "",
+          });
+        }
+        continue;
+      }
+      if (shell) {
+        // No nested detail yet — don't promote empty Edge/RDP shells to the podium.
+        continue;
+      }
+    }
+    if ((row.sec || 0) < minSec) continue;
+    bag.push({
+      name: row.name || row.app_name || "Приложение",
+      sec: row.sec || 0,
+      icon_url: row.icon_url || "",
+      category: row.category || "neutral",
+      via: "",
+      kind: row.kind || "",
+    });
+  }
+
+  // Fallback: if shells were skipped and bag is thin, use by_activity directly.
+  if (bag.length < 3 && (summary.by_activity || []).length) {
+    const seen = new Set(bag.map((b) => String(b.name).toLowerCase()));
+    for (const a of summary.by_activity || []) {
+      if ((a.sec || 0) < minSec) continue;
+      const name = formatActivityDisplayName(a.name);
+      const key = name.toLowerCase();
+      if (seen.has(key)) continue;
+      if (isShellAppRow(a) && !a.site && !/^RDP\s*·/i.test(String(a.name || ""))) continue;
+      seen.add(key);
+      bag.push({
+        name,
+        sec: a.sec || 0,
+        icon_url: a.icon_url || "",
+        category: a.category || "neutral",
+        via: shortViaLabel(
+          a.app_name === "mstsc.exe" || a.app_name === "msrdc.exe"
+            ? "Remote Desktop"
+            : a.app_name === "msedge.exe"
+              ? "Microsoft Edge"
+              : a.app_name === "chrome.exe"
+                ? "Google Chrome"
+                : "",
+          a.app_name
+        ),
+        kind: a.kind || "",
+      });
+    }
+  }
+
+  const merged = new Map();
+  for (const it of bag) {
+    const key = String(it.name || "").toLowerCase();
+    const prev = merged.get(key);
+    if (!prev) {
+      merged.set(key, { ...it });
+      continue;
+    }
+    prev.sec = Math.round((prev.sec + it.sec) * 10) / 10;
+    if (!prev.icon_url && it.icon_url) prev.icon_url = it.icon_url;
+    if (!prev.via && it.via) prev.via = it.via;
+  }
+  return [...merged.values()].sort((a, b) => b.sec - a.sec);
+}
+
 function renderTopAppsPulse(summary) {
   const el = document.getElementById("topAppsPulse");
   if (!el) return;
   clearSkel(el);
   const dayTotal = Math.max(1, Number(summary.total_sec) || 0);
-  const apps = (summary.by_app || [])
-    .filter((r) => (r.sec || 0) >= 30)
+  const apps = topFocusCandidates(summary)
     .slice(0, 5)
     .map((r, i) => ({
       rank: i + 1,
-      name: r.name || r.app_name || "Приложение",
+      name: r.name,
       sec: r.sec || 0,
       icon_url: r.icon_url || "",
       category: r.category || "neutral",
+      via: r.via || "",
       share: Math.round(((r.sec || 0) / dayTotal) * 100),
     }));
   if (!apps.length) {
-    el.innerHTML = `<p class="hint">Пока нет данных по приложениям за сегодня.</p>`;
+    el.innerHTML = `<p class="hint">Пока нет данных по активностям за сегодня.</p>`;
     return;
   }
   const top3 = apps.slice(0, 3);
@@ -763,11 +893,15 @@ function renderTopAppsPulse(summary) {
       const placeClass = app.rank === 1 ? "is-first" : app.rank === 2 ? "is-second" : "is-third";
       const cat = CAT_LABELS[app.category] || CAT_LABELS.neutral;
       const catColor = CAT_COLORS[app.category] || CAT_COLORS.neutral;
+      const via = app.via
+        ? `<span class="apps-podium-via">${escapeHtml(app.via)}</span>`
+        : "";
       return `<li class="apps-podium-slot ${placeClass}">
         <div class="apps-podium-card">
           <div class="apps-podium-trophy">${appsCupSvg(app.rank)}</div>
           <div class="apps-podium-icon">${iconImgHtml(app.icon_url, app.rank === 1 ? 44 : 36)}</div>
           <div class="apps-podium-name" title="${escapeHtml(app.name)}">${escapeHtml(app.name)}</div>
+          ${via}
           <div class="apps-podium-meta">
             <strong>${fmtDur(app.sec)}</strong>
             <span>${app.share}% · <em style="color:${catColor}">${escapeHtml(cat)}</em></span>
@@ -780,15 +914,19 @@ function renderTopAppsPulse(summary) {
   const runners = apps.slice(3);
   const runnersHtml = runners.length
     ? `<ol class="apps-runners" start="4">${runners
-        .map(
-          (app) => `<li class="apps-runner">
+        .map((app) => {
+          const via = app.via ? `<em class="apps-runner-via">${escapeHtml(app.via)}</em>` : "";
+          return `<li class="apps-runner">
             <span class="apps-runner-rank">#${app.rank}</span>
             ${iconImgHtml(app.icon_url, 28)}
-            <span class="apps-runner-name">${escapeHtml(app.name)}</span>
+            <span class="apps-runner-copy">
+              <span class="apps-runner-name">${escapeHtml(app.name)}</span>
+              ${via}
+            </span>
             <span class="apps-runner-bar" aria-hidden="true"><i style="width:${Math.max(8, app.share)}%;background:${CAT_COLORS[app.category] || CAT_COLORS.neutral}"></i></span>
             <span class="apps-runner-meta">${fmtDur(app.sec)} · ${app.share}%</span>
-          </li>`
-        )
+          </li>`;
+        })
         .join("")}</ol>`
     : "";
   el.innerHTML = `<div class="apps-top">

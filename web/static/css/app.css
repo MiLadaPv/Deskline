@@ -5517,6 +5517,14 @@ html[data-theme="dark"] .google-btn {
   white-space: nowrap;
 }
 
+.apps-podium-via {
+  margin-top: -4px;
+  font-size: 0.72rem;
+  font-weight: 650;
+  color: var(--ink-soft);
+  letter-spacing: 0.01em;
+}
+
 .apps-podium-slot.is-first .apps-podium-name {
   font-size: 1.02rem;
 }
@@ -5601,6 +5609,12 @@ html[data-theme="dark"] .google-btn {
   font-variant-numeric: tabular-nums;
 }
 
+.apps-runner-copy {
+  min-width: 0;
+  display: grid;
+  gap: 1px;
+}
+
 .apps-runner-name {
   font-size: 0.88rem;
   font-weight: 650;
@@ -5608,6 +5622,13 @@ html[data-theme="dark"] .google-btn {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.apps-runner-via {
+  font-style: normal;
+  font-size: 0.72rem;
+  font-weight: 650;
+  color: var(--ink-soft);
 }
 
 .apps-runner-bar {
