@@ -1,37 +1,40 @@
-"""Splash WebP must be high-FPS (Nano Banana), not a 7-step slideshow."""
+"""Boot splash must stay GPU-friendly: vector mark + compositor transforms only."""
 
 from __future__ import annotations
 
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-ANIM = ROOT / "web" / "static" / "img" / "logo-anim"
+CSS = (ROOT / "web" / "static" / "css" / "app.css").read_text(encoding="utf-8")
+BOOT = (ROOT / "web" / "templates" / "partials" / "boot_logo.html").read_text(encoding="utf-8")
+JS = (ROOT / "web" / "static" / "js" / "app.js").read_text(encoding="utf-8")
 
 
-def _anmf_durations(path: Path) -> list[int]:
-    data = path.read_bytes()
-    durs: list[int] = []
-    i = 0
-    while True:
-        j = data.find(b"ANMF", i)
-        if j < 0:
-            break
-        size = int.from_bytes(data[j + 4 : j + 8], "little")
-        payload = data[j + 8 : j + 8 + size]
-        if len(payload) >= 16:
-            dur = payload[12] | (payload[13] << 8) | (payload[14] << 16)
-            durs.append(dur)
-        i = j + 8 + size
-    return durs
+def test_boot_logo_is_inline_vector_not_webp_movie():
+    assert "boot-logo-svg" in BOOT
+    assert "logo-bar-scale" in BOOT
+    assert "logo-grow.webp" not in BOOT
+    assert "logo-grow-dark.webp" not in BOOT
+    assert "<svg" in BOOT
 
 
-def test_logo_grow_webp_is_high_fps():
-    for name in ("logo-grow.webp", "logo-grow-dark.webp"):
-        path = ANIM / name
-        assert path.is_file(), name
-        durs = _anmf_durations(path)
-        assert len(durs) >= 48, f"{name} too few frames: {len(durs)}"
-        # Majority of frames should be ~60fps (16–20ms)
-        short = [d for d in durs if 14 <= d <= 20]
-        assert len(short) >= 40, f"{name} not high-FPS: {sorted(set(durs))}"
-        assert sum(durs) >= 1500
+def test_boot_css_uses_compositor_props_only():
+    boot_idx = CSS.find(".boot-splash {")
+    assert boot_idx >= 0
+    chunk = CSS[boot_idx : boot_idx + 4500]
+    assert "bootBarGrow" in chunk
+    assert "bootMarkIn" in chunk
+    assert "bootTitleIn" in chunk
+    assert "bootProgressDraw" in chunk
+    assert "letter-spacing" not in chunk.split("@keyframes bootTitleIn")[1].split("}")[0]
+    assert "filter: blur" not in chunk
+    assert "boot-glow" not in chunk
+    assert "will-change: transform, opacity" in chunk or "translate3d" in chunk
+    assert "filter: blur" not in CSS[CSS.find("@keyframes shellRise") : CSS.find("@keyframes shellRise") + 220]
+
+
+def test_boot_js_plays_and_exits_cleanly():
+    assert 'classList.add("is-playing")' in JS
+    assert 'classList.add("is-leaving")' in JS
+    assert "prefers-reduced-motion" in JS
+    assert "deskline_splash_done" in JS

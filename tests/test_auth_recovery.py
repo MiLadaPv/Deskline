@@ -63,9 +63,9 @@ def test_login_template_has_launch_and_forgot():
     assert "logo.png" in logo
     assert "logo-dark.png" in logo
     boot = (WEB_ROOT / "templates" / "partials" / "boot_logo.html").read_text(encoding="utf-8")
-    assert "logo-grow.webp" in boot
-    assert "logo-grow-dark.webp" in boot
-    assert "logo-grow.webp" not in html or "boot_logo.html" in html
+    assert "boot-logo-svg" in boot
+    assert "logo-bar-scale" in boot
+    assert "logo-grow.webp" not in boot
     assert "partials/boot_logo.html" in html
     assert "preview-gauge" in html
     assert "preview-stage" in html

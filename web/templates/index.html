@@ -14,8 +14,11 @@
 <body>
   <div class="atmosphere" aria-hidden="true"></div>
   <div class="boot-splash" id="appSplash" aria-hidden="true">
-    {% include "partials/boot_logo.html" %}
-    <p class="boot-splash-title">Deskline</p>
+    <div class="boot-stage">
+      {% include "partials/boot_logo.html" %}
+      <p class="boot-splash-title">Deskline</p>
+      <div class="boot-progress" aria-hidden="true"><i></i></div>
+    </div>
   </div>
   <header class="top">
     <div class="brand-block">

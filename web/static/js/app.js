@@ -5005,12 +5005,33 @@ function wireUi() {
 async function boot() {
   const splash = document.getElementById("appSplash");
   const markShellReady = () => document.body.classList.add("is-shell-ready");
-  if (splash && !sessionStorage.getItem("deskline_splash_done")) {
-    window.setTimeout(() => {
-      splash.classList.add("is-done");
-      sessionStorage.setItem("deskline_splash_done", "1");
+  const finishSplash = () => {
+    if (!splash) {
       markShellReady();
-    }, 2200);
+      return;
+    }
+    splash.classList.remove("is-playing", "is-leaving");
+    splash.classList.add("is-done");
+    sessionStorage.setItem("deskline_splash_done", "1");
+    markShellReady();
+  };
+  if (splash && !sessionStorage.getItem("deskline_splash_done")) {
+    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (reduce) {
+      finishSplash();
+    } else {
+      requestAnimationFrame(() => splash.classList.add("is-playing"));
+      if (document.fonts?.ready) {
+        try {
+          await Promise.race([
+            document.fonts.ready,
+            new Promise((r) => window.setTimeout(r, 400)),
+          ]);
+        } catch (_) {}
+      }
+      window.setTimeout(() => splash.classList.add("is-leaving"), 1950);
+      window.setTimeout(finishSplash, 2480);
+    }
   } else if (splash) {
     splash.classList.add("is-done");
     markShellReady();

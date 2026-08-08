@@ -144,8 +144,8 @@ html, body {
 }
 
 @keyframes shellRise {
-  from { opacity: 0; transform: translateY(18px) scale(0.985); filter: blur(4px); }
-  to { opacity: 1; transform: translateY(0) scale(1); filter: blur(0); }
+  from { opacity: 0; transform: translate3d(0, 14px, 0); }
+  to { opacity: 1; transform: translate3d(0, 0, 0); }
 }
 
 @keyframes panelStage {
@@ -4056,32 +4056,11 @@ button.gantt-block:focus-visible {
   z-index: 1000;
   display: grid;
   place-content: center;
-  gap: 14px;
   background: var(--paper);
-  transition: opacity 0.55s ease, visibility 0.55s ease;
-}
-
-.boot-splash::before {
-  content: "";
-  position: absolute;
-  inset: 18% 28%;
-  border-radius: 50%;
-  background: radial-gradient(
-    circle,
-    color-mix(in srgb, var(--accent) 28%, transparent),
-    transparent 68%
-  );
-  filter: blur(28px);
-  opacity: 0.55;
-  pointer-events: none;
+  /* Compositor-friendly exit — no layout thrash */
+  transition: opacity 0.55s cubic-bezier(0.22, 1, 0.36, 1), visibility 0.55s linear;
+  contain: paint;
   transform: translateZ(0);
-  will-change: transform, opacity;
-  animation: boot-glow 1.4s cubic-bezier(0.16, 1, 0.3, 1) both;
-}
-
-@keyframes boot-glow {
-  from { opacity: 0; transform: scale(0.7); }
-  to { opacity: 0.55; transform: scale(1); }
 }
 
 .boot-splash.is-done {
@@ -4090,30 +4069,59 @@ button.gantt-block:focus-visible {
   pointer-events: none;
 }
 
+.boot-splash.is-leaving {
+  opacity: 0;
+  transform: translate3d(0, 0, 0) scale(1.015);
+}
+
+.boot-stage {
+  display: grid;
+  justify-items: center;
+  gap: 18px;
+  transform: translateZ(0);
+}
+
 .boot-logo-anim {
-  width: min(300px, 56vw);
+  width: min(168px, 44vw);
   height: auto;
+  aspect-ratio: 664 / 761;
   display: block;
   margin: 0 auto;
-  object-fit: contain;
-  background: transparent !important;
-  border: 0;
-  border-radius: 0;
-  box-shadow: none;
-  /* Soft glow via shadow — avoids per-frame SVG/CSS filter thrash on WebP. */
-  filter: none;
-  image-rendering: auto;
   position: relative;
   z-index: 1;
   transform: translateZ(0);
-  will-change: transform, opacity;
   backface-visibility: hidden;
-  animation: boot-logo-in 0.9s cubic-bezier(0.16, 1, 0.3, 1) both;
+  will-change: transform, opacity;
 }
 
-@keyframes boot-logo-in {
-  from { opacity: 0; transform: translate3d(0, 10px, 0) scale(0.94); }
-  to { opacity: 1; transform: translate3d(0, 0, 0) scale(1); }
+.boot-logo-svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+  overflow: visible;
+}
+
+.boot-splash.is-playing .boot-logo-anim {
+  animation: bootMarkIn 0.95s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.boot-splash.is-playing .logo-d {
+  animation: bootDIn 0.9s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.boot-splash.is-playing .logo-bar-scale {
+  animation: bootBarGrow 0.9s cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation-delay: var(--bar-delay, 0.12s);
+}
+
+.boot-splash:not(.is-playing):not(.is-done) .logo-bar-scale {
+  transform: scale(1, 0);
+}
+
+.boot-splash:not(.is-playing):not(.is-done) .boot-logo-anim,
+.boot-splash:not(.is-playing):not(.is-done) .boot-splash-title,
+.boot-splash:not(.is-playing):not(.is-done) .boot-progress {
+  opacity: 0;
 }
 
 .boot-logo-anim-dark { display: none; }
@@ -4126,17 +4134,94 @@ html[data-theme="dark"] .boot-logo-anim-dark {
   margin: 0;
   text-align: center;
   font-family: var(--brand);
-  font-size: clamp(1.55rem, 3.2vw, 1.9rem);
+  font-size: clamp(1.45rem, 3vw, 1.75rem);
+  font-weight: 700;
   color: var(--ink);
-  letter-spacing: 0.04em;
+  letter-spacing: -0.03em;
   position: relative;
   z-index: 1;
-  animation: boot-title-in 0.85s ease 0.55s both;
 }
 
-@keyframes boot-title-in {
-  from { opacity: 0; letter-spacing: 0.18em; transform: translateY(10px); }
-  to { opacity: 1; letter-spacing: 0.04em; transform: translateY(0); }
+.boot-splash.is-playing .boot-splash-title {
+  animation: bootTitleIn 0.75s cubic-bezier(0.16, 1, 0.3, 1) 0.42s both;
+}
+
+.boot-progress {
+  width: 44px;
+  height: 2px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--ink) 10%, transparent);
+  overflow: hidden;
+  opacity: 0;
+}
+
+.boot-splash.is-playing .boot-progress {
+  animation: bootProgressFade 0.4s ease 0.55s both;
+}
+
+.boot-progress > i {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--accent);
+  transform-origin: left center;
+  transform: scaleX(0);
+}
+
+.boot-splash.is-playing .boot-progress > i {
+  animation: bootProgressDraw 1.35s cubic-bezier(0.22, 1, 0.36, 1) 0.6s both;
+}
+
+@keyframes bootMarkIn {
+  from { opacity: 0; transform: translate3d(0, 12px, 0) scale(0.94); }
+  to { opacity: 1; transform: translate3d(0, 0, 0) scale(1); }
+}
+
+@keyframes bootDIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes bootBarGrow {
+  from { transform: scale(1, 0.08); opacity: 0.35; }
+  to { transform: scale(1, 1); opacity: 1; }
+}
+
+@keyframes bootTitleIn {
+  from { opacity: 0; transform: translate3d(0, 8px, 0); }
+  to { opacity: 1; transform: translate3d(0, 0, 0); }
+}
+
+@keyframes bootProgressFade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes bootProgressDraw {
+  from { transform: scaleX(0); }
+  to { transform: scaleX(1); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .boot-splash.is-playing .boot-logo-anim,
+  .boot-splash.is-playing .logo-d,
+  .boot-splash.is-playing .logo-bar-scale,
+  .boot-splash.is-playing .boot-splash-title,
+  .boot-splash.is-playing .boot-progress,
+  .boot-splash.is-playing .boot-progress > i {
+    animation: none !important;
+    opacity: 1 !important;
+    transform: none !important;
+  }
+
+  .boot-splash.is-leaving {
+    transform: none;
+  }
+}
+
+html[data-theme="dark"] .boot-splash {
+  background: var(--paper);
 }
 
 .logo-mark {
