@@ -14,21 +14,22 @@ def test_top_apps_pulse_markup():
     assert "Топ активностей" in HTML
     assert "Что делали" in HTML
     assert "pulse-apps-panel" in HTML
+    assert 'id="activityDetailModal"' in HTML
+    assert 'id="activityDetailList"' in HTML
 
 
 def test_top_apps_pulse_render_hooks():
     assert "function renderTopAppsPulse" in JS
     assert "function topFocusCandidates" in JS
-    assert "function isShellAppRow" in JS
-    assert "SHELL_APP_EXES" in JS
+    assert "function resolveActivityBreakdown" in JS
+    assert "function openActivityDetail" in JS
+    assert "function wireTopAppsPulse" in JS
+    assert "data-pulse-idx" in JS
     assert "by_app_grouped" in JS
     assert "renderTopAppsPulse(summary)" in JS
-    assert 'needsSkeleton(apps, "summary-apps"' in JS
-    assert 'markSkelContext("summary-apps"' in JS
 
 
 def test_top_focus_prefers_nested_activities():
-    # Browsers / RDP shells must yield to nested site / host children.
     assert "msedge.exe" in JS
     assert "mstsc.exe" in JS
     assert "formatActivityDisplayName" in JS
@@ -40,9 +41,10 @@ def test_top_focus_prefers_nested_activities():
 def test_top_apps_podium_styles():
     assert ".apps-podium" in CSS
     assert ".apps-cup-gold" in CSS
-    assert ".apps-cup-silver" in CSS
-    assert ".apps-cup-bronze" in CSS
+    assert ".apps-cup-halo" in CSS
+    assert ".apps-cup-gem" in CSS
     assert ".apps-runners" in CSS
     assert 'html[data-theme="dark"] .apps-podium-card' in CSS
-    assert 'html[data-theme="dark"] .apps-runner' in CSS
-    assert 'html[data-theme="dark"] .apps-podium-slot.is-first .apps-podium-card' in CSS
+    assert ".activity-detail-row" in CSS
+    assert ".apps-podium-icon .rank-icon" in CSS
+    assert "object-fit: contain" in CSS

@@ -720,14 +720,22 @@ function renderKpis(summary, team) {
 
 function appsCupSvg(rank) {
   const tone = rank === 1 ? "gold" : rank === 2 ? "silver" : "bronze";
-  return `<svg class="apps-cup apps-cup-${tone}" viewBox="0 0 40 44" width="28" height="31" aria-hidden="true" focusable="false">
-    <path class="apps-cup-bowl" d="M10 5.5h20v5.2c0 7.4-4.2 12.2-10 12.2S10 18.1 10 10.7V5.5z"/>
-    <path class="apps-cup-rim" d="M9.2 5.5h21.6v2.2H9.2z"/>
-    <path class="apps-cup-handle" d="M10 8.2H6.4c-1.8 0-3 1.7-2.5 3.4.7 2.4 2.8 3.6 5.6 3.8"/>
-    <path class="apps-cup-handle" d="M30 8.2h3.6c1.8 0 3 1.7 2.5 3.4-.7 2.4-2.8 3.6-5.6 3.8"/>
-    <path class="apps-cup-stem" d="M18.2 22.6h3.6v6.2h-3.6z"/>
-    <path class="apps-cup-base" d="M13.5 31.4h13v2.4c0 1.2-.9 2.1-2.1 2.1H15.6c-1.2 0-2.1-.9-2.1-2.1v-2.4z"/>
-    <path class="apps-cup-shine" d="M14.2 8.4c.4 4.8 2.2 8.2 5 9.8" fill="none"/>
+  return `<svg class="apps-cup apps-cup-${tone}" viewBox="0 0 48 48" width="32" height="32" aria-hidden="true" focusable="false">
+    <defs>
+      <linearGradient id="cupGrad-${tone}" x1="12" y1="8" x2="36" y2="40" gradientUnits="userSpaceOnUse">
+        <stop offset="0%" stop-color="currentColor" stop-opacity="0.92"/>
+        <stop offset="55%" stop-color="currentColor"/>
+        <stop offset="100%" stop-color="currentColor" stop-opacity="0.72"/>
+      </linearGradient>
+    </defs>
+    <circle class="apps-cup-halo" cx="24" cy="20" r="15" />
+    <path class="apps-cup-bowl" fill="url(#cupGrad-${tone})" d="M15.5 9.5h17a2.5 2.5 0 0 1 2.5 2.5v3.2c0 7.1-4.7 11.8-11 11.8s-11-4.7-11-11.8V12a2.5 2.5 0 0 1 2.5-2.5z"/>
+    <path class="apps-cup-rim" fill="currentColor" d="M14.2 9.2h19.6a1.2 1.2 0 0 1 0 2.4H14.2a1.2 1.2 0 0 1 0-2.4z"/>
+    <path class="apps-cup-handle" d="M15.6 12.2H11c-2.2 0-3.6 2-3 4.1.8 2.8 3.2 4.2 6.4 4.4"/>
+    <path class="apps-cup-handle" d="M32.4 12.2H37c2.2 0 3.6 2 3 4.1-.8 2.8-3.2 4.2-6.4 4.4"/>
+    <rect class="apps-cup-stem" x="21.6" y="26.8" width="4.8" height="7.2" rx="1.4" fill="currentColor"/>
+    <path class="apps-cup-base" fill="currentColor" d="M17 36.2h14a2.2 2.2 0 0 1 0 4.4H17a2.2 2.2 0 0 1 0-4.4z"/>
+    <circle class="apps-cup-gem" cx="24" cy="17.5" r="2.2"/>
   </svg>`;
 }
 
@@ -743,6 +751,9 @@ const SHELL_APP_EXES = new Set([
   "mstsc.exe",
   "msrdc.exe",
 ]);
+
+let lastTopPulseSummary = null;
+let topPulseItems = [];
 
 function isShellAppRow(row) {
   const exe = String(row?.app_name || "").trim().toLowerCase();
@@ -791,11 +802,15 @@ function topFocusCandidates(summary) {
         for (const c of children) {
           bag.push({
             name: formatActivityDisplayName(c.name),
+            rawName: c.name || "",
+            parentName: row.name || "",
+            parentApp: row.app_name || "",
             sec: c.sec || 0,
             icon_url: c.icon_url || row.icon_url || "",
             category: c.category || row.category || "neutral",
             via: shortViaLabel(row.name, row.app_name),
             kind: c.kind || row.kind || "",
+            site: c.site || "",
           });
         }
         continue;
@@ -808,11 +823,15 @@ function topFocusCandidates(summary) {
     if ((row.sec || 0) < minSec) continue;
     bag.push({
       name: row.name || row.app_name || "Приложение",
+      rawName: row.name || "",
+      parentName: row.name || "",
+      parentApp: row.app_name || "",
       sec: row.sec || 0,
       icon_url: row.icon_url || "",
       category: row.category || "neutral",
       via: "",
       kind: row.kind || "",
+      site: "",
     });
   }
 
@@ -826,22 +845,25 @@ function topFocusCandidates(summary) {
       if (seen.has(key)) continue;
       if (isShellAppRow(a) && !a.site && !/^RDP\s*·/i.test(String(a.name || ""))) continue;
       seen.add(key);
+      const parentGuess =
+        a.app_name === "mstsc.exe" || a.app_name === "msrdc.exe"
+          ? "Remote Desktop"
+          : a.app_name === "msedge.exe"
+            ? "Microsoft Edge"
+            : a.app_name === "chrome.exe"
+              ? "Google Chrome"
+              : "";
       bag.push({
         name,
+        rawName: a.name || "",
+        parentName: parentGuess,
+        parentApp: a.app_name || "",
         sec: a.sec || 0,
         icon_url: a.icon_url || "",
         category: a.category || "neutral",
-        via: shortViaLabel(
-          a.app_name === "mstsc.exe" || a.app_name === "msrdc.exe"
-            ? "Remote Desktop"
-            : a.app_name === "msedge.exe"
-              ? "Microsoft Edge"
-              : a.app_name === "chrome.exe"
-                ? "Google Chrome"
-                : "",
-          a.app_name
-        ),
+        via: shortViaLabel(parentGuess, a.app_name),
         kind: a.kind || "",
+        site: a.site || "",
       });
     }
   }
@@ -857,26 +879,158 @@ function topFocusCandidates(summary) {
     prev.sec = Math.round((prev.sec + it.sec) * 10) / 10;
     if (!prev.icon_url && it.icon_url) prev.icon_url = it.icon_url;
     if (!prev.via && it.via) prev.via = it.via;
+    if (!prev.parentName && it.parentName) prev.parentName = it.parentName;
+    if (!prev.parentApp && it.parentApp) prev.parentApp = it.parentApp;
+    if (!prev.rawName && it.rawName) prev.rawName = it.rawName;
   }
   return [...merged.values()].sort((a, b) => b.sec - a.sec);
+}
+
+function resolveActivityBreakdown(summary, item) {
+  const grouped = summary?.by_app_grouped || [];
+  const want = String(item?.rawName || item?.name || "").toLowerCase();
+  const wantDisplay = String(item?.name || "").toLowerCase();
+  let parent =
+    grouped.find((g) => {
+      const kids = g.children || [];
+      return kids.some((c) => {
+        const cn = String(c.name || "").toLowerCase();
+        const cd = formatActivityDisplayName(c.name).toLowerCase();
+        return cn === want || cd === wantDisplay || cd === want;
+      });
+    }) || null;
+  if (!parent && item?.parentApp) {
+    parent = grouped.find(
+      (g) => String(g.app_name || "").toLowerCase() === String(item.parentApp).toLowerCase()
+    ) || null;
+  }
+  if (!parent && item?.parentName) {
+    parent =
+      grouped.find(
+        (g) => String(g.name || "").toLowerCase() === String(item.parentName).toLowerCase()
+      ) || null;
+  }
+  if (!parent) {
+    parent =
+      grouped.find(
+        (g) => String(g.name || "").toLowerCase() === wantDisplay || String(g.name || "").toLowerCase() === want
+      ) || null;
+  }
+
+  const children = (parent?.children || []).filter((c) => (c.sec || 0) >= 30);
+  if (parent && children.length) {
+    return {
+      title: item.name,
+      kicker: parent.name || item.via || "Расшифровка",
+      lead: `${fmtDur(parent.sec || item.sec)} в «${parent.name || item.name}» сегодня`,
+      focusName: item.name,
+      rows: children
+        .slice()
+        .sort((a, b) => (b.sec || 0) - (a.sec || 0))
+        .map((c) => ({
+          name: formatActivityDisplayName(c.name),
+          sec: c.sec || 0,
+          icon_url: c.icon_url || parent.icon_url || "",
+          category: c.category || parent.category || "neutral",
+          active:
+            formatActivityDisplayName(c.name).toLowerCase() === wantDisplay ||
+            String(c.name || "").toLowerCase() === want,
+        })),
+    };
+  }
+
+  return {
+    title: item.name,
+    kicker: item.via || "Расшифровка",
+    lead: `${fmtDur(item.sec)} · ${CAT_LABELS[item.category] || CAT_LABELS.neutral}`,
+    focusName: item.name,
+    rows: [
+      {
+        name: item.name,
+        sec: item.sec || 0,
+        icon_url: item.icon_url || "",
+        category: item.category || "neutral",
+        active: true,
+      },
+    ],
+  };
+}
+
+function closeActivityDetail() {
+  const modal = document.getElementById("activityDetailModal");
+  if (modal) modal.hidden = true;
+}
+
+function openActivityDetail(item) {
+  const modal = document.getElementById("activityDetailModal");
+  const title = document.getElementById("activityDetailTitle");
+  const kicker = document.getElementById("activityDetailKicker");
+  const lead = document.getElementById("activityDetailLead");
+  const list = document.getElementById("activityDetailList");
+  if (!modal || !title || !list || !item) return;
+  const detail = resolveActivityBreakdown(lastTopPulseSummary || {}, item);
+  const total = Math.max(
+    1,
+    detail.rows.reduce((s, r) => s + (r.sec || 0), 0)
+  );
+  title.textContent = detail.title;
+  if (kicker) kicker.textContent = detail.kicker || "Расшифровка";
+  if (lead) lead.textContent = detail.lead || "";
+  list.innerHTML = detail.rows
+    .map((r) => {
+      const share = Math.round(((r.sec || 0) / total) * 100);
+      const cat = CAT_LABELS[r.category] || CAT_LABELS.neutral;
+      const catColor = CAT_COLORS[r.category] || CAT_COLORS.neutral;
+      return `<li class="activity-detail-row${r.active ? " is-active" : ""}">
+        ${iconImgHtml(r.icon_url, 28)}
+        <span class="activity-detail-copy">
+          <strong>${escapeHtml(r.name)}</strong>
+          <em style="color:${catColor}">${escapeHtml(cat)}</em>
+        </span>
+        <span class="activity-detail-bar" aria-hidden="true"><i style="width:${Math.max(6, share)}%;background:${catColor}"></i></span>
+        <span class="activity-detail-meta">${fmtDur(r.sec)} · ${share}%</span>
+      </li>`;
+    })
+    .join("");
+  modal.hidden = false;
+}
+
+function wireTopAppsPulse(el) {
+  if (!el || el.dataset.topAppsWired === "1") return;
+  el.dataset.topAppsWired = "1";
+  el.addEventListener("click", (ev) => {
+    const hit = ev.target.closest("[data-pulse-idx]");
+    if (!hit || !el.contains(hit)) return;
+    ev.preventDefault();
+    const idx = Number(hit.dataset.pulseIdx);
+    const item = topPulseItems[idx];
+    if (item) openActivityDetail(item);
+  });
+  el.addEventListener("keydown", (ev) => {
+    if (ev.key !== "Enter" && ev.key !== " ") return;
+    const hit = ev.target.closest("[data-pulse-idx]");
+    if (!hit || !el.contains(hit)) return;
+    ev.preventDefault();
+    const idx = Number(hit.dataset.pulseIdx);
+    const item = topPulseItems[idx];
+    if (item) openActivityDetail(item);
+  });
 }
 
 function renderTopAppsPulse(summary) {
   const el = document.getElementById("topAppsPulse");
   if (!el) return;
   clearSkel(el);
+  lastTopPulseSummary = summary || null;
   const dayTotal = Math.max(1, Number(summary.total_sec) || 0);
   const apps = topFocusCandidates(summary)
     .slice(0, 5)
     .map((r, i) => ({
+      ...r,
       rank: i + 1,
-      name: r.name,
-      sec: r.sec || 0,
-      icon_url: r.icon_url || "",
-      category: r.category || "neutral",
-      via: r.via || "",
       share: Math.round(((r.sec || 0) / dayTotal) * 100),
     }));
+  topPulseItems = apps;
   if (!apps.length) {
     el.innerHTML = `<p class="hint">Пока нет данных по активностям за сегодня.</p>`;
     return;
@@ -896,10 +1050,11 @@ function renderTopAppsPulse(summary) {
       const via = app.via
         ? `<span class="apps-podium-via">${escapeHtml(app.via)}</span>`
         : "";
+      const idx = app.rank - 1;
       return `<li class="apps-podium-slot ${placeClass}">
-        <div class="apps-podium-card">
+        <button type="button" class="apps-podium-card" data-pulse-idx="${idx}" aria-label="Расшифровка: ${escapeHtml(app.name)}">
           <div class="apps-podium-trophy">${appsCupSvg(app.rank)}</div>
-          <div class="apps-podium-icon">${iconImgHtml(app.icon_url, app.rank === 1 ? 44 : 36)}</div>
+          <div class="apps-podium-icon">${iconImgHtml(app.icon_url, app.rank === 1 ? 40 : 32)}</div>
           <div class="apps-podium-name" title="${escapeHtml(app.name)}">${escapeHtml(app.name)}</div>
           ${via}
           <div class="apps-podium-meta">
@@ -907,7 +1062,7 @@ function renderTopAppsPulse(summary) {
             <span>${app.share}% · <em style="color:${catColor}">${escapeHtml(cat)}</em></span>
           </div>
           <div class="apps-podium-plinth" aria-hidden="true"><span>#${app.rank}</span></div>
-        </div>
+        </button>
       </li>`;
     })
     .join("");
@@ -916,15 +1071,18 @@ function renderTopAppsPulse(summary) {
     ? `<ol class="apps-runners" start="4">${runners
         .map((app) => {
           const via = app.via ? `<em class="apps-runner-via">${escapeHtml(app.via)}</em>` : "";
-          return `<li class="apps-runner">
-            <span class="apps-runner-rank">#${app.rank}</span>
-            ${iconImgHtml(app.icon_url, 28)}
-            <span class="apps-runner-copy">
-              <span class="apps-runner-name">${escapeHtml(app.name)}</span>
-              ${via}
-            </span>
-            <span class="apps-runner-bar" aria-hidden="true"><i style="width:${Math.max(8, app.share)}%;background:${CAT_COLORS[app.category] || CAT_COLORS.neutral}"></i></span>
-            <span class="apps-runner-meta">${fmtDur(app.sec)} · ${app.share}%</span>
+          const idx = app.rank - 1;
+          return `<li>
+            <button type="button" class="apps-runner" data-pulse-idx="${idx}" aria-label="Расшифровка: ${escapeHtml(app.name)}">
+              <span class="apps-runner-rank">#${app.rank}</span>
+              ${iconImgHtml(app.icon_url, 28)}
+              <span class="apps-runner-copy">
+                <span class="apps-runner-name">${escapeHtml(app.name)}</span>
+                ${via}
+              </span>
+              <span class="apps-runner-bar" aria-hidden="true"><i style="width:${Math.max(8, app.share)}%;background:${CAT_COLORS[app.category] || CAT_COLORS.neutral}"></i></span>
+              <span class="apps-runner-meta">${fmtDur(app.sec)} · ${app.share}%</span>
+            </button>
           </li>`;
         })
         .join("")}</ol>`
@@ -933,6 +1091,7 @@ function renderTopAppsPulse(summary) {
     <ol class="apps-podium">${podium}</ol>
     ${runnersHtml}
   </div>`;
+  wireTopAppsPulse(el);
 }
 
 function renderTopProjectsPulse(summary) {
@@ -5193,6 +5352,21 @@ function wireUi() {
   document.getElementById("paywallCloseBtn")?.addEventListener("click", () => {
     const modal = document.getElementById("paywallModal");
     if (modal) modal.hidden = true;
+  });
+
+  const activityModal = document.getElementById("activityDetailModal");
+  const closeActivity = () => closeActivityDetail();
+  document.getElementById("activityDetailClose")?.addEventListener("click", closeActivity);
+  document.getElementById("activityDetailDismiss")?.addEventListener("click", closeActivity);
+  activityModal?.addEventListener("click", (ev) => {
+    if (ev.target === activityModal) closeActivity();
+  });
+  document.getElementById("activityDetailUsage")?.addEventListener("click", () => {
+    closeActivity();
+  });
+  document.addEventListener("keydown", (ev) => {
+    if (ev.key !== "Escape") return;
+    if (activityModal && !activityModal.hidden) closeActivity();
   });
 
   document.getElementById("rdpVisionConfirmBtn")?.addEventListener("click", async () => {
