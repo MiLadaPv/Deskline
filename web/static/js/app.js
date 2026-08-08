@@ -2864,6 +2864,7 @@ async function refreshMeetings({ skeleton = false } = {}) {
 
   const sessEl = document.getElementById("meetingsSessions");
   if (sessEl) {
+    clearSkel(sessEl);
     const groups = groupFeedByApp(compactFeedRows(report.sessions || [], 60, 180)).slice(0, 12);
     if (!groups.length) {
       sessEl.innerHTML = `<li><span class="timeline-time">—</span><span class="rank-icon">•</span><span class="rank-name">Нет сессий за период</span><span class="rank-meta"></span></li>`;
@@ -2876,6 +2877,7 @@ async function refreshMeetings({ skeleton = false } = {}) {
 
   const emailEl = document.getElementById("meetingsEmailList");
   if (emailEl) {
+    clearSkel(emailEl);
     const rows = report.email_top || [];
     if (!rows.length) {
       emailEl.innerHTML = `<li class="empty-state"><span class="rank-icon">•</span><span class="rank-name">Пока нет времени в почте</span><span class="rank-meta">—</span></li>`;
@@ -2899,6 +2901,7 @@ async function refreshMeetings({ skeleton = false } = {}) {
 
   const emailSessEl = document.getElementById("meetingsEmailSessions");
   if (emailSessEl) {
+    clearSkel(emailSessEl);
     const groups = groupFeedByApp(compactFeedRows(report.email_sessions || [], 60, 180)).slice(0, 10);
     if (!groups.length) {
       emailSessEl.innerHTML = `<li><span class="timeline-time">—</span><span class="rank-icon">•</span><span class="rank-name">Нет почтовых сессий</span><span class="rank-meta"></span></li>`;
@@ -4032,11 +4035,12 @@ function wireSessionGroups(listEl) {
   listEl.addEventListener("click", (ev) => {
     const btn = ev.target.closest(".session-group-toggle");
     if (!btn || !listEl.contains(btn)) return;
+    ev.preventDefault();
     const group = btn.closest(".session-group");
     if (!group) return;
     const open = group.classList.toggle("is-open");
     btn.setAttribute("aria-expanded", open ? "true" : "false");
-    const items = group.querySelector(".session-group-items");
+    const items = group.querySelector(":scope > .session-group-items");
     if (items) items.hidden = !open;
   });
 }
@@ -4101,6 +4105,7 @@ async function refreshTimeline({ skeleton = false } = {}) {
       renderDayGantt([]);
       renderDaySummaryLine({}, { gated: true });
       if (el) {
+        clearSkel(el);
         el.innerHTML = `<li><span class="timeline-time">—</span><span class="rank-icon">•</span><span class="rank-name">История дальше Free-лимита — доступно в Pro</span><span class="rank-meta"></span></li>`;
       }
       markSkelContext("day-gantt", ctx);
@@ -4117,6 +4122,7 @@ async function refreshTimeline({ skeleton = false } = {}) {
       markSkelContext("day-list", ctx);
       return;
     }
+    clearSkel(el);
     if (!feedGroups.length) {
       el.innerHTML = `<li><span class="timeline-time">—</span><span class="rank-icon">•</span><span class="rank-name">Пока нет сессий</span><span class="rank-meta"></span></li>`;
       markSkelContext("day-gantt", ctx);

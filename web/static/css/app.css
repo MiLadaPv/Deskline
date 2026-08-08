@@ -1270,23 +1270,18 @@ html[data-theme="dark"] .rank-row-child {
   margin-top: 4px;
 }
 
+/* Collapse/expand driven by .is-open so display:grid cannot fight [hidden]. */
 .session-group-items {
   list-style: none;
   margin: 0;
   padding: 0 8px 8px 8px;
-  display: grid;
   gap: 0;
   border-top: 1px solid var(--line);
   background: color-mix(in srgb, var(--paper) 55%, transparent);
-}
-
-/* Author display:grid beats the UA [hidden] rule — keep collapse working. */
-.session-group-items[hidden],
-.session-group:not(.is-open) .session-group-items {
   display: none;
 }
 
-.session-group.is-open .session-group-items:not([hidden]) {
+.session-group.is-open > .session-group-items {
   display: grid;
 }
 

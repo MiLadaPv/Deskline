@@ -98,8 +98,11 @@ def test_day_feed_ux_contracts():
     assert "session-group-toggle" in js
     assert ".day-picture-head" in css
     assert ".session-group" in css
-    assert ".session-group-items[hidden]" in css
-    assert ".session-group:not(.is-open) .session-group-items" in css
+    assert ".session-group.is-open > .session-group-items" in css
+    # Day list must clear .is-skel (pointer-events:none) before session toggles work.
+    feed_idx = js.find("feedGroups.map((g) => daySessionGroupHtml")
+    assert feed_idx > 0
+    assert "clearSkel(el)" in js[feed_idx - 500 : feed_idx]
     assert ".timeline li.is-hot" in css
 
 
