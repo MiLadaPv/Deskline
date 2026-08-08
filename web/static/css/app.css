@@ -1767,6 +1767,39 @@ html[data-theme="dark"] .shots-app-btn {
   padding-right: 2px;
   scrollbar-width: thin;
   scrollbar-color: color-mix(in srgb, var(--ink-soft) 45%, transparent) transparent;
+  overscroll-behavior: contain;
+}
+
+.shots-app-list-inner {
+  display: grid;
+  gap: 2px;
+  transform-origin: center top;
+  will-change: transform;
+}
+
+.shots-app-list.is-bounce-start .shots-app-list-inner {
+  animation: shotsAppRubberStart 0.42s var(--ease-out);
+}
+
+.shots-app-list.is-bounce-end .shots-app-list-inner {
+  animation: shotsAppRubberEnd 0.42s var(--ease-out);
+}
+
+@keyframes shotsAppRubberStart {
+  0%, 100% { transform: translateY(0); }
+  40% { transform: translateY(12px); }
+}
+
+@keyframes shotsAppRubberEnd {
+  0%, 100% { transform: translateY(0); }
+  40% { transform: translateY(-12px); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .shots-app-list.is-bounce-start .shots-app-list-inner,
+  .shots-app-list.is-bounce-end .shots-app-list-inner {
+    animation: none;
+  }
 }
 
 .shots-app-list::-webkit-scrollbar {

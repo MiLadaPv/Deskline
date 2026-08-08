@@ -3330,7 +3330,7 @@ function renderShotsAppList() {
     list.innerHTML = `<p class="shots-app-empty">${shotsAppOptions.length ? "Ничего не найдено" : "Пока нет приложений за день"}</p>`;
     return;
   }
-  list.innerHTML = rows
+  list.innerHTML = `<div class="shots-app-list-inner">${rows
     .map((o) => {
       const on = shotsAppFilter.has(o.key);
       return `<button type="button" class="shots-app-option${on ? " is-checked" : ""}" role="option" aria-selected="${on ? "true" : "false"}" data-app-key="${escapeHtml(o.key)}">
@@ -3338,7 +3338,18 @@ function renderShotsAppList() {
         <span>${escapeHtml(o.label)}</span>
       </button>`;
     })
-    .join("");
+    .join("")}</div>`;
+}
+
+function bumpShotsAppListRubber(list, edge) {
+  if (!list || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+  list.classList.remove("is-bounce-start", "is-bounce-end");
+  void list.offsetWidth;
+  list.classList.add(edge === "end" ? "is-bounce-end" : "is-bounce-start");
+  window.clearTimeout(list._bounceTimer);
+  list._bounceTimer = window.setTimeout(() => {
+    list.classList.remove("is-bounce-start", "is-bounce-end");
+  }, 420);
 }
 
 function wireShotsAppFilter() {
@@ -3363,6 +3374,33 @@ function wireShotsAppFilter() {
       btn.focus();
     }
   });
+
+  menu.addEventListener(
+    "wheel",
+    (ev) => {
+      const list = document.getElementById("shotsAppList");
+      ev.stopPropagation();
+      if (!list) {
+        ev.preventDefault();
+        return;
+      }
+      const onList = list === ev.target || list.contains(ev.target);
+      if (!onList) {
+        ev.preventDefault();
+        return;
+      }
+      const maxScroll = Math.max(0, list.scrollHeight - list.clientHeight);
+      const atTop = list.scrollTop <= 0;
+      const atBottom = list.scrollTop >= maxScroll - 1;
+      const up = ev.deltaY < 0;
+      const down = ev.deltaY > 0;
+      if (maxScroll <= 0 || (atTop && up) || (atBottom && down)) {
+        ev.preventDefault();
+        bumpShotsAppListRubber(list, down ? "end" : "start");
+      }
+    },
+    { passive: false }
+  );
 
   menu.addEventListener("click", (ev) => {
     const t = ev.target;

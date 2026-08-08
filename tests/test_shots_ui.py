@@ -27,6 +27,11 @@ def test_shots_toolbar_modern_shell():
     assert ".shots-cal" in CSS
     assert ".shots-app-menu" in CSS
     assert ".shots-app-option" in CSS
+    assert "overscroll-behavior: contain" in CSS
+    assert "shotsAppRubberEnd" in CSS
+    js = (ROOT / "web" / "static" / "js" / "app.js").read_text(encoding="utf-8")
+    assert "bumpShotsAppListRubber" in js
+    assert 'passive: false' in js or "{ passive: false }" in js
     assert ".shots-cal-day.is-empty" in CSS or ".shots-cal-day.has-shots" in CSS
     assert ".shots-refresh" in CSS
     assert ".shots-day-btn" in CSS
