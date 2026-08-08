@@ -1,12 +1,15 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <svg class="boot-logo-svg" viewBox="0 0 664 761" fill="none" shape-rendering="geometricPrecision" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
   <defs>
-    <linearGradient id="lg-g1" x1="197.5" y1="498" x2="197.5" y2="644" gradientUnits="userSpaceOnUse"><stop offset="0%" stop-color="#4DB3FF"/><stop offset="100%" stop-color="#0A6CF0"/></linearGradient>
-    <linearGradient id="lg-g2" x1="295.0" y1="407" x2="295.0" y2="643" gradientUnits="userSpaceOnUse"><stop offset="0%" stop-color="#3ED6C4"/><stop offset="100%" stop-color="#0A9B9A"/></linearGradient>
-    <linearGradient id="lg-g3" x1="395.0" y1="309" x2="395.0" y2="629" gradientUnits="userSpaceOnUse"><stop offset="0%" stop-color="#B4EC3A"/><stop offset="100%" stop-color="#5FC218"/></linearGradient>
+    <linearGradient id="lg-g1" x1="304.0" y1="468" x2="304.0" y2="600" gradientUnits="userSpaceOnUse"><stop offset="0%" stop-color="#4DB3FF"/><stop offset="100%" stop-color="#0A6CF0"/></linearGradient>
+    <linearGradient id="lg-g2" x1="387.0" y1="378" x2="387.0" y2="600" gradientUnits="userSpaceOnUse"><stop offset="0%" stop-color="#3ED6C4"/><stop offset="100%" stop-color="#0A9B9A"/></linearGradient>
+    <linearGradient id="lg-g3" x1="471.0" y1="300" x2="471.0" y2="600" gradientUnits="userSpaceOnUse"><stop offset="0%" stop-color="#B4EC3A"/><stop offset="100%" stop-color="#5FC218"/></linearGradient>
+    <clipPath id="lg-hole"><path d="M248 154 H312 C432 154 500 242 500 380 C500 518 432 608 312 608 H248 V154 Z"/></clipPath>
   </defs>
+  <g class="logo-bars" clip-path="url(#lg-hole)">
+    <rect class="logo-bar logo-bar-1" x="270" y="468" width="68" height="132" rx="0" ry="0" fill="url(#lg-g1)"/>
+<rect class="logo-bar logo-bar-2" x="352" y="378" width="70" height="222" rx="0" ry="0" fill="url(#lg-g2)"/>
+<rect class="logo-bar logo-bar-3" x="436" y="300" width="70" height="300" rx="0" ry="0" fill="url(#lg-g3)"/>
+  </g>
   <path class="logo-d" fill="#192232" fill-rule="evenodd" d="M170 50 C170 42 176 36 186 36 H310 C482 36 606 170 606 380 C606 590 482 725 310 725 H186 C176 725 170 718 170 710 V640 C126 632 90 590 90 538 V212 C90 160 126 118 170 110 V50 Z M248 154 H312 C432 154 500 242 500 380 C500 518 432 608 312 608 H248 V154 Z"/>
-  <rect class="logo-bar logo-bar-1" x="155" y="498" width="85" height="146" rx="0" ry="0" fill="url(#lg-g1)"/>
-<rect class="logo-bar logo-bar-2" x="252" y="407" width="86" height="236" rx="0" ry="0" fill="url(#lg-g2)"/>
-<rect class="logo-bar logo-bar-3" x="352" y="309" width="86" height="320" rx="0" ry="0" fill="url(#lg-g3)"/>
 </svg>
