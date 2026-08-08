@@ -1,4 +1,4 @@
-"""Build crisp Deskline mark: smooth D + sharp bars clipped flush to the D counter."""
+"""Build crisp Deskline mark: wider D + bright bars clipped flush to the counter."""
 
 from __future__ import annotations
 
@@ -8,35 +8,35 @@ ROOT = Path(__file__).resolve().parents[1]
 IMG = ROOT / "web" / "static" / "img"
 PARTIAL = ROOT / "web" / "templates" / "partials" / "boot_logo.html"
 
-# Hole bottom = 608, left = 248. Bars extend slightly past edges so clipPath
+# Hole bottom = 608, left = 232. Bars extend slightly past edges so clipPath
 # cuts them flush to the D counter (no visible gap).
 BAR_BOTTOM = 612  # 4px past hole floor → stencil edge sits on the letter
 BARS = [
-    # x, y, w, h, gid, light_top, deep_bottom
-    (248, BAR_BOTTOM - 148, 74, 148, "g1", "#8ED0FF", "#0757C7"),
-    (334, BAR_BOTTOM - 236, 76, 236, "g2", "#5EEAD4", "#0B7A72"),
-    (422, BAR_BOTTOM - 320, 86, 320, "g3", "#D8F99A", "#3F7A0B"),
+    # x, y, w, h, gid, bright_top, rich_bottom
+    (232, BAR_BOTTOM - 148, 82, 148, "g1", "#B8E4FF", "#1A8CFF"),
+    (328, BAR_BOTTOM - 248, 84, 248, "g2", "#7FF5E0", "#10D4B0"),
+    (426, BAR_BOTTOM - 336, 96, 336, "g3", "#ECFF6B", "#8AE010"),
 ]
 
-# Clean vertical left stem (no double kink). Outer + hole via evenodd.
+# Wider D: thicker overall glyph, roomy counter, clean vertical left stem.
 D_OUTER = (
-    "M120 56 "
-    "C120 44 132 36 146 36 "
-    "H310 "
-    "C482 36 606 170 606 380 "
-    "C606 590 482 725 310 725 "
-    "H146 "
-    "C132 725 120 716 120 704 "
+    "M95 56 "
+    "C95 44 108 36 124 36 "
+    "H330 "
+    "C520 36 640 170 640 380 "
+    "C640 590 520 725 330 725 "
+    "H124 "
+    "C108 725 95 716 95 704 "
     "V56 "
     "Z"
 )
 
 D_HOLE = (
-    "M248 154 "
-    "H312 "
-    "C432 154 500 242 500 380 "
-    "C500 518 432 608 312 608 "
-    "H248 "
+    "M232 154 "
+    "H310 "
+    "C450 154 530 242 530 380 "
+    "C530 518 450 608 310 608 "
+    "H232 "
     "V154 "
     "Z"
 )
@@ -53,7 +53,7 @@ def _grads_and_bars(prefix: str, animate: bool) -> tuple[str, str]:
             f'    <linearGradient id="{uid}" x1="{x + w / 2:.1f}" y1="{y}" '
             f'x2="{x + w / 2:.1f}" y2="{y + h}" gradientUnits="userSpaceOnUse">'
             f'<stop offset="0%" stop-color="{c0}"/>'
-            f'<stop offset="55%" stop-color="{c0}" stop-opacity="0.92"/>'
+            f'<stop offset="45%" stop-color="{c0}"/>'
             f'<stop offset="100%" stop-color="{c1}"/>'
             f"</linearGradient>"
         )
@@ -84,7 +84,6 @@ def build_svg(fill: str, prefix: str, animate: bool = False, for_inline: bool = 
         f'shape-rendering="geometricPrecision" aria-hidden="true" '
         f'xmlns="http://www.w3.org/2000/svg">'
     )
-    # Stencil: bars under clip of counter, then D on top so the stem masks edges.
     inner = (
         f"{open_tag}\n"
         f"  <defs>\n{grads}\n"
@@ -105,7 +104,7 @@ def build_partial() -> str:
     light = build_svg("#192232", "bl-", animate=True, for_inline=True)
     dark = build_svg("#F4F7F5", "bd-", animate=True, for_inline=True)
     return (
-        "{# Inline splash mark — stencil bars flush inside D counter #}\n"
+        "{# Inline splash mark — wider D, bright flush bars #}\n"
         f'<div class="boot-logo-anim boot-logo-anim-light">{light}</div>\n'
         f'<div class="boot-logo-anim boot-logo-anim-dark">{dark}</div>\n'
     )

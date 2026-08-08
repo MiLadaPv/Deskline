@@ -27,25 +27,24 @@ def test_boot_bars_are_flush_stencil_under_d():
     assert "logo-bars" in BOOT
     assert BOOT.find('class="logo-bars"') < BOOT.find('class="logo-d"')
     assert "BAR_BOTTOM = 612" in BUILDER
-    assert "(248," in BUILDER  # flush to hole left edge
-    assert 'x="248"' in BOOT
-    assert 'height="148"' in BOOT or 'height="236"' in BOOT
-    # Bottom of bars reaches past hole floor so clip sits on the letter edge
+    assert "(232," in BUILDER
+    assert 'x="232"' in BOOT
     assert "612" in BUILDER
+    assert "M95 56" in BUILDER
 
 
 def test_boot_css_preserves_gradients_and_enlarges_mark():
     boot_idx = CSS.find(".boot-splash {")
     assert boot_idx >= 0
-    chunk = CSS[boot_idx : boot_idx + 4500]
+    chunk = CSS[boot_idx : boot_idx + 5000]
     assert "bootBarGrow" in chunk
     assert "bootLetterIn" in chunk
-    assert "min(240px, 56vw)" in chunk
-    assert "clamp(1.85rem" in chunk
+    assert "bootLetterWave" in chunk
+    assert "min(280px, 62vw)" in chunk
+    assert "clamp(2.15rem" in chunk
     assert ".logo-mark .logo-bar-1" in CSS
     assert ".boot-logo-svg .logo-bar-1" in CSS
     assert "revert-layer" in CSS
-    # Bare global solid fill (no .logo-mark / .boot-logo-svg prefix) must be gone
     assert "\n.logo-bar-1 {" not in CSS
 
 

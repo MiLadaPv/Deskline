@@ -1,15 +1,15 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <svg class="boot-logo-svg" viewBox="0 0 664 761" fill="none" shape-rendering="geometricPrecision" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
   <defs>
-    <linearGradient id="lsd-g1" x1="285.0" y1="464" x2="285.0" y2="612" gradientUnits="userSpaceOnUse"><stop offset="0%" stop-color="#8ED0FF"/><stop offset="55%" stop-color="#8ED0FF" stop-opacity="0.92"/><stop offset="100%" stop-color="#0757C7"/></linearGradient>
-    <linearGradient id="lsd-g2" x1="372.0" y1="376" x2="372.0" y2="612" gradientUnits="userSpaceOnUse"><stop offset="0%" stop-color="#5EEAD4"/><stop offset="55%" stop-color="#5EEAD4" stop-opacity="0.92"/><stop offset="100%" stop-color="#0B7A72"/></linearGradient>
-    <linearGradient id="lsd-g3" x1="465.0" y1="292" x2="465.0" y2="612" gradientUnits="userSpaceOnUse"><stop offset="0%" stop-color="#D8F99A"/><stop offset="55%" stop-color="#D8F99A" stop-opacity="0.92"/><stop offset="100%" stop-color="#3F7A0B"/></linearGradient>
-    <clipPath id="lsd-hole"><path d="M248 154 H312 C432 154 500 242 500 380 C500 518 432 608 312 608 H248 V154 Z"/></clipPath>
+    <linearGradient id="lsd-g1" x1="273.0" y1="464" x2="273.0" y2="612" gradientUnits="userSpaceOnUse"><stop offset="0%" stop-color="#B8E4FF"/><stop offset="45%" stop-color="#B8E4FF"/><stop offset="100%" stop-color="#1A8CFF"/></linearGradient>
+    <linearGradient id="lsd-g2" x1="370.0" y1="364" x2="370.0" y2="612" gradientUnits="userSpaceOnUse"><stop offset="0%" stop-color="#7FF5E0"/><stop offset="45%" stop-color="#7FF5E0"/><stop offset="100%" stop-color="#10D4B0"/></linearGradient>
+    <linearGradient id="lsd-g3" x1="474.0" y1="276" x2="474.0" y2="612" gradientUnits="userSpaceOnUse"><stop offset="0%" stop-color="#ECFF6B"/><stop offset="45%" stop-color="#ECFF6B"/><stop offset="100%" stop-color="#8AE010"/></linearGradient>
+    <clipPath id="lsd-hole"><path d="M232 154 H310 C450 154 530 242 530 380 C530 518 450 608 310 608 H232 V154 Z"/></clipPath>
   </defs>
   <g class="logo-bars" clip-path="url(#lsd-hole)">
-    <g class="logo-bar-grow" style="--bar-delay:0.10s"><g transform="translate(285.0 612)"><g class="logo-bar-scale"><g transform="translate(-285.0 -612)"><rect class="logo-bar logo-bar-1" x="248" y="464" width="74" height="148" rx="0" ry="0" fill="url(#lsd-g1)"/></g></g></g></g>
-<g class="logo-bar-grow" style="--bar-delay:0.20s"><g transform="translate(372.0 612)"><g class="logo-bar-scale"><g transform="translate(-372.0 -612)"><rect class="logo-bar logo-bar-2" x="334" y="376" width="76" height="236" rx="0" ry="0" fill="url(#lsd-g2)"/></g></g></g></g>
-<g class="logo-bar-grow" style="--bar-delay:0.30s"><g transform="translate(465.0 612)"><g class="logo-bar-scale"><g transform="translate(-465.0 -612)"><rect class="logo-bar logo-bar-3" x="422" y="292" width="86" height="320" rx="0" ry="0" fill="url(#lsd-g3)"/></g></g></g></g>
+    <g class="logo-bar-grow" style="--bar-delay:0.10s"><g transform="translate(273.0 612)"><g class="logo-bar-scale"><g transform="translate(-273.0 -612)"><rect class="logo-bar logo-bar-1" x="232" y="464" width="82" height="148" rx="0" ry="0" fill="url(#lsd-g1)"/></g></g></g></g>
+<g class="logo-bar-grow" style="--bar-delay:0.20s"><g transform="translate(370.0 612)"><g class="logo-bar-scale"><g transform="translate(-370.0 -612)"><rect class="logo-bar logo-bar-2" x="328" y="364" width="84" height="248" rx="0" ry="0" fill="url(#lsd-g2)"/></g></g></g></g>
+<g class="logo-bar-grow" style="--bar-delay:0.30s"><g transform="translate(474.0 612)"><g class="logo-bar-scale"><g transform="translate(-474.0 -612)"><rect class="logo-bar logo-bar-3" x="426" y="276" width="96" height="336" rx="0" ry="0" fill="url(#lsd-g3)"/></g></g></g></g>
   </g>
-  <path class="logo-d" fill="#F4F7F5" fill-rule="evenodd" d="M120 56 C120 44 132 36 146 36 H310 C482 36 606 170 606 380 C606 590 482 725 310 725 H146 C132 725 120 716 120 704 V56 Z M248 154 H312 C432 154 500 242 500 380 C500 518 432 608 312 608 H248 V154 Z"/>
+  <path class="logo-d" fill="#F4F7F5" fill-rule="evenodd" d="M95 56 C95 44 108 36 124 36 H330 C520 36 640 170 640 380 C640 590 520 725 330 725 H124 C108 725 95 716 95 704 V56 Z M232 154 H310 C450 154 530 242 530 380 C530 518 450 608 310 608 H232 V154 Z"/>
 </svg>
