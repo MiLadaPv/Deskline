@@ -171,6 +171,11 @@ class RdpVisionConfirmBody(BaseModel):
     session_id: int | None = None
 
 
+class MeetingsPeersVisionBody(BaseModel):
+    channel_key: str | None = Field(default=None, max_length=200)
+    day: str | None = Field(default=None, max_length=32)
+
+
 class ExtensionEventBody(BaseModel):
     """Browser-extension tab heartbeat / closed segment."""
 
@@ -1398,6 +1403,47 @@ def create_app(tracker: Tracker, db: Database | None = None) -> FastAPI:
 
         rdp_vision.clear_pending()
         return {"ok": True}
+
+    @app.post("/api/meetings/peers-from-shot")
+    def meetings_peers_from_shot(body: MeetingsPeersVisionBody | None = None) -> dict[str, Any]:
+        """Recognize chat/call counterparts from the latest matching Deskline screenshot."""
+        _pro_required("screenshots")
+        from deskline.config import load_config
+        from deskline import meetings_vision
+
+        cfg = load_config()
+        if not str(cfg.get("rdp_vision_api_key") or "").strip():
+            raise HTTPException(
+                400,
+                "Нужен API-ключ Vision в настройках (тот же, что для RDP vision).",
+            )
+        day_raw = (body.day if body else None) or None
+        day = date.fromisoformat(day_raw) if day_raw else date.today()
+        _assert_day_allowed(day)
+        shot = meetings_vision.find_latest_channel_screenshot(
+            db,
+            channel_key=(body.channel_key if body else None),
+            day=day,
+        )
+        if not shot:
+            raise HTTPException(404, "Нет подходящего скриншота за этот день")
+        result = meetings_vision.extract_peers_from_screenshot(cfg, shot["path"])
+        if not result.get("ok"):
+            err = result.get("error") or "vision_failed"
+            if err == "vision_key_missing":
+                raise HTTPException(400, "Нужен API-ключ Vision в настройках")
+            raise HTTPException(502, "Не удалось распознать собеседников на скрине")
+        return {
+            "ok": True,
+            "peers": result.get("peers") or [],
+            "kind": result.get("kind"),
+            "confidence": result.get("confidence"),
+            "screenshot": {
+                "taken_at": shot.get("taken_at"),
+                "filename": Path(shot["path"]).name,
+                "url": f"/media/screenshots/{Path(shot['path']).name}",
+            },
+        }
 
     @app.post("/api/onboarding/complete")
     def onboarding_complete(body: OnboardingBody) -> dict[str, Any]:

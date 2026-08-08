@@ -3024,7 +3024,61 @@ function wireMeetingExpand(listEl) {
 function wireMeetingChannelPeers(listEl) {
   if (!listEl || listEl.dataset.peersWired === "1") return;
   listEl.dataset.peersWired = "1";
-  listEl.addEventListener("click", (ev) => {
+  listEl.addEventListener("click", async (ev) => {
+    const shotBtn = ev.target.closest(".meeting-peers-shot");
+    if (shotBtn && listEl.contains(shotBtn)) {
+      ev.preventDefault();
+      const row = shotBtn.closest(".meeting-channel");
+      if (!row) return;
+      const panel = row.querySelector(".meeting-peers");
+      const key = row.dataset.channelKey || "";
+      shotBtn.disabled = true;
+      const prev = shotBtn.textContent;
+      shotBtn.textContent = "Скрин…";
+      try {
+        const res = await api("/api/meetings/peers-from-shot", {
+          method: "POST",
+          body: JSON.stringify({ channel_key: key || null }),
+        });
+        const peers = res.peers || [];
+        if (!peers.length) {
+          showToast("На скрине не видно имени собеседника", "error");
+          if (panel) {
+            const empty = panel.querySelector(".meeting-peers-empty");
+            if (empty) empty.textContent = "На последнем скрине имя не распознано.";
+          }
+          return;
+        }
+        const peerRows = peers
+          .map((p) => {
+            const tag = p.kind === "group" ? "группа" : "чат";
+            return `<li class="meeting-peer">
+              <span class="meeting-peer-tag">${tag}</span>
+              <span class="meeting-peer-name">${escapeHtml(p.name)}</span>
+              <span class="meeting-peer-meta">со скрина</span>
+            </li>`;
+          })
+          .join("");
+        if (panel) {
+          panel.innerHTML = `<span class="meeting-detail-label">С кем (со скрина)</span>
+            <ul class="meeting-peers-list">${peerRows}</ul>`;
+          panel.hidden = false;
+          row.classList.add("is-open");
+          const toggle = row.querySelector(".meeting-peers-toggle");
+          if (toggle) {
+            toggle.setAttribute("aria-expanded", "true");
+            toggle.textContent = "Свернуть";
+          }
+        }
+        showToast(`Нашли: ${peers.map((p) => p.name).join(", ")}`, "ok");
+      } catch (err) {
+        showToast(err?.message || "Не удалось распознать со скрина", "error");
+      } finally {
+        shotBtn.disabled = false;
+        shotBtn.textContent = prev;
+      }
+      return;
+    }
     const btn = ev.target.closest(".meeting-peers-toggle");
     if (!btn || !listEl.contains(btn)) return;
     const row = btn.closest(".meeting-channel");
@@ -3102,7 +3156,7 @@ async function refreshMeetings({ skeleton = false } = {}) {
     const channels = (report.top || []).length;
     const emailSec = report.email_total_sec || 0;
     kpi.innerHTML = [
-      { label: "Связь / звонки", value: fmtDur(total), pct: share, tone: "productive" },
+      { label: "Встречи / звонки", value: fmtDur(total), pct: share, tone: "productive" },
       { label: "Доля дня", value: `${share}%`, pct: share, tone: "tracked" },
       { label: "Каналы", value: String(channels), pct: null, tone: "active" },
       { label: "Почта", value: fmtDur(emailSec), pct: null, tone: "active" },
@@ -3126,7 +3180,7 @@ async function refreshMeetings({ skeleton = false } = {}) {
     clearSkel(topEl);
     const rows = report.top || [];
     if (!rows.length) {
-      topEl.innerHTML = `<li class="empty-state"><span class="rank-icon">•</span><span class="rank-name">Пока нет Телемоста, Мессенджера, Teams…</span><span class="rank-meta">—</span></li>`;
+      topEl.innerHTML = `<li class="empty-state"><span class="rank-icon">•</span><span class="rank-name">Пока нет Телемоста, Teams, Zoom…</span><span class="rank-meta">—</span></li>`;
     } else {
       const total = report.total_sec || 0;
       topEl.innerHTML = rows
@@ -3151,18 +3205,20 @@ async function refreshMeetings({ skeleton = false } = {}) {
             : "";
           const body = peers.length
             ? `<ul class="meeting-peers-list">${peerRows}</ul>`
-            : `<p class="hint meeting-peers-empty">${escapeHtml(r.peers_hint || "Имён в заголовке окна не было.")}</p>`;
-          return `<li class="meeting-channel" data-channel-idx="${idx}">
+            : `<p class="hint meeting-peers-empty">${escapeHtml(r.peers_hint || "Имён в заголовке окна не было.")}</p>
+               <button type="button" class="btn meeting-peers-shot">Распознать со скрина</button>`;
+          return `<li class="meeting-channel" data-channel-idx="${idx}" data-channel-key="${escapeHtml(r.key || "")}">
             <div class="meeting-channel-main">
               ${icon}
               <span class="meeting-channel-text">
-                <span class="rank-name">${escapeHtml(r.name)} <span class="rank-kind">${kind}</span></span>
-                <button type="button" class="meeting-expand meeting-peers-toggle" aria-expanded="false">С кем</button>
+                <span class="rank-name">${escapeHtml(r.name)}</span>
+                <span class="rank-kind">${kind}</span>
               </span>
+              <button type="button" class="meeting-expand meeting-peers-toggle" aria-expanded="false">С кем</button>
               <span class="rank-meta">${fmtDur(r.sec)} · ${share}%</span>
             </div>
             <div class="meeting-peers" hidden>
-              <span class="meeting-detail-label">С кем говорили</span>
+              <span class="meeting-detail-label">С кем</span>
               ${body}
             </div>
           </li>`;

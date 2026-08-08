@@ -23,7 +23,7 @@ MEETING_APP_EXES: frozenset[str] = frozenset(
         "discord.exe",  # voice / huddles - counted as meeting app
     }
 )
-# Browser hosts that are meeting / call products (incl. RU: Telemost, Yandex Messenger).
+# Browser hosts that are meeting / call products (not chat-first messengers).
 MEETING_SITE_HOSTS: frozenset[str] = frozenset(
     {
         "zoom.us",
@@ -31,9 +31,14 @@ MEETING_SITE_HOSTS: frozenset[str] = frozenset(
         "teams.microsoft.com",
         "teams.live.com",
         "webex.com",
-        "discord.com",
         "telemost.yandex.ru",
+    }
+)
+# Chat products that look like "calls" only when the title shows a real call/huddle.
+CHAT_SITE_HOSTS: frozenset[str] = frozenset(
+    {
         "messenger.yandex.ru",
+        "discord.com",
         "web.skype.com",
     }
 )
@@ -77,8 +82,18 @@ EMAIL_SITE_HOSTS: frozenset[str] = frozenset(
     }
 )
 _MEETING_TITLE_RE = re.compile(
-    r"телемост|telemost|яндекс\s*мессенджер|yandex\s*messenger|"
+    r"телемост|telemost|"
     r"google\s*meet|\bzoom\b|microsoft\s*teams|\bwebex\b",
+    re.IGNORECASE,
+)
+_CALL_SIGNAL_RE = re.compile(
+    r"звонок|видеозвонок|видео\s*встреч|в\s+звонке|в\s+встрече|"
+    r"call\s+with|in\s+a\s+call|joining\s+call|huddle|voice\s+channel|"
+    r"meeting\s+with|screen\s+shar",
+    re.IGNORECASE,
+)
+_CHAT_BRAND_RE = re.compile(
+    r"яндекс\s*мессенджер|yandex\s*messenger|\bdiscord\b|\bskype\b",
     re.IGNORECASE,
 )
 _BRAND_PREFIX_RE = re.compile(
@@ -199,6 +214,20 @@ def infer_meeting_site(
         return "teams.microsoft.com"
     return None
 
+def is_chat_site(site: str | None) -> bool:
+    host = normalize_site_host(site)
+    if not host:
+        return False
+    if host in CHAT_SITE_HOSTS:
+        return True
+    return any(host == h or host.endswith("." + h) for h in CHAT_SITE_HOSTS)
+
+
+def title_suggests_call(activity_label: str | None = None, window_title: str | None = None) -> bool:
+    blob = f"{activity_label or ''} {window_title or ''}".replace("\xa0", " ")
+    return bool(_CALL_SIGNAL_RE.search(blob))
+
+
 def is_meeting_activity(
     *,
     app_name: str | None = None,
@@ -206,12 +235,23 @@ def is_meeting_activity(
     activity_label: str | None = None,
     window_title: str | None = None,
 ) -> bool:
+    """True for real meeting/call surfaces — not passive messenger chat browsing."""
     if is_meeting_app(app_name):
         return True
-    if infer_meeting_site(site=site, activity_label=activity_label, window_title=window_title):
+    host = normalize_site_host(site) or infer_meeting_site(
+        site=site, activity_label=activity_label, window_title=window_title
+    )
+    blob = f"{activity_label or ''} {window_title or ''}".replace("\xa0", " ")
+    if host and is_chat_site(host):
+        return title_suggests_call(activity_label=activity_label, window_title=window_title)
+    if host and is_meeting_site(host):
         return True
-    blob = f"{activity_label or ''} {window_title or ''}"
-    return bool(_MEETING_TITLE_RE.search(blob.replace("\xa0", " ")))
+    # Chat brand in title without a call signal stays out of the Calls panel.
+    if _CHAT_BRAND_RE.search(blob) and not title_suggests_call(
+        activity_label=activity_label, window_title=window_title
+    ):
+        return False
+    return bool(_MEETING_TITLE_RE.search(blob))
 
 def is_email_activity(
     *,
@@ -361,13 +401,13 @@ def attach_peers_to_channels(
         row["has_peers"] = bool(peers)
         if key.startswith("site:messenger.yandex.ru") and not peers:
             row["peers_hint"] = (
-                "Edge не пишет имя чата в заголовок окна для Яндекс Мессенджера "
-                "(только «N новых сообщений») — собеседника отсюда не видно."
+                "В заголовке Edge обычно нет имени чата. Можно распознать собеседника "
+                "по скриншоту Deskline (нужен API-ключ Vision в настройках)."
             )
         elif not peers:
             row["peers_hint"] = (
                 "В заголовке окна не было имён. Для Zoom/Teams/Телемоста имена "
-                "появятся, если их показывает сам заголовок."
+                "появятся, если их показывает сам заголовок — или распознайте со скрина."
             )
         else:
             row["peers_hint"] = None
@@ -558,8 +598,8 @@ def build_meetings_report(
         "email_top": email_out[:12],
         "email_sessions": email_sess[:12],
         "note": (
-            "Учитывается время в фокусе окна: Телемост, Яндекс Мессенджер, Teams, Zoom, Meet… "
-            "Кнопка «С кем» на канале показывает имена из заголовка окна "
-            "(групповые — списком). У Мессенджера в Edge имя чата в заголовок часто не попадает."
+            "В «Звонках» — фокус в Телемосте, Teams, Zoom, Meet и похожих. "
+            "Чаты (Яндекс Мессенджер и т.п.) сюда не входят, пока в заголовке нет признаков звонка. "
+            "«С кем» берёт имена из заголовка окна; если пусто — можно распознать со скриншота."
         ),
     }

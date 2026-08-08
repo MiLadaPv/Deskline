@@ -5153,7 +5153,7 @@ html[data-theme="dark"] .google-btn {
 
 .meeting-channel-main {
   display: grid;
-  grid-template-columns: 36px minmax(0, 1fr) auto;
+  grid-template-columns: 36px minmax(0, 1fr) auto auto;
   align-items: center;
   column-gap: 12px;
   padding: 12px;
@@ -5161,16 +5161,33 @@ html[data-theme="dark"] .google-btn {
 
 .meeting-channel-text {
   min-width: 0;
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px 10px;
+  display: grid;
+  gap: 2px;
+  align-content: center;
 }
 
 .meeting-channel-text .rank-name {
-  white-space: normal;
-  overflow: visible;
-  text-overflow: unset;
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.meeting-channel-text .rank-kind {
+  justify-self: start;
+}
+
+.meeting-channel-main > .meeting-expand {
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+.meeting-channel-main > .rank-meta {
+  justify-self: end;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
 }
 
 .meeting-peers {
@@ -5180,6 +5197,19 @@ html[data-theme="dark"] .google-btn {
   border: none;
   border-top: 1px solid var(--line);
   background: color-mix(in srgb, var(--paper) 55%, transparent);
+}
+
+.meeting-peers-shot {
+  margin-top: 10px;
+}
+
+.meeting-detail-label {
+  letter-spacing: 0.04em;
+}
+
+.meeting-peer-tag {
+  text-transform: none;
+  letter-spacing: 0.02em;
 }
 
 .meeting-peers-list {
@@ -5289,8 +5319,8 @@ html[data-theme="dark"] .google-btn {
   display: block;
   font-size: var(--label-size);
   font-weight: var(--label-weight);
-  letter-spacing: var(--label-tracking);
-  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  text-transform: none;
   color: var(--ink-soft);
   margin-bottom: 4px;
 }

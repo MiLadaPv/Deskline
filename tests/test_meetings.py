@@ -28,7 +28,7 @@ def test_meeting_allowlist_helpers():
     assert is_meeting_site("meet.google.com")
     assert is_meeting_site("www.zoom.us")
     assert is_meeting_site("us05web.zoom.us")
-    assert is_meeting_site("messenger.yandex.ru")
+    assert not is_meeting_site("messenger.yandex.ru")  # chat-first, not auto-call
     assert is_meeting_site("telemost.yandex.ru")
     assert not is_meeting_site("telegram.org")
     assert meeting_app_label("zoom.exe") == "Zoom"
@@ -49,10 +49,19 @@ def test_telemost_and_messenger_title_inference():
         activity_label="Звонок в Яндекс Телемосте",
         window_title="",
     )
+    # Passive Messenger chat must NOT count as a call.
+    assert not is_meeting_activity(
+        app_name="msedge.exe",
+        site="messenger.yandex.ru",
+        activity_label="Яндекс Мессенджер",
+        window_title="Яндекс Мессенджер — 16 новых сообщений — Личный: Microsoft Edge",
+    )
+    # Explicit call signal in Messenger title still counts.
     assert is_meeting_activity(
         app_name="msedge.exe",
         site="messenger.yandex.ru",
         activity_label="Яндекс Мессенджер",
+        window_title="Звонок — Яндекс Мессенджер — Microsoft Edge",
     )
     assert is_email_activity(site="mail.yandex.ru", activity_kind="email")
     assert is_email_activity(activity_label="Яндекс Почта")
@@ -194,10 +203,11 @@ def test_build_meetings_report_filters_and_totals():
         email_sessions=[],
         total_tracked_sec=1800,
     )
-    assert report["total_sec"] == 1020.0
-    assert report["share_pct"] == 56.7
+    assert report["total_sec"] == 900.0
+    assert report["share_pct"] == 50.0
     assert len(report["by_app"]) == 1
-    assert len(report["by_site"]) == 2
+    assert len(report["by_site"]) == 1
+    assert report["by_site"][0]["name"] == "meet.google.com"
     assert len(report["sessions"]) == 2
     assert report["email_total_sec"] == 90.0
     assert "телемост" in report["note"].casefold() or "мессенджер" in report["note"].casefold()
@@ -263,9 +273,11 @@ def test_meetings_for_range_counts_yandex_and_mail(tmp_path: Path, monkeypatch):
     db.end_session(sid_mail, ended_at=start + timedelta(minutes=66))
 
     report = db.meetings_for_range(start, end)
-    assert report["total_sec"] >= 40 * 60
+    # Zoom 20m + Telemost 10m — Messenger chat must not inflate calls.
+    assert report["total_sec"] >= 28 * 60
+    assert report["total_sec"] < 40 * 60
     sites = {r.get("site") for r in report["by_site"]}
-    assert "messenger.yandex.ru" in sites
+    assert "messenger.yandex.ru" not in sites
     assert "telemost.yandex.ru" in sites
     assert report["email_total_sec"] >= 9 * 60
     assert any(r["name"] == "Яндекс Почта" for r in report["email_top"])
@@ -328,5 +340,25 @@ def test_meetings_ui_no_rank_grid_overlap_and_grouped_sessions():
     assert "session-groups" in html
     assert "li.meeting-channel" in css
     assert "flex-direction: column" in css
+    assert "meeting-channel-main > .meeting-expand" in css
     assert "meetingSessionGroupHtml" in js
     assert "groupFeedByApp(compactFeedRows(report.sessions" in js
+    assert "meeting-peers-shot" in js
+    assert "/api/meetings/peers-from-shot" in js
+    assert "Встречи / звонки" in js
+
+
+def test_meetings_peers_vision_helpers():
+    from deskline.meetings_vision import _shot_matches_channel, extract_peers_from_screenshot
+
+    assert _shot_matches_channel(
+        {"activity_label": "Яндекс Мессенджер", "window_title": "x"},
+        "site:messenger.yandex.ru",
+    )
+    assert not _shot_matches_channel(
+        {"activity_label": "Cursor", "window_title": "a.py"},
+        "site:messenger.yandex.ru",
+    )
+    missing = extract_peers_from_screenshot({}, "/no/such/file.jpg")
+    assert missing["ok"] is False
+    assert missing["error"] == "screenshot_missing"
