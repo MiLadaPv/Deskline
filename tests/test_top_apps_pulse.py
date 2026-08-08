@@ -43,3 +43,6 @@ def test_top_apps_podium_styles():
     assert ".apps-cup-silver" in CSS
     assert ".apps-cup-bronze" in CSS
     assert ".apps-runners" in CSS
+    assert 'html[data-theme="dark"] .apps-podium-card' in CSS
+    assert 'html[data-theme="dark"] .apps-runner' in CSS
+    assert 'html[data-theme="dark"] .apps-podium-slot.is-first .apps-podium-card' in CSS

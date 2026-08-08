@@ -5427,24 +5427,24 @@ html[data-theme="dark"] .google-btn {
   padding: 12px 10px 0;
   border-radius: 16px 16px 10px 10px;
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.72), rgba(236, 246, 241, 0.35));
-  border: 1px solid color-mix(in srgb, var(--accent) 12%, rgba(31, 107, 86, 0.1));
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.75);
+    linear-gradient(180deg, color-mix(in srgb, var(--card) 96%, #fff), color-mix(in srgb, var(--accent-soft) 28%, var(--card)));
+  border: 1px solid color-mix(in srgb, var(--accent) 14%, var(--line));
+  box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 55%, transparent);
 }
 
 .apps-podium-slot.is-first .apps-podium-card {
   padding-top: 16px;
-  border-color: color-mix(in srgb, #c9a227 34%, rgba(31, 107, 86, 0.12));
+  border-color: color-mix(in srgb, #c9a227 34%, var(--line));
   background:
-    linear-gradient(180deg, rgba(255, 249, 230, 0.9), rgba(236, 246, 241, 0.4));
+    linear-gradient(180deg, color-mix(in srgb, #c9a227 16%, #fff8e8), color-mix(in srgb, var(--accent-soft) 22%, var(--card)));
 }
 
 .apps-podium-slot.is-second .apps-podium-card {
-  border-color: color-mix(in srgb, #8a95a5 28%, rgba(31, 107, 86, 0.1));
+  border-color: color-mix(in srgb, #8a95a5 28%, var(--line));
 }
 
 .apps-podium-slot.is-third .apps-podium-card {
-  border-color: color-mix(in srgb, #b87333 28%, rgba(31, 107, 86, 0.1));
+  border-color: color-mix(in srgb, #b87333 28%, var(--line));
 }
 
 .apps-podium-trophy {
@@ -5598,8 +5598,8 @@ html[data-theme="dark"] .google-btn {
   align-items: center;
   padding: 8px 10px;
   border-radius: 12px;
-  background: rgba(255, 255, 255, 0.55);
-  border: 1px solid color-mix(in srgb, var(--accent) 10%, rgba(31, 107, 86, 0.08));
+  background: color-mix(in srgb, var(--card) 88%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent) 10%, var(--line));
 }
 
 .apps-runner-rank {
@@ -5634,7 +5634,7 @@ html[data-theme="dark"] .google-btn {
 .apps-runner-bar {
   height: 6px;
   border-radius: 999px;
-  background: rgba(31, 107, 86, 0.08);
+  background: color-mix(in srgb, var(--ink-soft) 18%, transparent);
   overflow: hidden;
 }
 
@@ -5650,6 +5650,76 @@ html[data-theme="dark"] .google-btn {
   color: var(--ink-soft);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
+}
+
+html[data-theme="dark"] .apps-podium-card {
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--paper-2) 92%, #24352e), color-mix(in srgb, var(--card) 75%, #0a1210));
+  border-color: color-mix(in srgb, var(--accent) 22%, var(--line));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+html[data-theme="dark"] .apps-podium-slot.is-first .apps-podium-card {
+  background:
+    linear-gradient(180deg, color-mix(in srgb, #c9a227 22%, var(--paper-2)), color-mix(in srgb, var(--paper-2) 78%, #0a100e));
+  border-color: color-mix(in srgb, #e0c35a 36%, var(--line));
+}
+
+html[data-theme="dark"] .apps-podium-slot.is-second .apps-podium-card {
+  background:
+    linear-gradient(180deg, color-mix(in srgb, #8a95a5 16%, var(--paper-2)), color-mix(in srgb, var(--paper-2) 82%, #0a100e));
+  border-color: color-mix(in srgb, #b8c2ce 28%, var(--line));
+}
+
+html[data-theme="dark"] .apps-podium-slot.is-third .apps-podium-card {
+  background:
+    linear-gradient(180deg, color-mix(in srgb, #b87333 16%, var(--paper-2)), color-mix(in srgb, var(--paper-2) 82%, #0a100e));
+  border-color: color-mix(in srgb, #d49a5c 28%, var(--line));
+}
+
+html[data-theme="dark"] .apps-cup-gold {
+  color: #e0c35a;
+}
+
+html[data-theme="dark"] .apps-cup-silver {
+  color: #b8c2ce;
+}
+
+html[data-theme="dark"] .apps-cup-bronze {
+  color: #d49a5c;
+}
+
+html[data-theme="dark"] .apps-cup .apps-cup-shine {
+  stroke: rgba(255, 255, 255, 0.22);
+}
+
+html[data-theme="dark"] .apps-podium-plinth {
+  background: color-mix(in srgb, var(--accent) 14%, rgba(0, 0, 0, 0.28));
+  color: var(--accent);
+}
+
+html[data-theme="dark"] .apps-podium-slot.is-first .apps-podium-plinth {
+  background: color-mix(in srgb, #c9a227 20%, rgba(0, 0, 0, 0.32));
+  color: #e8c85a;
+}
+
+html[data-theme="dark"] .apps-podium-slot.is-second .apps-podium-plinth {
+  background: color-mix(in srgb, #8a95a5 16%, rgba(0, 0, 0, 0.3));
+  color: #c5ced8;
+}
+
+html[data-theme="dark"] .apps-podium-slot.is-third .apps-podium-plinth {
+  background: color-mix(in srgb, #b87333 16%, rgba(0, 0, 0, 0.3));
+  color: #d4a06a;
+}
+
+html[data-theme="dark"] .apps-runner {
+  background: color-mix(in srgb, var(--paper-2) 82%, transparent);
+  border-color: var(--line);
+}
+
+html[data-theme="dark"] .apps-runner-bar {
+  background: rgba(255, 255, 255, 0.08);
 }
 
 @media (max-width: 640px) {
