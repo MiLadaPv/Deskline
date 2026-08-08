@@ -23,10 +23,18 @@ def test_top_apps_pulse_render_hooks():
     assert "function topFocusCandidates" in JS
     assert "function resolveActivityBreakdown" in JS
     assert "function openActivityDetail" in JS
+    assert "function setBodyScrollLock" in JS
     assert "function wireTopAppsPulse" in JS
     assert "data-pulse-idx" in JS
     assert "by_app_grouped" in JS
     assert "renderTopAppsPulse(summary)" in JS
+
+
+def test_activity_modal_scroll_lock():
+    assert "is-scroll-locked" in CSS
+    assert "setBodyScrollLock(true)" in JS
+    assert "setBodyScrollLock(false)" in JS
+    assert "overscroll-behavior: contain" in CSS
 
 
 def test_top_focus_prefers_nested_activities():

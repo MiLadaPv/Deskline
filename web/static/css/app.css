@@ -5800,7 +5800,9 @@ html[data-theme="dark"] .apps-runner-bar {
   width: min(520px, 100%);
   max-height: min(82vh, 720px);
   overflow: auto;
+  overscroll-behavior: contain;
   padding-top: 22px;
+  touch-action: pan-y;
 }
 
 .activity-detail-close {
@@ -7197,6 +7199,8 @@ html[data-theme="dark"] .prod-days-chart-wide .stack-seg.distracting {
   display: grid;
   place-items: center;
   padding: 20px;
+  overflow: auto;
+  overscroll-behavior: contain;
   background:
     radial-gradient(620px 320px at 50% 30%, rgba(31, 107, 86, 0.22), transparent 60%),
     rgba(15, 28, 24, 0.52);
@@ -7205,6 +7209,13 @@ html[data-theme="dark"] .prod-days-chart-wide .stack-seg.distracting {
 }
 .onboard-modal[hidden],
 .paywall-modal[hidden] { display: none !important; }
+
+html.is-scroll-locked,
+body.is-scroll-locked {
+  overflow: hidden !important;
+  overscroll-behavior: none;
+  touch-action: none;
+}
 .onboard-card {
   position: relative;
   width: min(460px, 100%);

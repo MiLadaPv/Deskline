@@ -956,9 +956,21 @@ function resolveActivityBreakdown(summary, item) {
   };
 }
 
+function setBodyScrollLock(locked) {
+  document.body.classList.toggle("is-scroll-locked", !!locked);
+  document.documentElement.classList.toggle("is-scroll-locked", !!locked);
+  document.body.style.overflow = locked ? "hidden" : "";
+  document.documentElement.style.overflow = locked ? "hidden" : "";
+}
+
 function closeActivityDetail() {
   const modal = document.getElementById("activityDetailModal");
-  if (modal) modal.hidden = true;
+  if (!modal || modal.hidden) {
+    setBodyScrollLock(false);
+    return;
+  }
+  modal.hidden = true;
+  setBodyScrollLock(false);
 }
 
 function openActivityDetail(item) {
@@ -993,6 +1005,7 @@ function openActivityDetail(item) {
     })
     .join("");
   modal.hidden = false;
+  setBodyScrollLock(true);
 }
 
 function wireTopAppsPulse(el) {
@@ -5364,6 +5377,18 @@ function wireUi() {
   document.getElementById("activityDetailUsage")?.addEventListener("click", () => {
     closeActivity();
   });
+  // Block background scroll while the modal is open (wheel/trackpad on the scrim).
+  const blockBgScroll = (ev) => {
+    if (!activityModal || activityModal.hidden) return;
+    const card = ev.target.closest?.(".activity-detail-card");
+    if (card) {
+      const canScroll = card.scrollHeight > card.clientHeight + 1;
+      if (canScroll) return;
+    }
+    ev.preventDefault();
+  };
+  activityModal?.addEventListener("wheel", blockBgScroll, { passive: false });
+  activityModal?.addEventListener("touchmove", blockBgScroll, { passive: false });
   document.addEventListener("keydown", (ev) => {
     if (ev.key !== "Escape") return;
     if (activityModal && !activityModal.hidden) closeActivity();
