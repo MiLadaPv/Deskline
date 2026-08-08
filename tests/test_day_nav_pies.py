@@ -147,6 +147,15 @@ def test_gantt_category_colors_match_legend():
     assert ".stack-leg i.idle" in css
     assert ".stack-leg i.productive { background: var(--cat-productive); }" in css
     assert ".stack-leg i.neutral { background: var(--cat-neutral); }" in css
+    assert "var(--cat-void)" in css
+    assert "html[data-theme=\"dark\"] .gantt-wrap" in css
+    assert "html[data-theme=\"dark\"] .gantt-track" in css
+    # Track fill must use the same void token as the legend swatch.
+    track_idx = css.find(".gantt-track {")
+    assert track_idx >= 0
+    track_chunk = css[track_idx : track_idx + 420]
+    assert "var(--cat-void)" in track_chunk
+    assert "#eef4f1" not in track_chunk
     idle_idx = css.find(".gantt-block.idle")
     assert idle_idx >= 0
     idle_chunk = css[idle_idx : idle_idx + 160]
