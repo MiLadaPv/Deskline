@@ -2258,6 +2258,115 @@ html[data-theme="dark"] .shimmer {
   margin-bottom: 10px;
 }
 
+/* Match real .pt-row layout so the projects tab doesn't jump after load. */
+.skel-pt-row {
+  border: 1px solid var(--line);
+  background: color-mix(in srgb, var(--card) 94%, #fff);
+  border-left: 3px solid color-mix(in srgb, var(--accent) 35%, var(--line));
+  margin-bottom: 8px;
+  overflow: hidden;
+}
+
+.skel-pt-head {
+  display: grid;
+  grid-template-columns: 1rem 10px minmax(0, 1fr) 2.6rem 3.4rem 2rem;
+  gap: 10px;
+  align-items: center;
+  padding: 12px 14px;
+}
+
+.skel-pt-chevron {
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+  justify-self: center;
+  background: color-mix(in srgb, var(--paper-2) 75%, #c5d0cb);
+}
+
+.skel-pt-swatch {
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  background: color-mix(in srgb, var(--accent) 45%, var(--paper-2));
+}
+
+.skel-pt-meta {
+  height: 12px;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--paper-2) 75%, #c5d0cb);
+}
+
+.skel-pt-del {
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  justify-self: end;
+  background: color-mix(in srgb, var(--paper-2) 75%, #c5d0cb);
+}
+
+.skel-pt-expand {
+  padding: 0 12px 12px;
+  display: grid;
+  gap: 8px;
+  border-top: 1px solid var(--line);
+  background: color-mix(in srgb, var(--paper) 45%, transparent);
+}
+
+.skel-pt-task-form {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 2rem;
+  gap: 8px;
+  align-items: center;
+  padding-top: 10px;
+}
+
+.skel-pt-btn {
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--accent) 35%, var(--paper-2));
+}
+
+.skel-pt-task {
+  display: grid;
+  grid-template-columns: 1.4rem minmax(0, 1fr) 4.5rem 2rem;
+  gap: 10px;
+  align-items: center;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: color-mix(in srgb, var(--card) 88%, transparent);
+}
+
+.skel-pt-check {
+  width: 16px;
+  height: 16px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--paper-2) 75%, #c5d0cb);
+}
+
+.skel-pt-task-copy {
+  min-width: 0;
+  display: grid;
+  gap: 6px;
+}
+
+.skel-pt-pill {
+  height: 26px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--accent) 28%, var(--paper-2));
+}
+
+html[data-theme="dark"] .skel-project,
+html[data-theme="dark"] .skel-pt-row,
+html[data-theme="dark"] .skel-pt-task {
+  background: var(--card);
+}
+
+html[data-theme="dark"] .skel-pt-expand {
+  background: color-mix(in srgb, var(--paper-2) 55%, transparent);
+}
+
 .skel-rating-row {
   display: grid;
   grid-template-columns: 28px 1fr;

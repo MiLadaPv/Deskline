@@ -623,9 +623,37 @@ function showSkeleton(el, kind, count = 6) {
       <div class="skel-gantt-track shimmer" style="width:58%;animation-delay:.16s"></div>
     </div>`;
   } else if (kind === "projects") {
-    html = Array.from({ length: count || 4 }, (_, i) => {
+    html = Array.from({ length: count || 3 }, (_, i) => {
       const d = i * 0.06;
-      return `<div class="skel-project" aria-hidden="true">${skelLine("48%", d)}${skelLine("88%", d + 0.04)}${skelLine("66%", d + 0.08)}</div>`;
+      const open = i === 0;
+      const tasks = open
+        ? `<div class="skel-pt-expand" aria-hidden="true">
+            <div class="skel-pt-task-form">
+              <span class="skel-line shimmer" style="width:70%;animation-delay:${d + 0.1}s"></span>
+              <span class="skel-pt-btn shimmer" style="animation-delay:${d + 0.12}s"></span>
+            </div>
+            <div class="skel-pt-task">
+              <span class="skel-pt-check shimmer" style="animation-delay:${d + 0.14}s"></span>
+              <div class="skel-pt-task-copy">
+                ${skelLine("58%", d + 0.14)}
+                ${skelLine("28%", d + 0.18)}
+              </div>
+              <span class="skel-pt-pill shimmer" style="animation-delay:${d + 0.16}s"></span>
+              <span class="skel-pt-del shimmer" style="animation-delay:${d + 0.18}s"></span>
+            </div>
+          </div>`
+        : "";
+      return `<div class="skel-pt-row${open ? " is-open" : ""}" aria-hidden="true">
+        <div class="skel-pt-head">
+          <span class="skel-pt-chevron shimmer" style="animation-delay:${d}s"></span>
+          <span class="skel-pt-swatch shimmer" style="animation-delay:${d + 0.02}s"></span>
+          <span class="skel-line shimmer" style="width:${42 + (i % 3) * 12}%;animation-delay:${d + 0.04}s"></span>
+          <span class="skel-pt-meta shimmer" style="animation-delay:${d + 0.06}s"></span>
+          <span class="skel-pt-meta shimmer" style="animation-delay:${d + 0.08}s"></span>
+          <span class="skel-pt-del shimmer" style="animation-delay:${d + 0.1}s"></span>
+        </div>
+        ${tasks}
+      </div>`;
     }).join("");
   } else if (kind === "rating") {
     html = Array.from({ length: count || 5 }, (_, i) => {
