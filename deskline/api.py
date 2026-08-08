@@ -1123,7 +1123,11 @@ def create_app(tracker: Tracker, db: Database | None = None) -> FastAPI:
                     path = ensure_app_icon(stem, recalled_app_path(stem))
         if is_weak_icon_cache(path) or not path.exists():
             path = shared_placeholder_path()
-        return FileResponse(path, media_type="image/png")
+        headers: dict[str, str] = {}
+        # Don't let the browser stick a placeholder under the real icon URL.
+        if path.name == "placeholder.png" and safe != "placeholder.png":
+            headers["Cache-Control"] = "no-store"
+        return FileResponse(path, media_type="image/png", headers=headers)
 
     @app.post("/api/control/pause")
     def pause() -> dict[str, Any]:

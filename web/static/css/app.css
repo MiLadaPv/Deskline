@@ -1280,6 +1280,16 @@ html[data-theme="dark"] .rank-row-child {
   background: color-mix(in srgb, var(--paper) 55%, transparent);
 }
 
+/* Author display:grid beats the UA [hidden] rule — keep collapse working. */
+.session-group-items[hidden],
+.session-group:not(.is-open) .session-group-items {
+  display: none;
+}
+
+.session-group.is-open .session-group-items:not([hidden]) {
+  display: grid;
+}
+
 #panel-day .session-group-items .session-visit {
   display: grid;
   grid-template-columns: 3.6rem 28px minmax(0, 1fr) auto;

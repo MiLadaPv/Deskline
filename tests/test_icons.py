@@ -288,3 +288,29 @@ def test_resolve_exe_path_accepts_displayicon_suffix(tmp_path: Path):
     fake_exe.write_bytes(b"MZ")
     found = resolve_exe_path("app.exe", f"{fake_exe},0")
     assert found == fake_exe
+
+
+def test_known_cursor_paths_include_system_drive(monkeypatch, tmp_path: Path):
+    from deskline.icons import resolve_exe_path
+
+    fake = tmp_path / "Cursor.exe"
+    fake.write_bytes(b"MZ")
+    monkeypatch.setenv("SystemDrive", str(tmp_path)[:2] if len(str(tmp_path)) >= 2 else "C:")
+    # Point known pattern at our temp file via expandvars-friendly layout.
+    monkeypatch.setattr(
+        "deskline.icons._KNOWN_APP_PATHS",
+        {"cursor.exe": [str(fake)]},
+    )
+    monkeypatch.setattr("deskline.icons.shutil.which", lambda n: None)
+    monkeypatch.setattr("deskline.icons._resolve_via_registry", lambda n: None)
+    monkeypatch.setattr("deskline.icons.recalled_app_path", lambda n: None)
+    found = resolve_exe_path("cursor.exe")
+    assert found == fake
+
+
+def test_media_icon_placeholder_is_uncached():
+    import deskline.api as api_mod
+
+    src = Path(api_mod.__file__).read_text(encoding="utf-8")
+    assert 'headers["Cache-Control"] = "no-store"' in src
+    assert 'path.name == "placeholder.png"' in src

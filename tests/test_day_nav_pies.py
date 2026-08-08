@@ -98,6 +98,8 @@ def test_day_feed_ux_contracts():
     assert "session-group-toggle" in js
     assert ".day-picture-head" in css
     assert ".session-group" in css
+    assert ".session-group-items[hidden]" in css
+    assert ".session-group:not(.is-open) .session-group-items" in css
     assert ".timeline li.is-hot" in css
 
 

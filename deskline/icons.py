@@ -32,6 +32,9 @@ _KNOWN_APP_PATHS: dict[str, list[str]] = {
         r"%LOCALAPPDATA%\Programs\cursor\Cursor.exe",
         r"%LOCALAPPDATA%\Programs\Cursor\Cursor.exe",
         r"%LOCALAPPDATA%\cursor\Cursor.exe",
+        r"%SystemDrive%\Cursor\Cursor.exe",
+        r"%USERPROFILE%\Cursor\Cursor.exe",
+        r"%USERPROFILE%\AppData\Local\Programs\cursor\Cursor.exe",
     ],
 }
 
