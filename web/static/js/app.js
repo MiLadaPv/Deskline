@@ -718,6 +718,85 @@ function renderKpis(summary, team) {
     .join("");
 }
 
+function appsCupSvg(rank) {
+  const tone = rank === 1 ? "gold" : rank === 2 ? "silver" : "bronze";
+  return `<svg class="apps-cup apps-cup-${tone}" viewBox="0 0 40 44" width="28" height="31" aria-hidden="true" focusable="false">
+    <path class="apps-cup-bowl" d="M10 5.5h20v5.2c0 7.4-4.2 12.2-10 12.2S10 18.1 10 10.7V5.5z"/>
+    <path class="apps-cup-rim" d="M9.2 5.5h21.6v2.2H9.2z"/>
+    <path class="apps-cup-handle" d="M10 8.2H6.4c-1.8 0-3 1.7-2.5 3.4.7 2.4 2.8 3.6 5.6 3.8"/>
+    <path class="apps-cup-handle" d="M30 8.2h3.6c1.8 0 3 1.7 2.5 3.4-.7 2.4-2.8 3.6-5.6 3.8"/>
+    <path class="apps-cup-stem" d="M18.2 22.6h3.6v6.2h-3.6z"/>
+    <path class="apps-cup-base" d="M13.5 31.4h13v2.4c0 1.2-.9 2.1-2.1 2.1H15.6c-1.2 0-2.1-.9-2.1-2.1v-2.4z"/>
+    <path class="apps-cup-shine" d="M14.2 8.4c.4 4.8 2.2 8.2 5 9.8" fill="none"/>
+  </svg>`;
+}
+
+function renderTopAppsPulse(summary) {
+  const el = document.getElementById("topAppsPulse");
+  if (!el) return;
+  clearSkel(el);
+  const dayTotal = Math.max(1, Number(summary.total_sec) || 0);
+  const apps = (summary.by_app || [])
+    .filter((r) => (r.sec || 0) >= 30)
+    .slice(0, 5)
+    .map((r, i) => ({
+      rank: i + 1,
+      name: r.name || r.app_name || "Приложение",
+      sec: r.sec || 0,
+      icon_url: r.icon_url || "",
+      category: r.category || "neutral",
+      share: Math.round(((r.sec || 0) / dayTotal) * 100),
+    }));
+  if (!apps.length) {
+    el.innerHTML = `<p class="hint">Пока нет данных по приложениям за сегодня.</p>`;
+    return;
+  }
+  const top3 = apps.slice(0, 3);
+  // Classic podium order: silver · gold · bronze
+  const slots =
+    top3.length >= 2
+      ? [top3[1] || null, top3[0] || null, top3[2] || null]
+      : [null, top3[0] || null, null];
+  const podium = slots
+    .map((app) => {
+      if (!app) return `<li class="apps-podium-slot is-empty" aria-hidden="true"></li>`;
+      const placeClass = app.rank === 1 ? "is-first" : app.rank === 2 ? "is-second" : "is-third";
+      const cat = CAT_LABELS[app.category] || CAT_LABELS.neutral;
+      const catColor = CAT_COLORS[app.category] || CAT_COLORS.neutral;
+      return `<li class="apps-podium-slot ${placeClass}">
+        <div class="apps-podium-card">
+          <div class="apps-podium-trophy">${appsCupSvg(app.rank)}</div>
+          <div class="apps-podium-icon">${iconImgHtml(app.icon_url, app.rank === 1 ? 44 : 36)}</div>
+          <div class="apps-podium-name" title="${escapeHtml(app.name)}">${escapeHtml(app.name)}</div>
+          <div class="apps-podium-meta">
+            <strong>${fmtDur(app.sec)}</strong>
+            <span>${app.share}% · <em style="color:${catColor}">${escapeHtml(cat)}</em></span>
+          </div>
+          <div class="apps-podium-plinth" aria-hidden="true"><span>#${app.rank}</span></div>
+        </div>
+      </li>`;
+    })
+    .join("");
+  const runners = apps.slice(3);
+  const runnersHtml = runners.length
+    ? `<ol class="apps-runners" start="4">${runners
+        .map(
+          (app) => `<li class="apps-runner">
+            <span class="apps-runner-rank">#${app.rank}</span>
+            ${iconImgHtml(app.icon_url, 28)}
+            <span class="apps-runner-name">${escapeHtml(app.name)}</span>
+            <span class="apps-runner-bar" aria-hidden="true"><i style="width:${Math.max(8, app.share)}%;background:${CAT_COLORS[app.category] || CAT_COLORS.neutral}"></i></span>
+            <span class="apps-runner-meta">${fmtDur(app.sec)} · ${app.share}%</span>
+          </li>`
+        )
+        .join("")}</ol>`
+    : "";
+  el.innerHTML = `<div class="apps-top">
+    <ol class="apps-podium">${podium}</ol>
+    ${runnersHtml}
+  </div>`;
+}
+
 function renderTopProjectsPulse(summary) {
   const el = document.getElementById("topProjectsPulse");
   if (!el) return;
@@ -2405,17 +2484,20 @@ async function refreshProjects({ skeleton = false } = {}) {
 async function refreshSummary({ skeleton = false } = {}) {
   const kpi = document.getElementById("kpiStrip");
   const proj = document.getElementById("topProjectsPulse");
+  const apps = document.getElementById("topAppsPulse");
   const quiet = document.getElementById("quietList");
   const gauges = document.getElementById("teamGauges");
   const ctx = `summary|${filterProjectId || ""}|${filterEmployeeId || ""}`;
   const show =
     skeleton ||
     needsSkeleton(kpi, "summary", ctx, { force: skeleton }) ||
-    needsSkeleton(proj, "summary-proj", ctx, { force: skeleton });
+    needsSkeleton(proj, "summary-proj", ctx, { force: skeleton }) ||
+    needsSkeleton(apps, "summary-apps", ctx, { force: skeleton });
   if (show) {
     lastSummaryKey = "";
     showSkeleton(kpi, "kpi", 5);
     showSkeleton(proj, "donut");
+    if (apps) showSkeleton(apps, "list", 3);
     if (quiet) showSkeleton(quiet, "list", 4);
     if (gauges) showSkeleton(gauges, "list", 3);
     showSkeleton(document.getElementById("hoursChart"), "chart");
@@ -2456,9 +2538,11 @@ async function refreshSummary({ skeleton = false } = {}) {
   }
   renderQuietPeople(team);
   renderKpis(summary, team);
+  renderTopAppsPulse(summary);
   renderTopProjectsPulse(summary);
   markSkelContext("summary", ctx);
   markSkelContext("summary-proj", ctx);
+  markSkelContext("summary-apps", ctx);
   refreshTrends({ skeleton: show }).catch(() => {});
 }
 
