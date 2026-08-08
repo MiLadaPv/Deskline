@@ -1,4 +1,4 @@
-"""Build crisp Deskline mark: smooth D + sharp bars clipped to the D counter (stencil)."""
+"""Build crisp Deskline mark: smooth D + sharp bars clipped flush to the D counter."""
 
 from __future__ import annotations
 
@@ -8,27 +8,26 @@ ROOT = Path(__file__).resolve().parents[1]
 IMG = ROOT / "web" / "static" / "img"
 PARTIAL = ROOT / "web" / "templates" / "partials" / "boot_logo.html"
 
-# Bars sit fully inside the D counter (hole left edge ~248). Sharp corners.
+# Hole bottom = 608, left = 248. Bars extend slightly past edges so clipPath
+# cuts them flush to the D counter (no visible gap).
+BAR_BOTTOM = 612  # 4px past hole floor → stencil edge sits on the letter
 BARS = [
-    (270, 468, 68, 132, "g1", "#4DB3FF", "#0A6CF0"),
-    (352, 378, 70, 222, "g2", "#3ED6C4", "#0A9B9A"),
-    (436, 300, 70, 300, "g3", "#B4EC3A", "#5FC218"),
+    # x, y, w, h, gid, light_top, deep_bottom
+    (248, BAR_BOTTOM - 148, 74, 148, "g1", "#8ED0FF", "#0757C7"),
+    (334, BAR_BOTTOM - 236, 76, 236, "g2", "#5EEAD4", "#0B7A72"),
+    (422, BAR_BOTTOM - 320, 86, 320, "g3", "#D8F99A", "#3F7A0B"),
 ]
 
-# Outer + hole (evenodd). Hole alone is used as clipPath for stencil bars.
+# Clean vertical left stem (no double kink). Outer + hole via evenodd.
 D_OUTER = (
-    "M170 50 "
-    "C170 42 176 36 186 36 "
+    "M120 56 "
+    "C120 44 132 36 146 36 "
     "H310 "
     "C482 36 606 170 606 380 "
     "C606 590 482 725 310 725 "
-    "H186 "
-    "C176 725 170 718 170 710 "
-    "V640 "
-    "C126 632 90 590 90 538 "
-    "V212 "
-    "C90 160 126 118 170 110 "
-    "V50 "
+    "H146 "
+    "C132 725 120 716 120 704 "
+    "V56 "
     "Z"
 )
 
@@ -54,6 +53,7 @@ def _grads_and_bars(prefix: str, animate: bool) -> tuple[str, str]:
             f'    <linearGradient id="{uid}" x1="{x + w / 2:.1f}" y1="{y}" '
             f'x2="{x + w / 2:.1f}" y2="{y + h}" gradientUnits="userSpaceOnUse">'
             f'<stop offset="0%" stop-color="{c0}"/>'
+            f'<stop offset="55%" stop-color="{c0}" stop-opacity="0.92"/>'
             f'<stop offset="100%" stop-color="{c1}"/>'
             f"</linearGradient>"
         )
@@ -105,7 +105,7 @@ def build_partial() -> str:
     light = build_svg("#192232", "bl-", animate=True, for_inline=True)
     dark = build_svg("#F4F7F5", "bd-", animate=True, for_inline=True)
     return (
-        "{# Inline splash mark — stencil bars inside D counter #}\n"
+        "{# Inline splash mark — stencil bars flush inside D counter #}\n"
         f'<div class="boot-logo-anim boot-logo-anim-light">{light}</div>\n'
         f'<div class="boot-logo-anim boot-logo-anim-dark">{dark}</div>\n'
     )

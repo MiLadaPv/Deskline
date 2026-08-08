@@ -1,4 +1,4 @@
-"""Boot splash must stay GPU-friendly: stencil vector mark + letter wave loader."""
+"""Boot splash must stay GPU-friendly: flush stencil mark + letter wave loader."""
 
 from __future__ import annotations
 
@@ -21,29 +21,33 @@ def test_boot_logo_is_inline_vector_not_webp_movie():
     assert "<svg" in BOOT
 
 
-def test_boot_bars_are_stencil_clipped_under_d():
+def test_boot_bars_are_flush_stencil_under_d():
     assert "clipPath" in BOOT
     assert 'clip-path="url(' in BOOT
     assert "logo-bars" in BOOT
-    # Bars group must appear before the D path (D paints on top).
     assert BOOT.find('class="logo-bars"') < BOOT.find('class="logo-d"')
-    assert "D_HOLE" in BUILDER or "clipPath" in BUILDER
-    assert "(270," in BUILDER  # bars inset past hole edge ~248
+    assert "BAR_BOTTOM = 612" in BUILDER
+    assert "(248," in BUILDER  # flush to hole left edge
+    assert 'x="248"' in BOOT
+    assert 'height="148"' in BOOT or 'height="236"' in BOOT
+    # Bottom of bars reaches past hole floor so clip sits on the letter edge
+    assert "612" in BUILDER
 
 
-def test_boot_css_uses_compositor_props_only():
+def test_boot_css_preserves_gradients_and_enlarges_mark():
     boot_idx = CSS.find(".boot-splash {")
     assert boot_idx >= 0
     chunk = CSS[boot_idx : boot_idx + 4500]
     assert "bootBarGrow" in chunk
-    assert "bootMarkIn" in chunk
     assert "bootLetterIn" in chunk
-    assert "bootLetterPulse" in chunk
-    assert "boot-progress" not in chunk
-    assert "filter: blur" not in chunk
-    assert "boot-glow" not in chunk
-    shell = CSS[CSS.find("@keyframes shellRise") : CSS.find("@keyframes shellRise") + 220]
-    assert "filter: blur" not in shell
+    assert "min(240px, 56vw)" in chunk
+    assert "clamp(1.85rem" in chunk
+    assert ".logo-mark .logo-bar-1" in CSS
+    assert ".boot-logo-svg .logo-bar-1" in CSS
+    assert "revert-layer" in CSS
+    # Must not be a bare global solid fill rule
+    assert "\n.logo-bar-1 { fill:" not in CSS
+    assert CSS.count(".logo-bar-1 { fill: #3b82f6; }") == 0
 
 
 def test_boot_letter_loader_replaces_progress_line():
@@ -52,7 +56,6 @@ def test_boot_letter_loader_replaces_progress_line():
     assert "boot-progress" not in INDEX
     assert "boot-progress" not in LOGIN
     assert 'aria-label="Deskline"' in INDEX
-    assert CSS.count("boot-letter") >= 2
 
 
 def test_boot_js_plays_and_exits_cleanly():

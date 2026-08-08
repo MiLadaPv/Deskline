@@ -4082,7 +4082,7 @@ button.gantt-block:focus-visible {
 }
 
 .boot-logo-anim {
-  width: min(168px, 44vw);
+  width: min(240px, 56vw);
   height: auto;
   aspect-ratio: 664 / 761;
   display: block;
@@ -4133,13 +4133,13 @@ html[data-theme="dark"] .boot-logo-anim-dark {
   margin: 0;
   display: flex;
   justify-content: center;
-  gap: 0.015em;
+  gap: 0.02em;
   text-align: center;
   font-family: var(--brand);
-  font-size: clamp(1.45rem, 3vw, 1.75rem);
+  font-size: clamp(1.85rem, 4.2vw, 2.35rem);
   font-weight: 700;
   color: var(--ink);
-  letter-spacing: -0.03em;
+  letter-spacing: -0.035em;
   position: relative;
   z-index: 1;
   line-height: 1;
@@ -4147,6 +4147,7 @@ html[data-theme="dark"] .boot-logo-anim-dark {
 
 .boot-letter {
   display: inline-block;
+  color: var(--ink);
   transform: translateZ(0);
   backface-visibility: hidden;
   will-change: transform, opacity;
@@ -4238,9 +4239,17 @@ html[data-theme="dark"] .logo-mark .logo-img-dark { display: block; }
   fill: var(--logo-ink);
 }
 
-.logo-bar-1 { fill: #3b82f6; }
-.logo-bar-2 { fill: #14b8a6; }
-.logo-bar-3 { fill: #84cc16; }
+/* Solid fills only for small UI marks — boot SVG keeps gradient url(#…) fills */
+.logo-mark .logo-bar-1 { fill: #3b82f6; }
+.logo-mark .logo-bar-2 { fill: #14b8a6; }
+.logo-mark .logo-bar-3 { fill: #84cc16; }
+
+.boot-logo-svg .logo-bar-1,
+.boot-logo-svg .logo-bar-2,
+.boot-logo-svg .logo-bar-3 {
+  /* Keep presentation attribute fill="url(#…)" — do not flatten to solid. */
+  fill: revert-layer;
+}
 
 .logo-anim {
   animation: logo-tile-in 0.55s cubic-bezier(0.22, 1, 0.36, 1) both;
