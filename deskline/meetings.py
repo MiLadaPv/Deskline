@@ -379,6 +379,13 @@ _UNREAD_RE = re.compile(
     re.IGNORECASE,
 )
 _GROUP_SPLIT_RE = re.compile(r"\s*(?:,|;|/|·|\||\bи\b)\s*", re.IGNORECASE)
+_PEER_NOISE_RE = re.compile(
+    r"^(?:"
+    r"meeting|zoom\s*meeting|zoom\s*webinar|webinar|call|calls|"
+    r"звонок|видеозвонок|встреча|конференция|huddle"
+    r")$",
+    re.IGNORECASE,
+)
 
 
 def meeting_peers_from_title(
@@ -408,7 +415,7 @@ def meeting_peers_from_title(
     title = re.sub(r"^яндекс\s*:\s*", "", title, flags=re.IGNORECASE).strip(" -—|·:•")
     if not title or len(title) < 2:
         return []
-    if _NOISE_DETAIL.match(title):
+    if _NOISE_DETAIL.match(title) or _PEER_NOISE_RE.match(title):
         return []
     brand = (activity_label or meeting_site_label(site) or "").casefold()
     if brand and title.casefold() == brand:
@@ -416,7 +423,7 @@ def meeting_peers_from_title(
     parts = [p.strip(" -—|·:•") for p in _GROUP_SPLIT_RE.split(title) if p and p.strip()]
     peers: list[str] = []
     for part in parts or [title]:
-        if len(part) < 2 or _NOISE_DETAIL.match(part):
+        if len(part) < 2 or _NOISE_DETAIL.match(part) or _PEER_NOISE_RE.match(part):
             continue
         part = re.sub(r"^(?:with|с|со)\s+", "", part, flags=re.IGNORECASE).strip()
         if brand and part.casefold() == brand:
@@ -454,12 +461,20 @@ def is_group_meeting_title(window_title: str | None) -> bool:
 def attach_peers_to_channels(
     channels: list[dict[str, Any]], sessions: list[dict[str, Any]]
 ) -> list[dict[str, Any]]:
-    """Roll session peer details up onto channel rows for expandable «С кем»."""
+    """Roll session peer details up onto channel rows for «С кем»."""
     buckets: dict[str, dict[str, dict[str, Any]]] = {}
     for sess in sessions or []:
         site = normalize_site_host(sess.get("site"))
         app = normalize_app_exe(sess.get("app_name"))
-        channel_key = f"site:{site}" if site else f"app:{app}"
+        # Must match build_meetings_report keys: apps → "zoom.exe", sites → "site:host".
+        if is_meeting_app(app):
+            channel_key = app
+        elif site:
+            channel_key = f"site:{site}"
+        else:
+            channel_key = f"app:{app}" if app else ""
+        if not channel_key:
+            continue
         peers = list(sess.get("peers") or [])
         if not peers and sess.get("detail"):
             peers = [str(sess["detail"])]
@@ -469,6 +484,7 @@ def attach_peers_to_channels(
                 site=site,
                 activity_label=sess.get("name") or sess.get("display_name"),
             )
+        peers = [p for p in peers if p and not _PEER_NOISE_RE.match(str(p))]
         if not peers:
             continue
         sec = float(sess.get("sec") or 0)
@@ -492,20 +508,18 @@ def attach_peers_to_channels(
     for ch in channels:
         row = dict(ch)
         key = str(row.get("key") or "")
-        peer_map = buckets.get(key) or {}
+        peer_map = buckets.get(key) or buckets.get(f"app:{key}") or {}
         peers = sorted(peer_map.values(), key=lambda r: float(r["sec"]), reverse=True)
         row["peers"] = peers[:12]
         row["peers_sec"] = round(sum(float(p["sec"]) for p in peers), 1)
         row["has_peers"] = bool(peers)
         if key.startswith("site:messenger.yandex.ru") and not peers:
             row["peers_hint"] = (
-                "В заголовке Edge обычно нет имени чата. Можно распознать собеседника "
-                "по скриншоту Deskline (нужен API-ключ Vision в настройках)."
+                "В заголовке Edge обычно нет имени чата. Нажмите «Узнать со скрина»."
             )
         elif not peers:
             row["peers_hint"] = (
-                "В заголовке окна не было имён. Для Zoom/Teams/Телемоста имена "
-                "появятся, если их показывает сам заголовок — или распознайте со скрина."
+                "Имя не было в заголовке окна Zoom/Teams. Нажмите «Узнать со скрина»."
             )
         else:
             row["peers_hint"] = None

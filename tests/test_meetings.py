@@ -114,7 +114,7 @@ def test_attach_peers_to_channels_marks_messenger_hint():
         ],
     )
     assert channels[0]["has_peers"] is False
-    assert "Edge" in (channels[0].get("peers_hint") or "")
+    assert "скрин" in (channels[0].get("peers_hint") or "").casefold()
 
     with_peers = attach_peers_to_channels(
         [{"key": "site:telemost.yandex.ru", "name": "Яндекс Телемост", "sec": 50}],
@@ -135,6 +135,20 @@ def test_attach_peers_to_channels_marks_messenger_hint():
     names = {p["name"] for p in with_peers[0]["peers"]}
     assert "Анна, Иван" in names or "Анна" in str(names)
     assert "Команда Проект" in names
+
+    zoom = attach_peers_to_channels(
+        [{"key": "zoom.exe", "name": "Zoom", "sec": 600, "app_name": "zoom.exe"}],
+        [
+            {
+                "app_name": "zoom.exe",
+                "sec": 600,
+                "window_title": "Zoom Meeting with Alice Johnson",
+                "name": "Zoom",
+            }
+        ],
+    )
+    assert zoom[0]["has_peers"] is True
+    assert any("Alice" in p["name"] for p in zoom[0]["peers"])
 
 
 def test_compact_meeting_sessions_absorbs_messenger_flicker():
@@ -340,7 +354,10 @@ def test_meetings_ui_no_rank_grid_overlap_and_grouped_sessions():
     assert "session-groups" in html
     assert "li.meeting-channel" in css
     assert "flex-direction: column" in css
-    assert "meeting-channel-main > .meeting-expand" in css
+    assert ".meeting-whom" in css
+    assert ".meeting-channel-side" in css
+    assert "meetingWhomLine" in js
+    assert "С кем:" in js
     assert "meetingSessionGroupHtml" in js
     assert "groupFeedByApp(compactFeedRows(report.sessions" in js
     assert "meeting-peers-shot" in js
