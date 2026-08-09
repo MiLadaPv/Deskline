@@ -132,8 +132,8 @@
           <div class="pulse-apps" id="topAppsPulse" aria-label="Топ активностей за день"></div>
         </section>
 
-        <div class="pulse-split">
-          <section class="pulse-panel">
+        <div class="pulse-split pulse-projects-who" id="projectsWhoSplit">
+          <section class="pulse-panel pulse-projects-panel">
             <header class="pulse-head">
               <div>
                 <p class="pulse-kicker">Проекты</p>
@@ -143,7 +143,7 @@
             </header>
             <div class="pulse-projects" id="topProjectsPulse"></div>
           </section>
-          <section class="pulse-panel" id="whoBlock">
+          <section class="pulse-panel" id="whoBlock" data-team-only hidden>
             <header class="pulse-head">
               <div>
                 <p class="pulse-kicker">Люди</p>
@@ -736,14 +736,14 @@
               <p class="plan-badge" id="planBadge">…</p>
               <p class="hint" id="planDetail"></p>
               <label class="settings-field">
-                Ключ Pro / Team
+                Ключ Pro
                 <input type="text" id="licenseKeyInput" placeholder="XXXX-XXXX-XXXX" autocomplete="off" spellcheck="false" />
               </label>
               <div class="inline-actions">
                 <button type="button" class="btn primary" id="licenseActivateBtn">Активировать</button>
                 <button type="button" class="btn" id="licenseDeactivateBtn">Снять ключ</button>
                 <a class="btn" id="checkoutAnnual" href="/welcome#pricing" target="_blank" rel="noopener">Купить Pro</a>
-                <a class="btn" id="checkoutTeam" href="/welcome#pricing" target="_blank" rel="noopener">Купить Team</a>
+                <a class="btn" id="checkoutTeam" href="/welcome#pricing" target="_blank" rel="noopener" data-team-only hidden>Купить Team</a>
               </div>
               <p class="hint">Оплата через Lemon Squeezy. Trial Pro — 14 дней с первого запуска.</p>
             </div>
@@ -765,7 +765,7 @@
             </div>
           </section>
 
-          <section class="settings-group" data-settings-group data-search="компания team hub lan сотрудник токен устройства">
+          <section class="settings-group" data-settings-group data-team-only hidden data-search="компания team hub lan сотрудник токен устройства">
             <h3 class="settings-group-title">
               <span class="settings-group-ico tone-indigo" aria-hidden="true">
                 <svg viewBox="0 0 24 24" width="16" height="16"><path fill="currentColor" d="M4 19V8.8A2.8 2.8 0 0 1 6.8 6H9V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v1h2.2A2.8 2.8 0 0 1 20 8.8V19h-5v-4.5a1.5 1.5 0 0 0-1.5-1.5h-3A1.5 1.5 0 0 0 9 14.5V19H4Zm7-14v1h2V5h-2Z"/></svg>
@@ -819,7 +819,7 @@
             </div>
           </section>
 
-          <section class="settings-group" data-settings-group data-search="агент hub url ingest токен сотрудник">
+          <section class="settings-group" data-settings-group data-team-only hidden data-search="агент hub url ingest токен сотрудник">
             <h3 class="settings-group-title">
               <span class="settings-group-ico tone-teal" aria-hidden="true">
                 <svg viewBox="0 0 24 24" width="16" height="16"><path fill="currentColor" d="M12 2a4 4 0 0 1 4 4v1h1.5A2.5 2.5 0 0 1 20 9.5V14a2 2 0 0 1-2 2h-1v2.5a1.5 1.5 0 0 1-1.5 1.5h-7A1.5 1.5 0 0 1 7 18.5V16H6a2 2 0 0 1-2-2V9.5A2.5 2.5 0 0 1 6.5 7H8V6a4 4 0 0 1 4-4Zm0 2a2 2 0 0 0-2 2v1h4V6a2 2 0 0 0-2-2Z"/></svg>

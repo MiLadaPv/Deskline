@@ -2443,6 +2443,25 @@ let filterProjectId = "";
 let filterTaskId = "";
 let filterEmployeeId = "";
 let companyMode = false;
+let personalMode = true;
+
+function showTeamUi() {
+  return !personalMode && companyMode;
+}
+
+function applyPersonalMode(on) {
+  personalMode = on !== false;
+  document.documentElement.setAttribute("data-personal", personalMode ? "1" : "0");
+  document.querySelectorAll("[data-team-only]").forEach((el) => {
+    el.hidden = personalMode;
+  });
+  updateCompanyUiVisibility();
+}
+
+// Default: personal product surface before settings load.
+if (typeof document !== "undefined") {
+  document.documentElement.setAttribute("data-personal", "1");
+}
 let companyEmployees = [];
 let selectedProjectId = "";
 let usagePeriod = "today";
@@ -2836,19 +2855,22 @@ async function refreshSummary({ skeleton = false } = {}) {
     showSkeleton(kpi, "kpi", 5);
     showSkeleton(proj, "donut");
     if (apps) showSkeleton(apps, "list", 3);
-    if (quiet) showSkeleton(quiet, "list", 4);
-    if (gauges) showSkeleton(gauges, "list", 3);
+    if (!personalMode) {
+      if (quiet) showSkeleton(quiet, "list", 4);
+      if (gauges) showSkeleton(gauges, "list", 3);
+    }
     showSkeleton(document.getElementById("hoursChart"), "chart");
     showSkeleton(document.getElementById("prodDaysChart"), "bars", 7);
   }
   const q = summaryQuery();
   const { from, to } = periodBounds("today");
   const teamQ = `from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}${filterProjectId ? `&project_id=${encodeURIComponent(filterProjectId)}` : ""}`;
-  const [summary, team] = await Promise.all([
-    api(`/api/summary/today${q}`),
-    api(`/api/company/team?${teamQ}`, { quiet402: true }).catch(() => []),
-  ]);
-  const key = summaryKey(summary) + `|p:${filterProjectId}|e:${filterEmployeeId}`;
+  const summary = await api(`/api/summary/today${q}`);
+  let team = [];
+  if (showTeamUi()) {
+    team = await api(`/api/company/team?${teamQ}`, { quiet402: true }).catch(() => []);
+  }
+  const key = summaryKey(summary) + `|p:${filterProjectId}|e:${filterEmployeeId}|pers:${personalMode ? 1 : 0}`;
   if (key === lastSummaryKey && !show) {
     refreshTrends({ skeleton: false }).catch(() => {});
     return;
@@ -2874,8 +2896,8 @@ async function refreshSummary({ skeleton = false } = {}) {
   if (activitySub) {
     activitySub.textContent = `${fmtDur(summary.active_sec)} активно · ${fmtDur(summary.idle_sec)} без ввода`;
   }
-  renderQuietPeople(team);
-  renderKpis(summary, team);
+  if (!personalMode) renderQuietPeople(team);
+  renderKpis(summary, personalMode ? [] : team);
   renderTopAppsPulse(summary);
   renderTopProjectsPulse(summary);
   markSkelContext("summary", ctx);
@@ -4112,7 +4134,7 @@ async function loadSettings() {
   }
   if (form.rdp_vision_model) form.rdp_vision_model.value = cfg.rdp_vision_model || "gpt-4o-mini";
   companyMode = !!cfg.company_mode;
-  updateCompanyUiVisibility();
+  applyPersonalMode(cfg.personal_mode !== false);
   await refreshCompanyPanel();
   updateStorageHint(cfg);
   const workToggle = document.getElementById("workModeToggle");
@@ -4179,12 +4201,17 @@ function wireSettingsSearch() {
 function updateCompanyUiVisibility() {
   const wrap = document.getElementById("filterEmployeeWrap");
   const hub = document.getElementById("companyHubPanel");
+  const who = document.getElementById("whoBlock");
+  const teamOn = showTeamUi();
+  if (wrap) wrap.hidden = !teamOn;
+  if (hub) hub.hidden = !teamOn;
+  if (who) who.hidden = personalMode || !teamOn;
   const whoCap = document.getElementById("whoCaption");
-  if (wrap) wrap.hidden = !companyMode;
-  if (hub) hub.hidden = !companyMode;
   if (whoCap) {
-    whoCap.textContent = companyMode ? "команда" : "сегодня";
+    whoCap.textContent = teamOn ? "команда" : "сегодня";
   }
+  const split = document.getElementById("projectsWhoSplit");
+  if (split) split.classList.toggle("is-long", personalMode || !teamOn);
 }
 
 function fillEmployeeFilter(employees) {
@@ -4212,8 +4239,13 @@ async function refreshCompanyPanel() {
     return;
   }
   companyMode = !!data.company_mode;
+  if (data.personal_mode != null) applyPersonalMode(data.personal_mode !== false);
+  else updateCompanyUiVisibility();
   companyEmployees = data.employees || [];
-  updateCompanyUiVisibility();
+  if (personalMode) {
+    filterEmployeeId = "";
+    return;
+  }
   fillEmployeeFilter(companyEmployees);
   const list = document.getElementById("companyEmployeeList");
   if (list) {
@@ -5217,9 +5249,10 @@ function wireUi() {
       show_mini_tracker: form.show_mini_tracker ? form.show_mini_tracker.checked : true,
       work_mode: form.work_mode ? form.work_mode.checked : false,
       work_chat_keywords: keywords,
-      company_mode: form.company_mode ? form.company_mode.checked : false,
+      personal_mode: true,
+      company_mode: false,
       company_display_name: form.company_display_name ? form.company_display_name.value.trim() : "",
-      listen_host: form.listen_host ? form.listen_host.value : "127.0.0.1",
+      listen_host: "127.0.0.1",
       hub_url: form.hub_url ? form.hub_url.value.trim() : "",
       hub_ingest_token: form.hub_ingest_token ? form.hub_ingest_token.value.trim() : "",
       rdp_vision_consent: form.rdp_vision_consent ? form.rdp_vision_consent.checked : false,
@@ -5240,7 +5273,7 @@ function wireUi() {
         form.screenshots_dir.value = saved.screenshots_dir || "";
       }
       companyMode = !!saved.company_mode;
-      updateCompanyUiVisibility();
+      applyPersonalMode(saved.personal_mode !== false);
       await refreshCompanyPanel();
       updateStorageHint(saved);
       lastSummaryKey = "";

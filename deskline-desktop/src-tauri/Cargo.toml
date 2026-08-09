@@ -1,6 +1,6 @@
 [package]
 name = "deskline-desktop"
-version = "0.5.95"
+version = "0.5.96"
 description = "Deskline — native desktop shell for the local productivity tracker"
 authors = ["Deskline"]
 edition = "2021"

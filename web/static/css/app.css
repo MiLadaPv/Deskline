@@ -5608,6 +5608,15 @@ html[data-theme="dark"] .google-btn {
   grid-template-columns: 1fr;
 }
 
+html[data-personal="1"] #whoBlock,
+html[data-personal="1"] [data-team-only] {
+  display: none !important;
+}
+
+html[data-personal="1"] .pulse-projects-who {
+  grid-template-columns: 1fr;
+}
+
 .pulse-apps-panel {
   margin-bottom: 12px;
 }

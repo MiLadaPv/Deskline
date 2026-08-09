@@ -106,6 +106,7 @@ class SettingsUpdate(BaseModel):
     current_task_id: int | None = None
     show_mini_tracker: bool | None = None
     theme: str | None = Field(default=None, pattern="^(system|light|dark)$")
+    personal_mode: bool | None = None
     company_mode: bool | None = None
     company_display_name: str | None = Field(default=None, max_length=120)
     listen_host: str | None = Field(default=None, max_length=64)
@@ -1182,6 +1183,19 @@ def create_app(tracker: Tracker, db: Database | None = None) -> FastAPI:
                     "entitlements": entitlements_public_dict(ent),
                 },
             )
+        # Personal build: company/hub UI is off until team mode ships.
+        # Enabling company_mode explicitly leaves personal mode.
+        if data.get("company_mode"):
+            data["personal_mode"] = False
+        else:
+            personal = data.get("personal_mode")
+            if personal is None:
+                personal = bool(cfg.get("personal_mode", True))
+            if personal:
+                data["personal_mode"] = True
+                data["company_mode"] = False
+                if "listen_host" not in data:
+                    data["listen_host"] = "127.0.0.1"
         if "company_mode" in data:
             if data["company_mode"]:
                 data.setdefault("listen_host", "0.0.0.0")
@@ -1240,6 +1254,7 @@ def create_app(tracker: Tracker, db: Database | None = None) -> FastAPI:
         employees = db.list_employees()
         return {
             "company_mode": bool(cfg.get("company_mode")),
+            "personal_mode": bool(cfg.get("personal_mode", True)),
             "company_display_name": cfg.get("company_display_name") or "",
             "listen_host": cfg.get("listen_host") or HOST,
             "port": PORT,
