@@ -362,3 +362,77 @@ def test_meetings_peers_vision_helpers():
     missing = extract_peers_from_screenshot({}, "/no/such/file.jpg")
     assert missing["ok"] is False
     assert missing["error"] == "screenshot_missing"
+
+
+def test_window_looks_like_active_call_zoom():
+    from deskline.meetings import window_looks_like_active_call
+
+    assert window_looks_like_active_call(
+        app_name="zoom.exe", window_title="Zoom Meeting"
+    )
+    assert window_looks_like_active_call(
+        app_name="zoom.exe",
+        window_title="",
+        class_name="ConfVideoLayoutWndClass",
+    )
+    assert not window_looks_like_active_call(
+        app_name="zoom.exe", window_title="Zoom Workplace"
+    )
+    assert not window_looks_like_active_call(
+        app_name="chrome.exe", window_title="Zoom Meeting"
+    )
+    assert window_looks_like_active_call(
+        app_name="teams.exe", window_title="Weekly sync | Microsoft Teams"
+    )
+
+
+def test_meetings_for_range_counts_background_zoom_presence(tmp_path: Path, monkeypatch):
+    monkeypatch.setattr("deskline.config.CONFIG_PATH", tmp_path / "config.json")
+    monkeypatch.setattr("deskline.config.DATA_ROOT", tmp_path)
+    monkeypatch.setattr("deskline.config.DB_PATH", tmp_path / "deskline.db")
+    save_config({**DEFAULT_CONFIG, "work_mode": False})
+
+    db = Database(tmp_path / "deskline.db")
+    now = datetime.now().astimezone()
+    start = now - timedelta(hours=2)
+    end = now
+
+    # 21 min focus in Zoom, then 39 min browsing while Zoom Meeting stays open.
+    sid_zoom = db.start_session(
+        "zoom.exe",
+        "Zoom Meeting",
+        None,
+        "productive",
+        display_name="Zoom",
+        activity_kind="messaging",
+        activity_label="Zoom",
+        started_at=start,
+    )
+    db.end_session(sid_zoom, ended_at=start + timedelta(minutes=21))
+
+    sid_chrome = db.start_session(
+        "chrome.exe",
+        "Lesson notes — Google Chrome",
+        "docs.google.com",
+        "productive",
+        display_name="Google Chrome",
+        activity_kind="other",
+        activity_label="Google Docs",
+        started_at=start + timedelta(minutes=21),
+    )
+    db.end_session(sid_chrome, ended_at=start + timedelta(minutes=60))
+
+    pid = db.start_meeting_presence(
+        "zoom.exe",
+        "Zoom Meeting",
+        started_at=start + timedelta(minutes=21),
+    )
+    db.end_meeting_presence(pid, ended_at=start + timedelta(minutes=60))
+
+    report = db.meetings_for_range(start, end)
+    # Foreground 21m + background presence 39m ≈ full hour call.
+    assert report["total_sec"] >= 59 * 60
+    assert report["total_sec"] <= 61 * 60
+    zoom = next(r for r in report["by_app"] if r["app_name"] == "zoom.exe")
+    assert zoom["sec"] >= 59 * 60
+    assert "браузер" in report["note"].casefold() or "переключа" in report["note"].casefold()

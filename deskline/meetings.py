@@ -1,5 +1,8 @@
-"""Calls, meetings & mail heuristics: foreground time in known apps/sites.
-Deskline tracks window focus, not true call-join state. Reports are labeled accordingly.
+"""Calls, meetings & mail heuristics.
+
+Foreground focus still drives the day timeline. For the Calls panel we also
+count *background call presence*: while a desktop meeting window stays open
+(e.g. Zoom Meeting), multitasking in the browser still counts as being on the call.
 """
 
 from __future__ import annotations
@@ -90,6 +93,24 @@ _CALL_SIGNAL_RE = re.compile(
     r"звонок|видеозвонок|видео\s*встреч|в\s+звонке|в\s+встрече|"
     r"call\s+with|in\s+a\s+call|joining\s+call|huddle|voice\s+channel|"
     r"meeting\s+with|screen\s+shar",
+    re.IGNORECASE,
+)
+# Desktop meeting UI that can stay open while the user focuses another app.
+_ZOOM_IN_CALL_CLASS_RE = re.compile(
+    r"Conf(?:Video|Content|Chat)|ZPContent|VideoFrame|CptHost|ppt_presentation|"
+    r"Zoom(?:Meeting|Content)|zVideoUI",
+    re.IGNORECASE,
+)
+_IN_CALL_TITLE_RE = re.compile(
+    r"zoom\s+meeting|zoom\s+webinar|meeting\s+id|"
+    r"microsoft\s+teams.*(?:meeting|call)|meeting\s+compact|"
+    r"webex\s+meeting|\bhuddle\b|"
+    r"ид[её]т\s+встреч|конференци",
+    re.IGNORECASE,
+)
+_ZOOM_HOME_TITLE_RE = re.compile(
+    r"^(?:zoom(?:\s+workplace)?|zoom\s+cloud\s+meetings|zoom\s+-\s+settings|"
+    r"settings|sign\s*in|login)\s*$",
     re.IGNORECASE,
 )
 _CHAT_BRAND_RE = re.compile(
@@ -226,6 +247,83 @@ def is_chat_site(site: str | None) -> bool:
 def title_suggests_call(activity_label: str | None = None, window_title: str | None = None) -> bool:
     blob = f"{activity_label or ''} {window_title or ''}".replace("\xa0", " ")
     return bool(_CALL_SIGNAL_RE.search(blob))
+
+
+def window_looks_like_active_call(
+    *,
+    app_name: str | None = None,
+    window_title: str | None = None,
+    class_name: str | None = None,
+) -> bool:
+    """True when a desktop meeting *call UI* is open (may be unfocused)."""
+    exe = normalize_app_exe(app_name)
+    if exe not in MEETING_APP_EXES:
+        return False
+    title = str(window_title or "").replace("\xa0", " ").strip()
+    cls = str(class_name or "").strip()
+
+    if exe == "zoom.exe":
+        if _ZOOM_IN_CALL_CLASS_RE.search(cls):
+            return True
+        if _ZOOM_HOME_TITLE_RE.match(title):
+            return False
+        if _IN_CALL_TITLE_RE.search(title) or title_suggests_call(window_title=title):
+            return True
+        # Topic-named meeting windows often drop the word "Zoom Meeting".
+        if title and not re.search(r"settings|sign\s*in|login|workplace", title, re.I):
+            cleaned = re.sub(r"\bzoom\b", "", title, flags=re.I).strip(" -—–|·:")
+            return len(cleaned) >= 2
+        return False
+
+    if exe in {"teams.exe", "ms-teams.exe"}:
+        if _IN_CALL_TITLE_RE.search(title) or title_suggests_call(window_title=title):
+            return True
+        if re.search(r"\bmeeting\b|\bcall\b|встреч|звонок", title, re.I):
+            return True
+        # Named call/meeting windows often look like "Topic | Microsoft Teams".
+        if re.search(r"\|\s*microsoft\s+teams\s*$", title, re.I):
+            left = re.split(r"\|", title, maxsplit=1)[0].strip()
+            if left and not re.match(
+                r"^(chat|activity|calendar|teams|calls|сообщени|календар|активност)",
+                left,
+                re.I,
+            ):
+                return True
+        return False
+
+    if exe in {"slack.exe", "discord.exe", "skype.exe"}:
+        return title_suggests_call(window_title=title) or bool(
+            re.search(r"\bhuddle\b|voice\s+channel|in\s+a\s+call", title, re.I)
+        )
+
+    if exe in {"webex.exe", "ciscowebexstart.exe"}:
+        return bool(_IN_CALL_TITLE_RE.search(title) or title_suggests_call(window_title=title))
+
+    return bool(_IN_CALL_TITLE_RE.search(title) or title_suggests_call(window_title=title))
+
+
+def find_background_call_presence(*, foreground_pid: int | None = None):
+    """Return one open in-call window that is not the current foreground PID."""
+    from deskline.windows import WindowInfo, iter_top_level_windows
+
+    best: WindowInfo | None = None
+    best_rank = 99
+    for win in iter_top_level_windows(visible_only=True):
+        if foreground_pid and int(win.pid) == int(foreground_pid):
+            continue
+        if not window_looks_like_active_call(
+            app_name=win.app_name,
+            window_title=win.window_title,
+            class_name=win.class_name,
+        ):
+            continue
+        # Prefer Zoom/Teams over chat clients when several match.
+        exe = normalize_app_exe(win.app_name)
+        rank = 0 if exe in {"zoom.exe", "teams.exe", "ms-teams.exe", "webex.exe"} else 1
+        if best is None or rank < best_rank:
+            best = win
+            best_rank = rank
+    return best
 
 
 def is_meeting_activity(
@@ -598,7 +696,9 @@ def build_meetings_report(
         "email_top": email_out[:12],
         "email_sessions": email_sess[:12],
         "note": (
-            "В «Звонках» — фокус в Телемосте, Teams, Zoom, Meet и похожих. "
+            "В «Звонках» — время в Телемосте, Teams, Zoom, Meet и похожих. "
+            "Если звонок в Zoom/Teams остаётся открыт, а вы переключаетесь в браузер — "
+            "это время тоже считается звонком. "
             "Чаты (Яндекс Мессенджер и т.п.) сюда не входят, пока в заголовке нет признаков звонка. "
             "«С кем» берёт имена из заголовка окна; если пусто — можно распознать со скриншота."
         ),

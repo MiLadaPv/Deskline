@@ -184,6 +184,18 @@ class Database:
                     FOREIGN KEY(employee_id) REFERENCES employees(id) ON DELETE CASCADE,
                     UNIQUE(employee_id, hostname)
                 );
+
+                CREATE TABLE IF NOT EXISTS meeting_presence (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    app_name TEXT NOT NULL,
+                    window_title TEXT NOT NULL DEFAULT '',
+                    started_at TEXT NOT NULL,
+                    ended_at TEXT,
+                    duration_sec REAL NOT NULL DEFAULT 0,
+                    employee_id INTEGER
+                );
+                CREATE INDEX IF NOT EXISTS idx_meeting_presence_started
+                    ON meeting_presence(started_at);
                 """
             )
             cols = {r[1] for r in conn.execute("PRAGMA table_info(sessions)").fetchall()}
@@ -200,6 +212,24 @@ class Database:
             ):
                 if col not in cols:
                     conn.execute(f"ALTER TABLE sessions ADD COLUMN {col} {decl}")
+            # Older installs created schema before meeting_presence existed.
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS meeting_presence (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    app_name TEXT NOT NULL,
+                    window_title TEXT NOT NULL DEFAULT '',
+                    started_at TEXT NOT NULL,
+                    ended_at TEXT,
+                    duration_sec REAL NOT NULL DEFAULT 0,
+                    employee_id INTEGER
+                )
+                """
+            )
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_meeting_presence_started "
+                "ON meeting_presence(started_at)"
+            )
             shot_cols = {r[1] for r in conn.execute("PRAGMA table_info(screenshots)").fetchall()}
             if "employee_id" not in shot_cols:
                 conn.execute("ALTER TABLE screenshots ADD COLUMN employee_id INTEGER")
@@ -308,6 +338,75 @@ class Database:
                 "UPDATE sessions SET ended_at=?, duration_sec=? WHERE id=?",
                 (_iso(ended), duration, session_id),
             )
+
+    def start_meeting_presence(
+        self,
+        app_name: str,
+        window_title: str,
+        *,
+        employee_id: int | None = None,
+        started_at: datetime | None = None,
+    ) -> int:
+        started = started_at or _utcnow()
+        with self.connect() as conn:
+            cur = conn.execute(
+                """
+                INSERT INTO meeting_presence(
+                    app_name, window_title, started_at, employee_id
+                ) VALUES (?, ?, ?, ?)
+                """,
+                (app_name, window_title or "", _iso(started), employee_id),
+            )
+            return int(cur.lastrowid)
+
+    def end_meeting_presence(
+        self, presence_id: int, ended_at: datetime | None = None
+    ) -> None:
+        ended = ended_at or _utcnow()
+        with self.connect() as conn:
+            row = conn.execute(
+                "SELECT started_at FROM meeting_presence WHERE id=?",
+                (presence_id,),
+            ).fetchone()
+            if not row:
+                return
+            started = _parse(row["started_at"])
+            duration = max(0.0, (ended - started).total_seconds()) if started else 0.0
+            conn.execute(
+                "UPDATE meeting_presence SET ended_at=?, duration_sec=? WHERE id=?",
+                (_iso(ended), duration, presence_id),
+            )
+
+    def open_meeting_presence(self) -> dict[str, Any] | None:
+        with self.connect() as conn:
+            row = conn.execute(
+                """
+                SELECT * FROM meeting_presence
+                WHERE ended_at IS NULL
+                ORDER BY id DESC LIMIT 1
+                """
+            ).fetchone()
+        return dict(row) if row else None
+
+    def reclaim_open_meeting_presence(self, ended_at: datetime | None = None) -> int:
+        """Close leftover background-call rows after crash/restart."""
+        ended = ended_at or _utcnow()
+        closed = 0
+        with self.connect() as conn:
+            rows = conn.execute(
+                "SELECT id, started_at FROM meeting_presence WHERE ended_at IS NULL"
+            ).fetchall()
+            for row in rows:
+                started = _parse(row["started_at"])
+                # Prefer started_at over "now" so we don't invent call hours after death.
+                stamp = started or ended
+                duration = max(0.0, (stamp - started).total_seconds()) if started else 0.0
+                conn.execute(
+                    "UPDATE meeting_presence SET ended_at=?, duration_sec=? WHERE id=?",
+                    (_iso(stamp), duration, int(row["id"])),
+                )
+                closed += 1
+        return closed
 
     def repair_sessions_spanning_boot(self, boot_time: float) -> int:
         """Clamp sessions that started before OS boot and ended after it.
@@ -1082,7 +1181,7 @@ class Database:
         end: datetime,
         employee_id: int | None = None,
     ) -> dict[str, Any]:
-        """Foreground time in meeting apps/sites (+ email) for [start, end)."""
+        """Foreground meeting time + background call presence for [start, end)."""
         from deskline.config import load_config
         from deskline.meetings import (
             build_meetings_report,
@@ -1110,6 +1209,17 @@ class Database:
                 """,
                 (_iso(end), _iso(start)),
             ).fetchall()
+            try:
+                presence_rows = conn.execute(
+                    """
+                    SELECT * FROM meeting_presence
+                    WHERE started_at < ? AND (ended_at IS NULL OR ended_at >= ?)
+                    ORDER BY started_at DESC
+                    """,
+                    (_iso(end), _iso(start)),
+                ).fetchall()
+            except Exception:
+                presence_rows = []
 
         by_app: dict[str, dict[str, Any]] = {}
         by_site: dict[str, dict[str, Any]] = {}
@@ -1253,6 +1363,60 @@ class Database:
                             ),
                         }
                     )
+
+        # Background call presence (Zoom Meeting open while browsing, etc.).
+        for row in presence_rows:
+            keys = set(row.keys())
+            s = _parse(row["started_at"]) or start
+            e = _parse(row["ended_at"]) if row["ended_at"] else now
+            if e is None:
+                e = now
+            seg_start = max(s, start)
+            seg_end = min(e, end)
+            dur = max(0.0, (seg_end - seg_start).total_seconds())
+            if dur < 1:
+                continue
+            emp = row["employee_id"] if "employee_id" in keys else None
+            if employee_id is not None and emp is not None and int(emp) != int(employee_id):
+                continue
+            app = normalize_app_exe(row["app_name"] if "app_name" in keys else "")
+            if not is_meeting_app(app):
+                continue
+            title = str(row["window_title"] or "") if "window_title" in keys else ""
+            icon = resolve_icon_url(app_name=app)
+            label = meeting_app_label(app)
+            bucket = by_app.setdefault(
+                app,
+                {
+                    "app_name": app,
+                    "name": label,
+                    "sec": 0.0,
+                    "icon_url": icon,
+                },
+            )
+            bucket["sec"] += dur
+            if not bucket.get("icon_url") and icon:
+                bucket["icon_url"] = icon
+            if len(sessions) < 80:
+                sessions.append(
+                    {
+                        "started_at": _iso(seg_start),
+                        "ended_at": _iso(seg_end),
+                        "sec": round(dur, 1),
+                        "idle_sec": 0.0,
+                        "name": label,
+                        "app_name": app,
+                        "display_name": label,
+                        "site": None,
+                        "category": "productive",
+                        "icon_url": icon,
+                        "window_title": title,
+                        "detail": meeting_context_from_title(
+                            title, activity_label=label
+                        ),
+                        "presence": True,
+                    }
+                )
 
         return build_meetings_report(
             by_app=list(by_app.values()),

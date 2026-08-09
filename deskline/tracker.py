@@ -12,10 +12,10 @@ from deskline.db import Database, parse_iso_datetime
 from deskline.heartbeat import clear_heartbeat, load_heartbeat, save_heartbeat
 from deskline.hub_client import push_sessions_to_hub
 from deskline.idle import is_idle, seconds_since_last_input
+from deskline.meetings import find_background_call_presence, is_meeting_activity, meeting_app_label
 from deskline.notify import ask_still_working, ask_welcome_back, notify, still_working_body
 from deskline.power import DEFAULT_SLEEP_GAP_SEC, is_sleep_gap, system_boot_time
 from deskline.windows import get_active_window
-
 
 def _shots_allowed(cfg: dict) -> bool:
     try:
@@ -62,6 +62,8 @@ class Tracker:
         self._idle = False
         self._status_listeners: list[Callable[[dict], None]] = []
         self._session_started_at: float | None = None
+        self._presence_session_id: int | None = None
+        self._presence_key: tuple[str, str] | None = None
         self.cfg = load_config()
 
         # Hard power-off / kill leaves ended_at NULL; never resume across restarts.
@@ -151,7 +153,9 @@ class Tracker:
         self._stop.set()
         if self._thread:
             self._thread.join(timeout=5)
-        self._close_current()
+        with self._lock:
+            self._close_current_unlocked()
+            self._close_presence_unlocked()
         self._emit()
 
     def pause(self) -> None:
@@ -162,6 +166,7 @@ class Tracker:
             cfg["paused"] = True
             self.cfg = save_config(cfg)
             self._close_current_unlocked()
+            self._close_presence_unlocked()
             self._idle = False
             self._idle_since = None
             self._distracting_since = None
@@ -222,22 +227,28 @@ class Tracker:
         open_sess = self.db.open_session()
         if not open_sess:
             clear_heartbeat()
-            return
+        else:
+            try:
+                started = parse_iso_datetime(open_sess.started_at).timestamp()
+            except Exception:
+                started = time.time()
+
+            hb = load_heartbeat()
+            if hb and int(hb["session_id"]) == int(open_sess.id):
+                end_ts = max(float(hb["last_tick_at"]), started)
+            else:
+                end_ts = started
+
+            ended = datetime.fromtimestamp(end_ts).astimezone()
+            self.db.end_session(open_sess.id, ended_at=ended)
+            clear_heartbeat()
 
         try:
-            started = parse_iso_datetime(open_sess.started_at).timestamp()
+            self.db.reclaim_open_meeting_presence()
         except Exception:
-            started = time.time()
-
-        hb = load_heartbeat()
-        if hb and int(hb["session_id"]) == int(open_sess.id):
-            end_ts = max(float(hb["last_tick_at"]), started)
-        else:
-            end_ts = started
-
-        ended = datetime.fromtimestamp(end_ts).astimezone()
-        self.db.end_session(open_sess.id, ended_at=ended)
-        clear_heartbeat()
+            pass
+        self._presence_session_id = None
+        self._presence_key = None
 
     def _loop(self) -> None:
         while not self._stop.is_set():
@@ -262,6 +273,7 @@ class Tracker:
             if cfg.get("paused"):
                 self._idle = False
                 self._idle_since = None
+                self._close_presence_unlocked()
                 return
 
             sleep_gap = float(cfg.get("sleep_gap_sec", DEFAULT_SLEEP_GAP_SEC))
@@ -274,6 +286,7 @@ class Tracker:
 
             win = get_active_window()
             if not win:
+                self._close_presence_unlocked()
                 return
 
             idle_after = float(cfg.get("idle_after_sec", 180.0))
@@ -413,8 +426,69 @@ class Tracker:
             self._maybe_rdp_vision(cfg, win.app_name, win.window_title)
             self._maybe_poor_time(cfg, now)
             self._maybe_still_working(cfg, now)
+            self._sync_meeting_presence_unlocked(cfg, win, now)
 
         self._emit()
+
+    def _sync_meeting_presence_unlocked(self, cfg: dict, win, now: float) -> None:
+        """Keep counting a desktop call while the user multitasks elsewhere."""
+        site = extract_site_from_title(win.window_title, win.app_name)
+        meta = resolve_activity(
+            win.app_name,
+            win.window_title,
+            site,
+            self.db.get_app_rules(),
+            self.db.get_site_rules(),
+            work_mode=bool(cfg.get("work_mode")),
+            work_chat_keywords=list(cfg.get("work_chat_keywords") or []),
+        )
+        fg_is_meeting = is_meeting_activity(
+            app_name=win.app_name,
+            site=meta.get("url_hint") or site,
+            activity_label=meta.get("activity_label"),
+            window_title=win.window_title,
+        )
+        if fg_is_meeting:
+            self._close_presence_unlocked()
+            return
+
+        call = None
+        try:
+            call = find_background_call_presence(foreground_pid=win.pid)
+        except Exception:
+            call = None
+        if not call:
+            self._close_presence_unlocked()
+            return
+
+        key = (call.app_name, call.window_title)
+        if self._presence_session_id is not None and self._presence_key == key:
+            return
+
+        self._close_presence_unlocked()
+        employee_id = cfg.get("local_employee_id")
+        try:
+            employee_id = int(employee_id) if employee_id is not None else None
+        except (TypeError, ValueError):
+            employee_id = None
+        if employee_id is None:
+            employee_id = self.db.ensure_default_employee()
+        self._presence_session_id = self.db.start_meeting_presence(
+            app_name=call.app_name,
+            window_title=call.window_title or meeting_app_label(call.app_name),
+            employee_id=employee_id,
+            started_at=datetime.fromtimestamp(now).astimezone(),
+        )
+        self._presence_key = key
+
+    def _close_presence_unlocked(self) -> None:
+        if self._presence_session_id is not None:
+            try:
+                self.db.end_meeting_presence(self._presence_session_id)
+            except Exception:
+                pass
+        self._presence_session_id = None
+        self._presence_key = None
 
     def _maybe_rdp_vision(self, cfg: dict, app_name: str | None, window_title: str | None) -> None:
         if self._idle or self.paused:
@@ -479,6 +553,14 @@ class Tracker:
             self._push_session_to_hub(sid)
             clear_heartbeat()
             self._current_session_id = None
+        if self._presence_session_id is not None:
+            ended = datetime.fromtimestamp(prev_tick).astimezone()
+            try:
+                self.db.end_meeting_presence(self._presence_session_id, ended_at=ended)
+            except Exception:
+                pass
+            self._presence_session_id = None
+            self._presence_key = None
         self._session_started_at = None
         # Force a new session on the next focus sample
         self._current_key = None
